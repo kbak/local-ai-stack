@@ -1,0 +1,65 @@
+services:
+  searxng:
+    image: searxng/searxng
+    container_name: searxng
+    restart: unless-stopped
+    ports:
+      - "8081:8080"
+    volumes:
+      - ./searxng-settings.yml:/etc/searxng/settings.yml
+    networks:
+      - ai-net
+    mem_limit: 512m
+
+
+  mcp-proxy:
+    build: ./mcp-proxy
+    container_name: mcp-proxy
+    restart: unless-stopped
+    ports:
+      - "8083:8083"
+    volumes:
+      - ./mcp-proxy-config.json:/config.json
+      - mcp-proxy-uv-cache:/root/.cache/uv
+    command: ["--host", "0.0.0.0", "--port", "8083", "--transport", "streamablehttp", "--named-server-config", "/config.json"]
+    networks:
+      - ai-net
+    mem_limit: 1g
+
+  mongodb:
+    image: mongo:7
+    container_name: mongodb
+    restart: unless-stopped
+    volumes:
+      - mongodb-data:/data/db
+    networks:
+      - ai-net
+    mem_limit: 512m
+
+  librechat:
+    image: ghcr.io/danny-avila/librechat:latest
+    container_name: librechat
+    restart: unless-stopped
+    ports:
+      - "3000:3080"
+    env_file:
+      - .env
+    volumes:
+      - ./librechat.yaml:/app/librechat.yaml
+      - librechat-data:/app/client/public/images
+    depends_on:
+      - mongodb
+    networks:
+      - ai-net
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    mem_limit: 512m
+
+networks:
+  ai-net:
+    driver: bridge
+
+volumes:
+  mcp-proxy-uv-cache:
+  mongodb-data:
+  librechat-data:

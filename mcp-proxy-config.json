@@ -1,0 +1,59 @@
+{
+  "mcpServers": {
+    "searxng": {
+      "command": "uvx",
+      "args": ["mcp-searxng==0.1.0"],
+      "env": {
+        "SEARXNG_URL": "http://searxng:8080"
+      }
+    },
+    "fetch": {
+      "command": "uvx",
+      "args": ["mcp-server-fetch==2025.4.7"]
+    },
+    "wikipedia": {
+      "command": "uvx",
+      "args": ["wikipedia-mcp==2.0.0"]
+    },
+    "arxiv": {
+      "command": "uvx",
+      "args": ["arxiv-mcp-server==0.4.11"]
+    },
+    "youtube": {
+      "command": "uvx",
+      "args": ["mcp-youtube-transcript==0.3.5"]
+    },
+    "time": {
+      "command": "uvx",
+      "args": ["mcp-server-time==2026.1.26"]
+    },
+    "hackernews": {
+      "command": "uvx",
+      "args": ["mcp-hn==0.1.0"]
+    },
+    "pdf": {
+      "command": "uvx",
+      "args": ["mcp-pdf-reader==0.1.7"]
+    },
+    "semantic-scholar": {
+      "command": "uvx",
+      "args": ["semantic-scholar-mcp==0.4.0"]
+    },
+    "patents": {
+      "command": "uvx",
+      "args": ["patent-mcp-server==0.8.0"]
+    },
+    "weather": {
+      "command": "uvx",
+      "args": ["--from", "mcp-weather-server==0.6.1", "mcp_weather_server"]
+    },
+    "currency": {
+      "command": "uvx",
+      "args": ["frankfurtermcp==0.4.4"]
+    },
+    "finance": {
+      "command": "uvx",
+      "args": ["yfinance-mcp-server==1.0.4"]
+    }
+  }
+}
