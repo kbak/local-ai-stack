@@ -8,7 +8,7 @@ Self-hosted LLM stack with privacy-focused web search and research tools. Runs o
 |---|---|---|
 | llama-swap | 8080 | Model manager — switches between llama-server instances on demand |
 | SearXNG | 8081 | Privacy-focused meta search engine |
-| mcp-proxy | 8083 | MCP tool server (13 tools via streamable HTTP) |
+| mcp-proxy | 8083 | MCP tool server (14 tools via streamable HTTP) |
 | MongoDB | — | LibreChat chat history storage |
 | LibreChat | 3000 | Web UI, accessible from any device |
 | signal-api | 9922 | Signal REST API (bbernhard/signal-cli-rest-api, native mode) |
@@ -16,7 +16,7 @@ Self-hosted LLM stack with privacy-focused web search and research tools. Runs o
 
 ## MCP Tools
 
-All tools are exposed via mcp-proxy on port 8083:
+All tools are exposed via mcp-proxy on port 8083 and available in both LibreChat and the Signal bot:
 
 - **searxng** — web search (via local SearXNG)
 - **fetch** — fetch URL content
@@ -28,9 +28,10 @@ All tools are exposed via mcp-proxy on port 8083:
 - **pdf** — PDF text extraction
 - **semantic-scholar** — academic paper search
 - **patents** — patent search
-- **weather** — current weather
+- **weather** — current weather and forecast
 - **currency** — exchange rates
 - **finance** — stock and financial data (yfinance)
+- **github** — read files, search code and repos, browse commits and issues (via official MCP server, requires `GITHUB_TOKEN`)
 
 ## Requirements
 
@@ -50,18 +51,24 @@ cd <repo>
 ```
 cp .env.example .env
 ```
-Edit `.env` and set strong random values for `JWT_SECRET` and `JWT_REFRESH_SECRET`.
+Edit `.env` and set:
+- Strong random values for `JWT_SECRET` and `JWT_REFRESH_SECRET`
+- `GITHUB_TOKEN` — personal access token with no scopes (public repos) or `repo` scope (private). Needed for the GitHub MCP tool. Without it the tool still works but hits GitHub's unauthenticated rate limit (60 req/hr).
 
 **3. Configure models in `llama-swap.yaml`**
 
-Edit `llama-swap.yaml` to set your models and their llama-server arguments. The default config includes Qwen3.5-35B-A3B and Gemma 4 31B.
+Edit `llama-swap.yaml` to set your models and their llama-server arguments. The default config includes Qwen3.5-35B-A3B and Gemma 4 31B, both using:
+- `--n-gpu-layers 999` — full GPU offload
+- `--flash-attn on` — flash attention
+- `--batch-size 4096 --ubatch-size 4096` — large batches for fast prompt processing on long contexts
+- `--ctx-size 262144` — 256k context window
 
 **4. Start the Docker stack**
 ```
 docker compose up -d --build
 ```
 
-First startup takes a few minutes — mcp-proxy builds a custom image that pre-installs all MCP packages.
+First startup takes a few minutes — mcp-proxy builds a custom image that pre-installs all MCP packages including the GitHub MCP server (requires Node.js, included in the image).
 
 **5. Start llama-swap**
 ```
@@ -88,7 +95,7 @@ The llama.cpp built-in web UI also supports MCP directly. Add individual servers
 ```
 http://<server-ip>:8083/servers/searxng/mcp
 http://<server-ip>:8083/servers/time/mcp
-http://<server-ip>:8083/servers/weather/mcp
+http://<server-ip>:8083/servers/github/mcp
 # etc.
 ```
 
@@ -117,6 +124,8 @@ Set `SIGNAL_NUMBER` to your registered number (international format, e.g. `+1415
 
 Optionally set `ALLOWED_NUMBERS` to restrict who can use the bot (comma-separated list). Leave unset to allow anyone who messages the number.
 
+Set `GITHUB_TOKEN` to the same token as in `.env` (the signal-bot calls the GitHub API directly, independently of mcp-proxy).
+
 **3. Build and start**
 ```
 docker compose up -d --build signal-bot
@@ -128,11 +137,17 @@ The bot responds in groups in two ways:
 - **Prefix**: message starts with `BOT_GROUP_PREFIX` (default: `@006`)
 - **Mention**: the bot's number is @mentioned in the message
 
+### Latency
+
+The bot polls for new messages every 1 second with a 1-second receive timeout, giving ~0.5s average wait before the LLM starts processing. This is close to LibreChat's HTTP-based latency.
+
 ### Custom skills
 
 Skills in `signal-bot-custom-skills/` are mounted into the container and auto-discovered at startup. Each skill is a directory with a `skill.yaml` and a Python file. The built-in `web_search` skill is disabled in favour of the local SearXNG instance.
 
-Available custom skills: arxiv, currency, finance, hackernews, patents, pdf, searxng, semantic_scholar, time, weather, wikipedia.
+Available custom skills: arxiv, currency, finance, github, hackernews, patents, pdf, searxng, semantic_scholar, time, weather, wikipedia.
+
+The **github** skill calls the GitHub REST API directly (not via mcp-proxy) using `GITHUB_TOKEN` from the environment.
 
 ### Dockerfile patches applied to uoltz
 
@@ -142,7 +157,7 @@ uoltz is cloned from GitHub at build time and patched in place. The patches are 
 The block that prints which skills were used after each response is removed. It was noisy and not useful in a chat context.
 
 **2. Direct signal-cli receive** (`signal_client.py`)
-The default receive path calls the signal-api REST endpoint (`GET /v1/receive`). In native mode, signal-api spawns a new `signal-cli` process per request — when the bot polls frequently, concurrent processes fight over the signal-cli config file lock, dropping messages. The patch replaces `receive()` with a direct `subprocess.run(["signal-cli", ...])` call using the shared `signal-cli-data` volume mounted read-only. Poll interval is also raised to 12 s to match the 10 s receive timeout.
+The default receive path calls the signal-api REST endpoint (`GET /v1/receive`). In native mode, signal-api spawns a new `signal-cli` process per request — when the bot polls frequently, concurrent processes fight over the signal-cli config file lock, dropping messages. The patch replaces `receive()` with a direct `subprocess.run(["signal-cli", ...])` call using the shared `signal-cli-data` volume mounted read-only. Poll interval is set to 1s with a 1s receive timeout.
 
 **3. Group mention detection** (`bot.py`)
 Signal delivers `@mentions` as a U+FFFC (object replacement character) in the message text, not as the literal prefix string. The patch threads the `mentions` array through `parse_messages` and checks whether the bot's own number appears in it. If it does, the leading U+FFFC character is stripped before passing the text to the agent.
@@ -160,3 +175,4 @@ Received messages carry `groupId` as the raw `internal_id` (base64, e.g. `9JDGhR
 - SearXNG runs locally — no search queries leave your network
 - llama-swap unloads the current model when a different one is requested — only one model in VRAM at a time
 - signal-cli-data volume is shared between signal-api (read-write) and signal-bot (read-only)
+- mcp-proxy includes Node.js for the GitHub MCP server; all other tools are pure Python via uvx
