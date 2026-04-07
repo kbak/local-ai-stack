@@ -1,0 +1,14 @@
+name: github
+description: Explore GitHub repositories - read files, search code, browse history and issues.
+version: "1.0.0"
+enabled: true
+command: /gh
+command_arg: query
+command_usage: "/gh <repo or question>"
+
+tools:
+  - "github_skill:get_file"
+  - "github_skill:search_code"
+  - "github_skill:search_repos"
+  - "github_skill:list_commits"
+  - "github_skill:get_issue"

@@ -2,7 +2,7 @@ FROM ghcr.io/sparfenyuk/mcp-proxy:latest
 
 # Install uv (provides uvx) and C++ libs needed by some MCP packages
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
-RUN apk add --no-cache libstdc++ gcc g++
+RUN apk add --no-cache libstdc++ gcc g++ nodejs npm
 
 # Pre-install all MCP packages at pinned versions so first connection doesn't time out
 RUN uvx mcp-server-fetch==2025.4.7 --help 2>/dev/null || true && \
@@ -17,4 +17,5 @@ RUN uvx mcp-server-fetch==2025.4.7 --help 2>/dev/null || true && \
     uvx --from mcp-weather-server==0.6.1 mcp_weather_server --help 2>/dev/null || true && \
     uvx frankfurtermcp==0.4.4 --help 2>/dev/null || true && \
     uvx yfinance-mcp-server==1.0.4 --help 2>/dev/null || true && \
-    uvx mcp-searxng==0.1.0 --help 2>/dev/null || true
+    uvx mcp-searxng==0.1.0 --help 2>/dev/null || true && \
+    npx -y @modelcontextprotocol/server-github --help 2>/dev/null || true

@@ -89,3 +89,7 @@ mcpServers:
     url: http://mcp-proxy:8083/servers/finance/mcp
     type: streamable-http
     serverInstructions: false
+  github:
+    url: http://mcp-proxy:8083/servers/github/mcp
+    type: streamable-http
+    serverInstructions: false

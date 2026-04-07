@@ -54,6 +54,10 @@
     "finance": {
       "command": "uvx",
       "args": ["yfinance-mcp-server==1.0.4"]
+    },
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"]
     }
   }
 }

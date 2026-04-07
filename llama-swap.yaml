@@ -1,10 +1,10 @@
-listen: "127.0.0.1:8080"
+listen: "0.0.0.0:8080"
 
 models:
   qwen:
-    cmd: llama-server --port ${PORT} -hf bartowski/Qwen_Qwen3.5-35B-A3B-GGUF:Q4_K_M --n-gpu-layers 999 --parallel 2 --flash-attn on --batch-size 4096 --ubatch-size 1024 --ctx-size 350000
+    cmd: llama-server --port ${PORT} -hf bartowski/Qwen_Qwen3.5-35B-A3B-GGUF:Q4_K_M --n-gpu-layers 999 --parallel 1 --flash-attn on --batch-size 4096 --ubatch-size 1024 --ctx-size 262144
     ttl: 0
 
   gemma4:
-    cmd: llama-server --port ${PORT} -hf ggml-org/gemma-4-31B-it-GGUF:Q4_K_M --n-gpu-layers 999 --parallel 2 --flash-attn on --cache-type-k q4_0 --cache-type-v q4_0 --batch-size 4096 --ubatch-size 1024 --ctx-size 350000
+    cmd: llama-server --port ${PORT} -hf ggml-org/gemma-4-31B-it-GGUF:Q4_K_M --n-gpu-layers 999 --parallel 1 --flash-attn on --cache-type-k q4_0 --cache-type-v q4_0 --batch-size 4096 --ubatch-size 1024 --ctx-size 262144
     ttl: 0

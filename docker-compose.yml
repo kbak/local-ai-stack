@@ -18,6 +18,8 @@ services:
     restart: unless-stopped
     ports:
       - "8083:8083"
+    env_file:
+      - .env
     volumes:
       - ./mcp-proxy-config.json:/config.json
       - mcp-proxy-uv-cache:/root/.cache/uv

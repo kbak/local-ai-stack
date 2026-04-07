@@ -40,8 +40,8 @@ new_receive = '''    def receive(self) -> list[dict]:
             result = subprocess.run(
                 ["signal-cli", "--config", "/signal-cli-data",
                  "--output", "json", "-a", self.number,
-                 "receive", "--timeout", "10"],
-                capture_output=True, text=True, timeout=30
+                 "receive", "--timeout", "1"],
+                capture_output=True, text=True, timeout=10
             )
             messages = []
             for line in result.stdout.splitlines():
@@ -71,7 +71,7 @@ print("Patched signal_client.py")
 PYEOF
 
 # Set poll interval to match receive timeout
-RUN sed -i 's/^POLL_INTERVAL = 2/POLL_INTERVAL = 12/' /app/bot.py
+RUN sed -i 's/^POLL_INTERVAL = 2/POLL_INTERVAL = 1/' /app/bot.py
 
 # Fix group mention detection: Signal sends @mentions as U+FFFC, not as text prefix
 # Also pass mentions through parse_messages and check them in group filter
