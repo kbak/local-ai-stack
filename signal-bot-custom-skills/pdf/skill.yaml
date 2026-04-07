@@ -1,0 +1,10 @@
+name: pdf
+description: Read and extract text from PDF files given a URL or file path.
+version: "1.0.0"
+enabled: true
+command: /pdf
+command_arg: url
+command_usage: "/pdf <url or path>"
+
+tools:
+  - "pdf_skill:read_pdf"

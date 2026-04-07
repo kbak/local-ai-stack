@@ -1,0 +1,11 @@
+name: currency
+description: Convert currencies and get exchange rates.
+version: "1.0.0"
+enabled: true
+command: /currency
+command_arg: query
+command_usage: "/currency <amount> <FROM> <TO>"
+
+tools:
+  - "currency_skill:convert_currency"
+  - "currency_skill:get_exchange_rates"

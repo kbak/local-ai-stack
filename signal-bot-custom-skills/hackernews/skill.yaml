@@ -1,0 +1,11 @@
+name: hackernews
+description: Browse Hacker News - get top stories, search posts, and retrieve story details.
+version: "1.0.0"
+enabled: true
+command: /hn
+command_arg: query
+command_usage: "/hn [search query or 'top']"
+
+tools:
+  - "hackernews_skill:get_top_stories"
+  - "hackernews_skill:search_stories"

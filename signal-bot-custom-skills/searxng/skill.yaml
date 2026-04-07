@@ -1,0 +1,10 @@
+name: searxng
+description: Search the web using SearXNG (local metasearch engine). Use for any web search, current info, news, or research queries. Replaces the default web_search skill.
+version: "1.0.0"
+enabled: true
+command: /search
+command_arg: query
+command_usage: "/search <query>"
+
+tools:
+  - "searxng:web_search"

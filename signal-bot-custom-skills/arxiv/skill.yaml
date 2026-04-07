@@ -1,0 +1,11 @@
+name: arxiv
+description: Search and retrieve academic papers from arXiv.
+version: "1.0.0"
+enabled: true
+command: /arxiv
+command_arg: query
+command_usage: "/arxiv <search query>"
+
+tools:
+  - "arxiv_skill:search_papers"
+  - "arxiv_skill:get_abstract"

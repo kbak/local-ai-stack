@@ -1,0 +1,10 @@
+name: patents
+description: Search US patents and patent applications via USPTO.
+version: "1.0.0"
+enabled: true
+command: /patents
+command_arg: query
+command_usage: "/patents <search query>"
+
+tools:
+  - "patents_skill:search_patents"

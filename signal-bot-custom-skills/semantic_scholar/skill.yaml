@@ -1,0 +1,11 @@
+name: semantic_scholar
+description: Search academic papers and authors on Semantic Scholar.
+version: "1.0.0"
+enabled: true
+command: /scholar
+command_arg: query
+command_usage: "/scholar <search query>"
+
+tools:
+  - "semantic_scholar_skill:search_papers"
+  - "semantic_scholar_skill:get_paper"

@@ -1,2 +1,7 @@
 # Secrets
 .env
+
+# No longer used — searxng runs via mcp-proxy
+searxng-mcp/
+
+signal-bot.env

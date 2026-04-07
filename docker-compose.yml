@@ -24,7 +24,7 @@ services:
     command: ["--host", "0.0.0.0", "--port", "8083", "--transport", "streamablehttp", "--named-server-config", "/config.json"]
     networks:
       - ai-net
-    mem_limit: 1g
+    mem_limit: 1500m
 
   mongodb:
     image: mongo:7
@@ -49,6 +49,44 @@ services:
       - librechat-data:/app/client/public/images
     depends_on:
       - mongodb
+      - mcp-proxy
+    networks:
+      - ai-net
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    mem_limit: 768m
+
+  signal-api:
+    image: bbernhard/signal-cli-rest-api
+    container_name: signal-api
+    restart: unless-stopped
+    ports:
+      - "9922:8080"
+    volumes:
+      - signal-cli-data:/home/.local/share/signal-cli
+    environment:
+      - MODE=native
+      - AUTO_RECEIVE_SCHEDULE=0 */6 * * *
+    networks:
+      - ai-net
+    mem_limit: 512m
+
+  signal-bot:
+    build:
+      context: .
+      dockerfile: signal-bot.Dockerfile
+    container_name: signal-bot
+    restart: unless-stopped
+    env_file:
+      - ./signal-bot.env
+    volumes:
+      - ./signal-bot-custom-skills:/app/data/custom_skills
+      - signal-bot-data:/app/data
+      - signal-cli-data:/signal-cli-data:ro
+    depends_on:
+      - signal-api
+      - mcp-proxy
+      - searxng
     networks:
       - ai-net
     extra_hosts:
@@ -63,3 +101,5 @@ volumes:
   mcp-proxy-uv-cache:
   mongodb-data:
   librechat-data:
+  signal-cli-data:
+  signal-bot-data:

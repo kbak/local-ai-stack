@@ -1,0 +1,8 @@
+name: time
+description: Get current time, convert between timezones, and answer time-related questions.
+version: "1.0.0"
+enabled: true
+
+tools:
+  - "time_skill:get_current_time"
+  - "time_skill:convert_time"

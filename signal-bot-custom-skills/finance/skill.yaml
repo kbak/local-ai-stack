@@ -1,0 +1,12 @@
+name: finance
+description: Get stock prices, financial data, and market information.
+version: "1.0.0"
+enabled: true
+command: /stock
+command_arg: ticker
+command_usage: "/stock <ticker symbol>"
+
+tools:
+  - "finance_skill:get_stock_info"
+  - "finance_skill:get_stock_history"
+  - "finance_skill:search_stocks"
