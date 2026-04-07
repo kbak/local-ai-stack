@@ -33,7 +33,7 @@ def get_current_weather(location: str) -> str:
         location: City name or location (e.g. 'Warsaw', 'New York, US').
     """
     try:
-        return _call_mcp("get_current_weather", {"location": location})
+        return _call_mcp("get_current_weather", {"city": location})
     except Exception as e:
         return f"Weather lookup failed: {e}"
 
@@ -48,7 +48,10 @@ def get_forecast(location: str, days: int = 3) -> str:
         location: City name or location.
         days: Number of days to forecast (1-7).
     """
+    import datetime
+    today = datetime.date.today()
+    end = today + datetime.timedelta(days=days)
     try:
-        return _call_mcp("get_weather_byDateTimeRange", {"location": location, "days": days})
+        return _call_mcp("get_weather_byDateTimeRange", {"city": location, "start_date": today.isoformat(), "end_date": end.isoformat()})
     except Exception as e:
         return f"Weather forecast failed: {e}"

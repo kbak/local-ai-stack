@@ -3,7 +3,7 @@
 import httpx
 from strands import tool
 
-SEARXNG_URL = "http://searxng:8081"
+SEARXNG_URL = "http://searxng:8080"
 
 
 @tool

@@ -5,3 +5,5 @@
 searxng-mcp/
 
 signal-bot.env
+
+.DS_Store
