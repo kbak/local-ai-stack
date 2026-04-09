@@ -156,17 +156,77 @@ uoltz is cloned from GitHub at build time and patched in place. The patches are 
 **1. Disable skill attribution output** (`bot.py`)
 The block that prints which skills were used after each response is removed. It was noisy and not useful in a chat context.
 
-**2. Direct signal-cli receive** (`signal_client.py`)
-The default receive path calls the signal-api REST endpoint (`GET /v1/receive`). In native mode, signal-api spawns a new `signal-cli` process per request — when the bot polls frequently, concurrent processes fight over the signal-cli config file lock, dropping messages. The patch replaces `receive()` with a direct `subprocess.run(["signal-cli", ...])` call using the shared `signal-cli-data` volume mounted read-only. Poll interval is set to 1s with a 1s receive timeout.
+**2. Message acknowledgement via emoji reaction** (`signal_client.py`, `bot.py`)
+Instead of sending a `⏳ Got it, working on it...` text message as an acknowledgement, the bot now reacts to the incoming message with a 🤖 emoji via the signal-api reactions endpoint. This keeps the chat clean and provides immediate feedback without adding a noisy message to the thread. The `react()` method is added to `SignalClient`; `bot.py` is patched to call it instead of `send()` for acks, passing the original message's sender and timestamp.
 
-**3. Group mention detection** (`bot.py`)
+**3. Per-sender conversation history** (`agent.py`, `bot.py`)
+The original uoltz code maintains a single shared `Agent` instance, meaning all conversations share the same history and context window — users' messages get mixed together. The patch replaces the single `_agent` global with a `dict[str, Agent]` keyed by conversation ID: the sender's phone number for direct messages, or the group ID for group chats. Each conversation gets its own isolated history. Model or context window changes (via `/model`, `/context`) clear all per-sender agents so they are lazily recreated with the new settings on the next message.
+
+**4. Language-aware responses** (`agent.py`)
+The system prompt is extended with an instruction to always respond in the same language the user is currently writing in. This is particularly useful in multilingual households or groups.
+
+**5. Group mention detection** (`bot.py`)
 Signal delivers `@mentions` as a U+FFFC (object replacement character) in the message text, not as the literal prefix string. The patch threads the `mentions` array through `parse_messages` and checks whether the bot's own number appears in it. If it does, the leading U+FFFC character is stripped before passing the text to the agent.
 
-**4. Group ID format mismatch** (`signal_client.py`)
+**6. Group ID format mismatch** (`signal_client.py`)
 Received messages carry `groupId` as the raw `internal_id` (base64, e.g. `9JDGhRIy...=`). The REST API's `/v2/send` endpoint requires the `group.XXX=` prefixed form returned by `/v1/groups/`. The patch adds a `_resolve_group_id()` helper that looks up the correct ID on demand, called automatically in `send()`.
 
-**5. Qwen thinking mode** (`agent.py`)
+**7. Qwen thinking mode** (`agent.py`)
 `/no_think` is prepended to the system prompt to suppress chain-of-thought output tokens from Qwen3 models, keeping responses concise.
+
+## Goose CLI Agent
+
+[Goose](https://github.com/aaif-goose/goose) is a local AI agent for terminal workflows — shell commands, Docker tasks, file operations, and lightweight coding. It runs outside Docker alongside llama-swap and connects to the same models and MCP tools.
+
+### Setup
+
+**1. Download and install**
+
+Download `goose-x86_64-pc-windows-msvc.zip` from the [latest release](https://github.com/aaif-goose/goose/releases/latest), extract, and add to PATH.
+
+**2. Configure**
+
+Goose config lives at `%APPDATA%\Block\goose\config\`. The custom provider for llama-swap is in `custom_providers\custom_llama-swap.json` (created by the wizard or manually).
+
+Key settings in `config.yaml`:
+```yaml
+GOOSE_PROVIDER: custom_llama-swap
+GOOSE_MODEL: qwen           # or gemma4
+GOOSE_TOOLSHIM: true        # required for local models — bypasses llama-server's strict JSON Schema validation
+GOOSE_TELEMETRY_ENABLED: false
+```
+
+Each MCP server is added as a separate `streamable_http` extension pointing at the mcp-proxy per-server paths:
+```yaml
+extensions:
+  finance:
+    enabled: true
+    type: streamable_http
+    name: finance
+    uri: http://127.0.0.1:8083/servers/finance/mcp
+    headers: {}
+    timeout: 60
+  # ... one entry per MCP server
+```
+
+**Note:** mcp-proxy does not expose an aggregated endpoint — each server must be listed individually.
+
+**3. Start a session**
+```
+goose session
+```
+
+### Thinking mode
+
+Qwen3 models support toggling chain-of-thought reasoning mid-session:
+- `/think` — enable thinking (default, ~20s per response for 35B model)
+- `/no_think` — disable thinking for fast responses (~1–2s)
+
+The toggle persists for the rest of the session.
+
+### MCP tool compatibility
+
+Some MCP servers expose tools with `null` descriptions or `["string", "null"]` union types in their JSON schemas, which cause llama-server to crash when building grammar constraints. `GOOSE_TOOLSHIM: true` bypasses this by handling tool calls in the prompt layer instead. The `wikipedia` extension is disabled in the Goose config due to this issue.
 
 ## Notes
 
