@@ -2,7 +2,11 @@ FROM ghcr.io/sparfenyuk/mcp-proxy:latest
 
 # Install uv (provides uvx) and C++ libs needed by some MCP packages
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
-RUN apk add --no-cache libstdc++ gcc g++ nodejs npm
+RUN apk add --no-cache libstdc++ gcc g++ nodejs npm git
+
+# Install caldav-mcp from source
+RUN git clone https://github.com/dominik1001/caldav-mcp.git /caldav-mcp && \
+    cd /caldav-mcp && npm install && npm run build
 
 # Pre-install all MCP packages at pinned versions so first connection doesn't time out
 RUN uvx mcp-server-fetch==2025.4.7 --help 2>/dev/null || true && \

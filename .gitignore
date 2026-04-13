@@ -1,6 +1,11 @@
 # Secrets
 .env
 
+# Python bytecode
+__pycache__/
+*.pyc
+*.pyo
+
 # No longer used — searxng runs via mcp-proxy
 searxng-mcp/
 
