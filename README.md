@@ -16,7 +16,7 @@ Self-hosted LLM stack with privacy-focused web search and research tools. Runs o
 
 ## MCP Tools
 
-All tools are exposed via mcp-proxy on port 8083. Most are available in both LibreChat and the Signal bot; caldav is LibreChat-only.
+All tools are exposed via mcp-proxy on port 8083 and protected by bearer token authentication (`MCP_PROXY_AUTH_TOKEN`). Most are available in both LibreChat and the Signal bot; caldav is LibreChat-only.
 
 - **searxng** — web search (via local SearXNG)
 - **fetch** — fetch URL content
@@ -56,6 +56,7 @@ Edit `.env` and set:
 - Strong random values for `JWT_SECRET` and `JWT_REFRESH_SECRET`
 - `GITHUB_TOKEN` — personal access token with no scopes (public repos) or `repo` scope (private). Needed for the GitHub MCP tool. Without it the tool still works but hits GitHub's unauthenticated rate limit (60 req/hr).
 - `CALDAV_BASE_URL`, `CALDAV_USERNAME`, `CALDAV_PASSWORD` — CalDAV server credentials for the caldav MCP tool (e.g. Nextcloud: `https://your-nextcloud/remote.php/dav`).
+- `MCP_PROXY_AUTH_TOKEN` — bearer token required by all MCP clients to access mcp-proxy. Generate with `openssl rand -hex 32`. All clients (LibreChat, Jan, etc.) must send `Authorization: Bearer <token>` with every request.
 
 **3. Configure models in `llama-swap.yaml`**
 
@@ -238,3 +239,4 @@ Some MCP servers expose tools with `null` descriptions or `["string", "null"]` u
 - llama-swap unloads the current model when a different one is requested — only one model in VRAM at a time
 - signal-cli-data volume is shared between signal-api (read-write) and signal-bot (read-only)
 - mcp-proxy includes Node.js for the GitHub and CalDAV MCP servers; all other tools are pure Python via uvx
+- mcp-proxy is built from [PR #187](https://github.com/sparfenyuk/mcp-proxy/pull/187) of the upstream repo which adds bearer token authentication — not yet in an official release

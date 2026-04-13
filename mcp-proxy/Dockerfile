@@ -1,8 +1,15 @@
-FROM ghcr.io/sparfenyuk/mcp-proxy:latest
+FROM python:3.13-alpine
 
-# Install uv (provides uvx) and C++ libs needed by some MCP packages
+# Install build deps and runtime tools
+RUN apk add --no-cache libstdc++ gcc g++ musl-dev nodejs npm git
+
+# Install uv (provides uvx)
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
-RUN apk add --no-cache libstdc++ gcc g++ nodejs npm git
+
+# Build and install mcp-proxy from PR #187 (bearer token auth)
+RUN git clone --branch feat/bearer-auth --depth 1 https://github.com/jsboige/mcp-proxy.git /mcp-proxy-src && \
+    pip install --no-cache-dir /mcp-proxy-src && \
+    rm -rf /mcp-proxy-src
 
 # Install caldav-mcp from source
 RUN git clone https://github.com/dominik1001/caldav-mcp.git /caldav-mcp && \
@@ -23,3 +30,5 @@ RUN uvx mcp-server-fetch==2025.4.7 --help 2>/dev/null || true && \
     uvx yfinance-mcp-server==1.0.4 --help 2>/dev/null || true && \
     uvx mcp-searxng==0.1.0 --help 2>/dev/null || true && \
     npx -y @modelcontextprotocol/server-github --help 2>/dev/null || true
+
+ENTRYPOINT ["mcp-proxy"]

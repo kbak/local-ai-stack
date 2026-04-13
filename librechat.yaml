@@ -41,59 +41,89 @@ mcpServers:
     url: http://mcp-proxy:8083/servers/searxng/mcp
     type: streamable-http
     serverInstructions: false
+    headers:
+      Authorization: "Bearer ${MCP_PROXY_AUTH_TOKEN}"
   time:
     url: http://mcp-proxy:8083/servers/time/mcp
     type: streamable-http
     serverInstructions: false
+    headers:
+      Authorization: "Bearer ${MCP_PROXY_AUTH_TOKEN}"
   fetch:
     url: http://mcp-proxy:8083/servers/fetch/mcp
     type: streamable-http
     serverInstructions: false
+    headers:
+      Authorization: "Bearer ${MCP_PROXY_AUTH_TOKEN}"
   wikipedia:
     url: http://mcp-proxy:8083/servers/wikipedia/mcp
     type: streamable-http
     serverInstructions: false
+    headers:
+      Authorization: "Bearer ${MCP_PROXY_AUTH_TOKEN}"
   arxiv:
     url: http://mcp-proxy:8083/servers/arxiv/mcp
     type: streamable-http
     serverInstructions: false
+    headers:
+      Authorization: "Bearer ${MCP_PROXY_AUTH_TOKEN}"
   youtube:
     url: http://mcp-proxy:8083/servers/youtube/mcp
     type: streamable-http
     serverInstructions: false
+    headers:
+      Authorization: "Bearer ${MCP_PROXY_AUTH_TOKEN}"
   hackernews:
     url: http://mcp-proxy:8083/servers/hackernews/mcp
     type: streamable-http
     serverInstructions: false
+    headers:
+      Authorization: "Bearer ${MCP_PROXY_AUTH_TOKEN}"
   pdf:
     url: http://mcp-proxy:8083/servers/pdf/mcp
     type: streamable-http
     serverInstructions: false
+    headers:
+      Authorization: "Bearer ${MCP_PROXY_AUTH_TOKEN}"
   semantic-scholar:
     url: http://mcp-proxy:8083/servers/semantic-scholar/mcp
     type: streamable-http
     serverInstructions: false
+    headers:
+      Authorization: "Bearer ${MCP_PROXY_AUTH_TOKEN}"
   patents:
     url: http://mcp-proxy:8083/servers/patents/mcp
     type: streamable-http
     serverInstructions: false
+    headers:
+      Authorization: "Bearer ${MCP_PROXY_AUTH_TOKEN}"
   weather:
     url: http://mcp-proxy:8083/servers/weather/mcp
     type: streamable-http
     serverInstructions: false
+    headers:
+      Authorization: "Bearer ${MCP_PROXY_AUTH_TOKEN}"
   currency:
     url: http://mcp-proxy:8083/servers/currency/mcp
     type: streamable-http
     serverInstructions: false
+    headers:
+      Authorization: "Bearer ${MCP_PROXY_AUTH_TOKEN}"
   finance:
     url: http://mcp-proxy:8083/servers/finance/mcp
     type: streamable-http
     serverInstructions: false
+    headers:
+      Authorization: "Bearer ${MCP_PROXY_AUTH_TOKEN}"
   github:
     url: http://mcp-proxy:8083/servers/github/mcp
     type: streamable-http
     serverInstructions: false
+    headers:
+      Authorization: "Bearer ${MCP_PROXY_AUTH_TOKEN}"
   caldav:
     url: http://mcp-proxy:8083/servers/caldav/mcp
     type: streamable-http
     serverInstructions: false
+    headers:
+      Authorization: "Bearer ${MCP_PROXY_AUTH_TOKEN}"

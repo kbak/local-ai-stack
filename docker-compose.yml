@@ -23,7 +23,7 @@ services:
     volumes:
       - ./mcp-proxy-config.json:/config.json
       - mcp-proxy-uv-cache:/root/.cache/uv
-    command: ["--host", "0.0.0.0", "--port", "8083", "--transport", "streamablehttp", "--named-server-config", "/config.json", "--pass-environment"]
+    command: ["--host", "0.0.0.0", "--port", "8083", "--transport", "streamablehttp", "--named-server-config", "/config.json", "--pass-environment", "--auth-bearer-token", "${MCP_PROXY_AUTH_TOKEN}"]
     networks:
       - ai-net
     mem_limit: 1500m
@@ -47,7 +47,7 @@ services:
     env_file:
       - .env
     volumes:
-      - ./librechat.yaml:/app/librechat.yaml
+      - ./librechat.yaml:/app/librechat.yaml.template:ro
       - librechat-data:/app/client/public/images
     depends_on:
       - mongodb
@@ -57,6 +57,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     mem_limit: 768m
+    entrypoint: ["/bin/sh", "-c", "node -e \"const fs=require('fs');fs.writeFileSync('/app/librechat.yaml',fs.readFileSync('/app/librechat.yaml.template','utf8').replace(/\\$\\{([^}]+)\\}/g,(_,k)=>process.env[k]||''))\" && exec node /app/api/server/index.js"]
 
   signal-api:
     image: bbernhard/signal-cli-rest-api
