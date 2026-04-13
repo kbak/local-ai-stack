@@ -8,7 +8,7 @@ Self-hosted LLM stack with privacy-focused web search and research tools. Runs o
 |---|---|---|
 | llama-swap | 8080 | Model manager — switches between llama-server instances on demand |
 | SearXNG | 8081 | Privacy-focused meta search engine |
-| mcp-proxy | 8083 | MCP tool server (14 tools via streamable HTTP) |
+| mcp-proxy | 8083 | MCP tool server (15 tools via streamable HTTP) |
 | MongoDB | — | LibreChat chat history storage |
 | LibreChat | 3000 | Web UI, accessible from any device |
 | signal-api | 9922 | Signal REST API (bbernhard/signal-cli-rest-api, native mode) |
@@ -16,7 +16,7 @@ Self-hosted LLM stack with privacy-focused web search and research tools. Runs o
 
 ## MCP Tools
 
-All tools are exposed via mcp-proxy on port 8083 and available in both LibreChat and the Signal bot:
+All tools are exposed via mcp-proxy on port 8083. Most are available in both LibreChat and the Signal bot; caldav is LibreChat-only.
 
 - **searxng** — web search (via local SearXNG)
 - **fetch** — fetch URL content
@@ -32,6 +32,7 @@ All tools are exposed via mcp-proxy on port 8083 and available in both LibreChat
 - **currency** — exchange rates
 - **finance** — stock and financial data (yfinance)
 - **github** — read files, search code and repos, browse commits and issues (via official MCP server, requires `GITHUB_TOKEN`)
+- **caldav** — calendar access via CalDAV (LibreChat only); requires `CALDAV_BASE_URL`, `CALDAV_USERNAME`, `CALDAV_PASSWORD` in `.env`
 
 ## Requirements
 
@@ -54,6 +55,7 @@ cp .env.example .env
 Edit `.env` and set:
 - Strong random values for `JWT_SECRET` and `JWT_REFRESH_SECRET`
 - `GITHUB_TOKEN` — personal access token with no scopes (public repos) or `repo` scope (private). Needed for the GitHub MCP tool. Without it the tool still works but hits GitHub's unauthenticated rate limit (60 req/hr).
+- `CALDAV_BASE_URL`, `CALDAV_USERNAME`, `CALDAV_PASSWORD` — CalDAV server credentials for the caldav MCP tool (e.g. Nextcloud: `https://your-nextcloud/remote.php/dav`).
 
 **3. Configure models in `llama-swap.yaml`**
 
@@ -101,7 +103,7 @@ http://<server-ip>:8083/servers/github/mcp
 
 ## Signal Bot
 
-A Signal messenger bot that routes messages through the local LLM with the same MCP tools available in LibreChat. Built on [uoltz](https://github.com/maciejjedrzejczyk/uoltz), cloned at Docker build time.
+A Signal messenger bot that routes messages through the local LLM with the same MCP tools available in LibreChat. Built on a [custom fork of uoltz](https://github.com/kbak/uoltz), cloned at Docker build time.
 
 ### Setup
 
@@ -149,9 +151,9 @@ Available custom skills: arxiv, currency, finance, github, hackernews, patents, 
 
 The **github** skill calls the GitHub REST API directly (not via mcp-proxy) using `GITHUB_TOKEN` from the environment.
 
-### Dockerfile patches applied to uoltz
+### Patches applied to uoltz
 
-uoltz is cloned from GitHub at build time and patched in place. The patches are not upstreamed.
+All patches are maintained in the [kbak/uoltz](https://github.com/kbak/uoltz) fork and applied directly to the source. See the fork's README for full details.
 
 **1. Disable skill attribution output** (`bot.py`)
 The block that prints which skills were used after each response is removed. It was noisy and not useful in a chat context.
@@ -235,4 +237,4 @@ Some MCP servers expose tools with `null` descriptions or `["string", "null"]` u
 - SearXNG runs locally — no search queries leave your network
 - llama-swap unloads the current model when a different one is requested — only one model in VRAM at a time
 - signal-cli-data volume is shared between signal-api (read-write) and signal-bot (read-only)
-- mcp-proxy includes Node.js for the GitHub MCP server; all other tools are pure Python via uvx
+- mcp-proxy includes Node.js for the GitHub and CalDAV MCP servers; all other tools are pure Python via uvx
