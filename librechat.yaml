@@ -3,6 +3,7 @@ version: 1.3.6
 mcpSettings:
   allowedDomains:
     - "http://mcp-proxy:8083"
+    - "http://location-tracker:8084"
   autoApprove: true
 
 endpoints:
@@ -127,3 +128,7 @@ mcpServers:
     serverInstructions: false
     headers:
       Authorization: "Bearer ${MCP_PROXY_AUTH_TOKEN}"
+  location-tracker:
+    url: http://location-tracker:8084/mcp
+    type: streamable-http
+    serverInstructions: false

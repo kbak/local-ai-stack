@@ -8,7 +8,8 @@ Self-hosted LLM stack with privacy-focused web search and research tools. Runs o
 |---|---|---|
 | llama-swap | 8080 | Model manager — switches between llama-server instances on demand |
 | SearXNG | 8081 | Privacy-focused meta search engine |
-| mcp-proxy | 8083 | MCP tool server (15 tools via streamable HTTP) |
+| mcp-proxy | 8083 | MCP tool server (16 tools via streamable HTTP) |
+| location-tracker | 8084 | City-presence timeline service; exposes `get_location_at` MCP tool |
 | MongoDB | — | LibreChat chat history storage |
 | LibreChat | 3000 | Web UI, accessible from any device |
 | signal-api | 9922 | Signal REST API (bbernhard/signal-cli-rest-api, native mode) |
@@ -33,6 +34,7 @@ All tools are exposed via mcp-proxy on port 8083 and protected by bearer token a
 - **finance** — stock and financial data (yfinance)
 - **github** — read files, search code and repos, browse commits and issues (via official MCP server, requires `GITHUB_TOKEN`)
 - **caldav** — calendar access via CalDAV (LibreChat only); requires `CALDAV_BASE_URL`, `CALDAV_USERNAME`, `CALDAV_PASSWORD` in `.env`
+- **location-tracker** — `get_location_at(datetime)` — returns city, confidence, and source for any datetime; backed by CalDAV + local LLM + SearXNG. See [`location-tracker/README.md`](location-tracker/README.md).
 
 ## Requirements
 

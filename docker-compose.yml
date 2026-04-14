@@ -96,6 +96,20 @@ services:
       - "host.docker.internal:host-gateway"
     mem_limit: 512m
 
+  location-tracker:
+    build: ./location-tracker
+    container_name: location-tracker
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - location-tracker-data:/data
+    networks:
+      - ai-net
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    mem_limit: 512m
+
 networks:
   ai-net:
     driver: bridge
@@ -106,3 +120,4 @@ volumes:
   librechat-data:
   signal-cli-data:
   signal-bot-data:
+  location-tracker-data:
