@@ -25,6 +25,7 @@ class RawEvent:
     summary: str
     description: str
     location: str       # explicit LOCATION field — may be empty
+    url: str            # URL field — may be empty
     start: datetime     # always UTC-normalised
     end: datetime       # always UTC-normalised
     tzid: str           # original TZID string, e.g. "Europe/Warsaw"
@@ -151,6 +152,8 @@ def fetch_events(
                 summary = str(component.get("SUMMARY", ""))
                 description = str(component.get("DESCRIPTION", ""))
                 location = str(component.get("LOCATION", ""))
+                url_val = component.get("URL")
+                url = str(url_val) if url_val else ""
 
                 dtstart = component.get("DTSTART")
                 dtend = component.get("DTEND")
@@ -171,6 +174,7 @@ def fetch_events(
                     summary=summary,
                     description=description,
                     location=location,
+                    url=url,
                     start=start_dt,
                     end=end_dt,
                     tzid=tzid,

@@ -11,6 +11,7 @@ import json
 import pytz
 from stack_shared.mcp_client import call_mcp
 
+from .caldav_update import patch_event
 from .classifier import classify
 from .config import (
     CALDAV_BASE_URL,
@@ -150,10 +151,19 @@ def _process_event(event, state: State) -> None:
     save(state)
 
     try:
-        briefing = enrich(event, result)
+        briefing, patch_address = enrich(event, result)
     except Exception:
         log.exception("Enrichment failed for '%s'", event.summary)
         return
+
+    # Patch the calendar event: emoji on title, address and maps URL if missing
+    from .enricher import _maps_url
+    maps_url = _maps_url(result.venue or event.summary, result.city or "")
+    patch_event(
+        event.uid,
+        new_location=patch_address,
+        new_url=maps_url if not event.url else None,
+    )
 
     try:
         send_message(briefing)

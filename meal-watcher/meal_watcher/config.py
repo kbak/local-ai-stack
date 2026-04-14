@@ -32,6 +32,9 @@ LOCATION_TRACKER_URL: str = os.environ.get(
     "LOCATION_TRACKER_URL", "http://location-tracker:8084/mcp"
 )
 
+# Google Places API (New)
+GOOGLE_PLACES_API_KEY: str = os.environ.get("GOOGLE_PLACES_API_KEY", "")
+
 # Signal
 SIGNAL_API_URL: str = os.environ.get("SIGNAL_API_URL", "http://signal-api:8080")
 SIGNAL_NUMBER: str = os.environ["SIGNAL_NUMBER"]
