@@ -3,12 +3,14 @@
 import httpx
 
 
-def call_mcp(server_url: str, tool_name: str, arguments: dict, timeout: int = 20) -> str:
+def call_mcp(server_url: str, tool_name: str, arguments: dict, timeout: int = 20, auth_token: str = "") -> str:
     """Call an MCP tool via streamable-http, handling session initialization automatically."""
     headers = {
         "Content-Type": "application/json",
         "Accept": "application/json",
     }
+    if auth_token:
+        headers["Authorization"] = f"Bearer {auth_token}"
 
     with httpx.Client(timeout=timeout) as client:
         # Step 1: initialize session

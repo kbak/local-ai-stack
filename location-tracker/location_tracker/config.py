@@ -29,3 +29,4 @@ SEARXNG_URL: str = os.environ.get("SEARXNG_URL", "http://searxng:8080")
 STATE_FILE: str = os.environ.get("STATE_FILE", "/data/location_state.json")
 
 MCP_PORT: int = int(os.environ.get("MCP_PORT", "8084"))
+MCP_AUTH_TOKEN: str = os.environ.get("MCP_PROXY_AUTH_TOKEN", "")

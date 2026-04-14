@@ -11,6 +11,8 @@ dependencies = [
     "pytz>=2024.1",
     "recurring-ical-events>=3.1.0",
     "icalendar>=5.0.0",
+    "starlette>=0.41.0",
+    "uvicorn>=0.30.0",
 ]
 
 [build-system]

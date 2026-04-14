@@ -2,14 +2,20 @@
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import threading
 from datetime import datetime, timezone
 
+from starlette.applications import Starlette
+from starlette.middleware import Middleware
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
+from starlette.responses import JSONResponse
+from starlette.routing import Mount
+import uvicorn
 from fastmcp import FastMCP
 
-from .config import MCP_PORT, POLL_INTERVAL_MINUTES
+from .config import MCP_AUTH_TOKEN, MCP_PORT, POLL_INTERVAL_MINUTES
 from .poller import poll_once
 from .state import State, load
 from .timeline import build_spans, get_location_at as _get_location_at
@@ -17,6 +23,15 @@ from .timeline import build_spans, get_location_at as _get_location_at
 log = logging.getLogger(__name__)
 
 mcp = FastMCP("location-tracker")
+
+
+class BearerAuthMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        if MCP_AUTH_TOKEN:
+            auth = request.headers.get("Authorization", "")
+            if auth != f"Bearer {MCP_AUTH_TOKEN}":
+                return JSONResponse({"error": "Unauthorized"}, status_code=401)
+        return await call_next(request)
 
 # Shared state — updated by background poller, read by MCP tool
 _state: State = State(anchors={}, spans=[])
@@ -73,8 +88,14 @@ def main() -> None:
     t = threading.Thread(target=_poll_loop, daemon=True)
     t.start()
 
-    log.info("Starting MCP server on port %d", MCP_PORT)
-    mcp.run(transport="streamable-http", host="0.0.0.0", port=MCP_PORT, path="/mcp")
+    log.info("Starting MCP server on port %d (auth: %s)", MCP_PORT, "enabled" if MCP_AUTH_TOKEN else "disabled")
+    mcp_app = mcp.http_app(path="/mcp")
+    app = Starlette(
+        routes=[Mount("/", app=mcp_app)],
+        middleware=[Middleware(BearerAuthMiddleware)],
+        lifespan=mcp_app.router.lifespan_context,
+    )
+    uvicorn.run(app, host="0.0.0.0", port=MCP_PORT)
 
 
 if __name__ == "__main__":

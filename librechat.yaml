@@ -132,3 +132,5 @@ mcpServers:
     url: http://location-tracker:8084/mcp
     type: streamable-http
     serverInstructions: false
+    headers:
+      Authorization: "Bearer ${MCP_PROXY_AUTH_TOKEN}"
