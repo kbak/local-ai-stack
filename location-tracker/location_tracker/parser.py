@@ -13,6 +13,7 @@ import httpx
 from openai import OpenAI
 
 from .config import (
+    HOME_CITY,
     INFERENCE_API_KEY,
     INFERENCE_BASE_URL,
     INFERENCE_MODEL,
@@ -31,19 +32,30 @@ def _llm() -> OpenAI:
     return _client
 
 
-_SYSTEM_PROMPT = """\
-You are a location extractor. Given a calendar event, determine if it represents \
-travel to a specific city. If it does, return a JSON object with:
-  {"city": "<city name, English>", "confidence": "high"|"medium"|"low"}
-If the event is NOT travel-related or you cannot determine a city, return:
-  {"city": null, "confidence": null}
+_SYSTEM_PROMPT = f"""\
+You are a travel detector. Given a calendar event, determine if it represents \
+travel AWAY FROM HOME requiring an overnight stay or multi-day presence in a different city.
+Home city is: {HOME_CITY or "unknown"}.
+
+If the event represents such travel, return:
+  {{"city": "<destination city name, English>", "confidence": "high"|"medium"|"low"}}
+Otherwise return:
+  {{"city": null, "confidence": null}}
 
 Rules:
-- "city" must be a real city name in English (e.g. "Warsaw", "San Diego", "London").
-- "high": explicit flight arrival, hotel check-in, or clear "arriving in <city>" phrasing.
-- "medium": hotel name with city, "driving to X", "going to X" with a recognisable place.
-- "low": vague but plausible travel signal.
-- Use the search tool if you are unsure whether a string refers to a city or location.
+- ONLY return a city for CONFIRMED travel: actual flights, confirmed hotel check-ins,
+  "arriving in X", "flying to X", "hotel [name] [city]".
+- Planning notes, ideas, wishful thinking ("plan summer in X", "thinking of going to X",
+  "maybe X trip", "research X") = null. Not confirmed travel.
+- Local events — concerts, restaurants, meetings, errands, day trips — are NOT travel,
+  even if they have an explicit venue address in another city.
+- A venue address or city in the LOCATION field does NOT make something travel.
+  Use the event type (flight? hotel? confirmed booking?) to decide.
+- When in doubt, return null. False positives corrupt the timeline permanently.
+- "high": explicit flight with destination city, or confirmed hotel check-in with city.
+- "medium": "driving to X overnight", confirmed multi-night stay with city.
+- Do NOT use "low" — if confidence would be low, return null instead.
+- Use the search tool only if you need to identify an airport code or city name.
 - Return ONLY the JSON object, no extra text.
 """
 
@@ -136,13 +148,16 @@ def parse_event_location(
     start_iso: str,
     end_iso: str,
     tzid: str,
+    location_hint: str = "",
 ) -> tuple[str | None, str | None]:
     """
     Returns (city, confidence) or (None, None) if not travel-related.
-    Called only for events WITHOUT an explicit LOCATION field.
+    location_hint is the raw LOCATION field from the calendar event, if any.
+    It is passed as context but does not bypass travel classification.
     """
     user_content = (
         f"Event summary: {summary}\n"
+        f"Location field: {location_hint or '(empty)'}\n"
         f"Description: {description or '(none)'}\n"
         f"Start: {start_iso} (TZID: {tzid or 'UTC'})\n"
         f"End: {end_iso}"

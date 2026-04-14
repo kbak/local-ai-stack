@@ -1,7 +1,9 @@
-FROM python:3.13-alpine
+FROM python:3.13-slim
 
 # Install build deps and runtime tools
-RUN apk add --no-cache libstdc++ gcc g++ musl-dev nodejs npm git
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc g++ nodejs npm git \
+    && rm -rf /var/lib/apt/lists/*
 
 # Install uv (provides uvx)
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/

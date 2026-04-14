@@ -10,6 +10,7 @@ Self-hosted LLM stack with privacy-focused web search and research tools. Runs o
 | SearXNG | 8081 | Privacy-focused meta search engine |
 | mcp-proxy | 8083 | MCP tool server (16 tools via streamable HTTP) |
 | location-tracker | 8084 | City-presence timeline service; exposes `get_location_at` MCP tool |
+| meal-watcher | — | Polls calendar for meal events, enriches with rating/menu/weather, delivers briefing via Signal |
 | MongoDB | — | LibreChat chat history storage |
 | LibreChat | 3000 | Web UI, accessible from any device |
 | signal-api | 9922 | Signal REST API (bbernhard/signal-cli-rest-api, native mode) |
@@ -35,6 +36,7 @@ All tools are exposed via mcp-proxy on port 8083 and protected by bearer token a
 - **github** — read files, search code and repos, browse commits and issues (via official MCP server, requires `GITHUB_TOKEN`)
 - **caldav** — calendar access via CalDAV (LibreChat only); requires `CALDAV_BASE_URL`, `CALDAV_USERNAME`, `CALDAV_PASSWORD` in `.env`
 - **location-tracker** — `get_location_at(datetime)` — returns city, confidence, and source for any datetime; backed by CalDAV + local LLM + SearXNG. See [`location-tracker/README.md`](location-tracker/README.md).
+- **meal-watcher** — no MCP tool; polls calendar, classifies meal events, enriches with rating/menu/weather, delivers briefing via Signal. See [`meal-watcher/README.md`](meal-watcher/README.md).
 
 ## Requirements
 
@@ -57,8 +59,11 @@ cp .env.example .env
 Edit `.env` and set:
 - Strong random values for `JWT_SECRET` and `JWT_REFRESH_SECRET`
 - `GITHUB_TOKEN` — personal access token with no scopes (public repos) or `repo` scope (private). Needed for the GitHub MCP tool. Without it the tool still works but hits GitHub's unauthenticated rate limit (60 req/hr).
-- `CALDAV_BASE_URL`, `CALDAV_USERNAME`, `CALDAV_PASSWORD` — CalDAV server credentials for the caldav MCP tool (e.g. Nextcloud: `https://your-nextcloud/remote.php/dav`).
-- `MCP_PROXY_AUTH_TOKEN` — bearer token required by all MCP clients to access mcp-proxy. Generate with `openssl rand -hex 32`. All clients (LibreChat, Jan, etc.) must send `Authorization: Bearer <token>` with every request.
+- `CALDAV_BASE_URL`, `CALDAV_USERNAME`, `CALDAV_PASSWORD` — CalDAV server credentials, shared by the caldav MCP tool, location-tracker, and meal-watcher (e.g. Nextcloud: `https://your-nextcloud/remote.php/dav`).
+- `MCP_PROXY_AUTH_TOKEN` — bearer token required by all MCP clients to access mcp-proxy and internal MCP servers (location-tracker). Generate with `openssl rand -hex 32`.
+- `HOME_CITY` — your home city, used as fallback by location-tracker and as context for travel detection (e.g. `Scottsdale`).
+- `CALDAV_CALENDAR_NAMES` — comma-separated calendar names to track for location and meal events (e.g. `Travel`). Leave empty to track all calendars.
+- `MEAL_BRIEFING_RECIPIENT` — Signal phone number (international format) that receives meal briefings from meal-watcher.
 
 **3. Configure models in `llama-swap.yaml`**
 

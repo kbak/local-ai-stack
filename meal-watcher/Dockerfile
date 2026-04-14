@@ -4,7 +4,6 @@ WORKDIR /app
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
-# Install system deps for caldav/ssl
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libssl-dev ca-certificates \
     && rm -rf /var/lib/apt/lists/*
@@ -13,16 +12,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY shared/ /shared/
 RUN pip install --no-cache-dir /shared/
 
-# Export locked deps to requirements.txt, then install — no runtime uv needed
+# Install locked dependencies
 # Exclude the local stack-shared path dep (already installed above)
-COPY location-tracker/pyproject.toml location-tracker/uv.lock ./
+COPY meal-watcher/pyproject.toml meal-watcher/uv.lock ./
 RUN uv export --frozen --no-dev --no-emit-project -o /tmp/requirements.txt && \
     grep -v '^-e ' /tmp/requirements.txt > /tmp/requirements-filtered.txt && \
     pip install --no-cache-dir -r /tmp/requirements-filtered.txt
 
-COPY location-tracker/location_tracker/ ./location_tracker/
+COPY meal-watcher/meal_watcher/ ./meal_watcher/
 
-# State volume mount point
 RUN mkdir -p /data
 
-CMD ["python", "-m", "location_tracker.mcp_server"]
+CMD ["python", "-m", "meal_watcher.main"]

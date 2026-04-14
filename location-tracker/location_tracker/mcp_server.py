@@ -8,12 +8,10 @@ from datetime import datetime, timezone
 
 from starlette.applications import Starlette
 from starlette.middleware import Middleware
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.requests import Request
-from starlette.responses import JSONResponse
 from starlette.routing import Mount
 import uvicorn
 from fastmcp import FastMCP
+from stack_shared.auth_middleware import BearerAuthMiddleware
 
 from .config import MCP_AUTH_TOKEN, MCP_PORT, POLL_INTERVAL_MINUTES
 from .poller import poll_once
@@ -23,15 +21,6 @@ from .timeline import build_spans, get_location_at as _get_location_at
 log = logging.getLogger(__name__)
 
 mcp = FastMCP("location-tracker")
-
-
-class BearerAuthMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next):
-        if MCP_AUTH_TOKEN:
-            auth = request.headers.get("Authorization", "")
-            if auth != f"Bearer {MCP_AUTH_TOKEN}":
-                return JSONResponse({"error": "Unauthorized"}, status_code=401)
-        return await call_next(request)
 
 # Shared state — updated by background poller, read by MCP tool
 _state: State = State(anchors={}, spans=[])
@@ -92,7 +81,7 @@ def main() -> None:
     mcp_app = mcp.http_app(path="/mcp")
     app = Starlette(
         routes=[Mount("/", app=mcp_app)],
-        middleware=[Middleware(BearerAuthMiddleware)],
+        middleware=[Middleware(BearerAuthMiddleware, token=MCP_AUTH_TOKEN)],
         lifespan=mcp_app.router.lifespan_context,
     )
     uvicorn.run(app, host="0.0.0.0", port=MCP_PORT)

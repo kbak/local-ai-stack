@@ -5,17 +5,20 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timezone
 
+from datetime import timedelta
+
 from .caldav_fetch import fetch_events
 from .parser import parse_event_location
 from .state import RawAnchor, State, load, save
 from .timeline import build_spans
 
+# Events shorter than this cannot be travel — they are reminders or planning notes.
+MIN_TRAVEL_DURATION = timedelta(hours=1)
+
 log = logging.getLogger(__name__)
 
 
 def _make_source(summary: str, location: str, start_iso: str, confidence: str) -> str:
-    if confidence == "explicit":
-        return f"{summary} @ {location} (from {start_iso[:10]})"
     return f"{summary} (from {start_iso[:10]})"
 
 
@@ -42,27 +45,37 @@ def poll_once(state: State | None = None) -> State:
         start_iso = event.start.isoformat()
         end_iso = event.end.isoformat()
 
-        # Fast path: explicit LOCATION field
-        if event.location.strip():
-            city = event.location.strip()
-            confidence = "explicit"
-            source = _make_source(event.summary, city, start_iso, confidence)
-            log.info("Explicit location for '%s': %s", event.summary, city)
-        else:
-            # LLM path
-            city, confidence = parse_event_location(
-                summary=event.summary,
-                description=event.description,
-                start_iso=start_iso,
-                end_iso=end_iso,
-                tzid=event.tzid,
+        # Short events are reminders or planning notes — skip LLM entirely.
+        if (event.end - event.start) < MIN_TRAVEL_DURATION:
+            log.debug("Skipping short event '%s' (%s)", event.summary, event.end - event.start)
+            state.anchors[event.uid] = RawAnchor(
+                uid=event.uid,
+                city=None,
+                confidence=None,
+                source=event.summary,
+                start_utc=start_iso,
+                end_utc=end_iso,
+                content_hash=event.content_hash,
             )
-            if city:
-                source = _make_source(event.summary, city, start_iso, confidence or "low")
-                log.info("LLM parsed '%s' → %s (%s)", event.summary, city, confidence)
-            else:
-                source = event.summary
-                log.debug("No travel signal in '%s'", event.summary)
+            continue
+
+        # Always run LLM to determine if this is genuine travel.
+        # The explicit LOCATION field (if any) is passed as a hint but does not bypass classification —
+        # a concert or dinner at a local venue should not be treated as a location change.
+        city, confidence = parse_event_location(
+            summary=event.summary,
+            description=event.description,
+            location_hint=event.location.strip(),
+            start_iso=start_iso,
+            end_iso=end_iso,
+            tzid=event.tzid,
+        )
+        if city:
+            source = _make_source(event.summary, city, start_iso, confidence or "low")
+            log.info("Parsed '%s' → %s (%s)", event.summary, city, confidence)
+        else:
+            source = event.summary
+            log.debug("No travel signal in '%s'", event.summary)
 
         state.anchors[event.uid] = RawAnchor(
             uid=event.uid,

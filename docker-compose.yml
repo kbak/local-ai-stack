@@ -97,13 +97,37 @@ services:
     mem_limit: 512m
 
   location-tracker:
-    build: ./location-tracker
+    build:
+      context: .
+      dockerfile: location-tracker/Dockerfile
     container_name: location-tracker
     restart: unless-stopped
     env_file:
       - .env
     volumes:
       - location-tracker-data:/data
+    networks:
+      - ai-net
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    mem_limit: 512m
+
+  meal-watcher:
+    build:
+      context: .
+      dockerfile: meal-watcher/Dockerfile
+    container_name: meal-watcher
+    restart: unless-stopped
+    env_file:
+      - .env
+      - signal-bot.env
+    volumes:
+      - meal-watcher-data:/data
+    depends_on:
+      - location-tracker
+      - mcp-proxy
+      - signal-api
+      - searxng
     networks:
       - ai-net
     extra_hosts:
@@ -121,3 +145,4 @@ volumes:
   signal-cli-data:
   signal-bot-data:
   location-tracker-data:
+  meal-watcher-data:
