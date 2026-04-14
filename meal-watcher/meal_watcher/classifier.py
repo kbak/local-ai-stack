@@ -33,6 +33,7 @@ Rules:
 - If the explicit location field is set, use it to confirm the venue type with one search.
 - If unsure after searching, return is_meal=false. False positives are worse than false negatives.
 - Many restaurant names embed the city: "Nobu Las Vegas", "Zinque Scottsdale" — extract it.
+- A title like "francine, scottsdale" or "nobu, las vegas" (name, city) = strong YES — restaurant name with city.
 - If no city found in the title, call get_location_at with the event start datetime.
 
 Respond with a JSON object only:

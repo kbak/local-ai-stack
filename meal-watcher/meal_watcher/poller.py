@@ -49,23 +49,6 @@ def _tz_for_naive_event(event_start_utc: datetime) -> str:
     return LOCAL_TIMEZONE
 
 
-def _fix_naive_datetime(event, local_tz_override: str) -> "RawEvent":
-    """Return event with start/end re-interpreted in the given timezone if they were naive."""
-    if event.tzid:
-        return event  # already has tz info
-    from dataclasses import replace
-    import pytz as _pytz
-    from datetime import timezone as _tz
-    try:
-        tz = _pytz.timezone(local_tz_override)
-    except Exception:
-        return event
-    # Re-parse: the naive datetime was stored as UTC — convert back to naive then re-localize
-    naive_start = event.start.replace(tzinfo=None)
-    naive_end = event.end.replace(tzinfo=None)
-    new_start = tz.localize(naive_start).astimezone(_tz.utc)
-    new_end = tz.localize(naive_end).astimezone(_tz.utc)
-    return replace(event, start=new_start, end=new_end, tzid=local_tz_override)
 
 log = logging.getLogger(__name__)
 
@@ -96,9 +79,12 @@ def poll_once(state: State | None = None) -> State:
 
     for event in events:
         # For naive-datetime events, resolve timezone from location-tracker
+        # (for display purposes only — _to_utc already correctly converted the time)
         if not event.tzid:
             tz = _tz_for_naive_event(event.start)
-            event = _fix_naive_datetime(event, tz)
+            if tz:
+                from dataclasses import replace
+                event = replace(event, tzid=tz)
 
         if event.start > lookahead_cutoff or event.start < lookback_cutoff:
             continue

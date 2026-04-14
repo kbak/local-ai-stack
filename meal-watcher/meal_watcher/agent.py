@@ -1,13 +1,8 @@
-"""LLM agent with tools for classification and enrichment.
+"""LLM agent used for classification only.
 
-All tools available to the LLM:
+Tools available to the LLM:
   - search(query)          → SearXNG
-  - fetch(url)             → mcp-proxy fetch tool
-  - get_weather(city, dt)  → mcp-proxy weather tool
   - get_location_at(dt)    → location-tracker
-
-The same tool loop is used for both classification and enrichment —
-enrichment just gets a richer prompt and more tool budget.
 """
 
 from __future__ import annotations
@@ -25,7 +20,6 @@ from .config import (
     INFERENCE_MODEL,
     LOCATION_TRACKER_URL,
     MCP_AUTH_TOKEN,
-    MCP_PROXY_URL,
     SEARXNG_URL,
 )
 
@@ -59,33 +53,6 @@ _TOOLS = [
     {
         "type": "function",
         "function": {
-            "name": "fetch",
-            "description": "Fetch the full text content of a URL. Use for restaurant websites, menu pages, review pages.",
-            "parameters": {
-                "type": "object",
-                "properties": {"url": {"type": "string"}},
-                "required": ["url"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "get_weather",
-            "description": "Get weather forecast for a city at a specific date/time.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "city": {"type": "string"},
-                    "datetime_iso": {"type": "string", "description": "ISO 8601 datetime"},
-                },
-                "required": ["city", "datetime_iso"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
             "name": "get_location_at",
             "description": "Get the user's city at a given datetime from the location tracker.",
             "parameters": {
@@ -106,14 +73,6 @@ def _execute_tool(name: str, args: dict) -> str:
     try:
         if name == "search":
             return _searxng(args["query"])
-        elif name == "fetch":
-            return _mcp_proxy("fetch", "fetch", {"url": args["url"]})
-        elif name == "get_weather":
-            return _mcp_proxy("weather", "get_weather_byDateTimeRange", {
-                "city": args["city"],
-                "start_date": args["datetime_iso"][:10],
-                "end_date": args["datetime_iso"][:10],
-            })
         elif name == "get_location_at":
             return call_mcp(
                 LOCATION_TRACKER_URL,
@@ -143,15 +102,6 @@ def _searxng(query: str) -> str:
         ])
     except Exception as e:
         return json.dumps({"error": str(e)})
-
-
-def _mcp_proxy(server: str, tool: str, args: dict) -> str:
-    return call_mcp(
-        f"{MCP_PROXY_URL}/servers/{server}/mcp",
-        tool,
-        args,
-        auth_token=MCP_AUTH_TOKEN,
-    )
 
 
 # ── Agent loop ────────────────────────────────────────────────────────────────
