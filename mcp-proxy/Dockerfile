@@ -8,8 +8,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Install uv (provides uvx)
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
 
-# Build and install mcp-proxy from PR #187 (bearer token auth)
-RUN git clone --branch feat/bearer-auth --depth 1 https://github.com/jsboige/mcp-proxy.git /mcp-proxy-src && \
+# Build and install mcp-proxy from upstream main
+RUN git clone --depth 1 https://github.com/sparfenyuk/mcp-proxy.git /mcp-proxy-src && \
     pip install --no-cache-dir /mcp-proxy-src && \
     rm -rf /mcp-proxy-src
 

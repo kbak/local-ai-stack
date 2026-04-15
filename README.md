@@ -300,10 +300,9 @@ docker compose exec tg-watcher python -c "from tg_watcher.summarizer import run_
 
 ## Notes
 
-- Chat history is persisted in a Docker volume — survives container restarts
+- LibreChat chat history is persisted in MongoDB (`mongodb-data` volume) — survives container restarts
 - MCP package cache is persisted — tool calls are fast after first use
 - SearXNG runs locally — no search queries leave your network
 - llama-swap unloads the current model when a different one is requested — only one model in VRAM at a time
 - signal-cli-data volume is shared between signal-api (read-write) and signal-bot (read-only)
 - mcp-proxy includes Node.js for the GitHub MCP server; all other tools are pure Python via uvx
-- mcp-proxy is built from [PR #187](https://github.com/sparfenyuk/mcp-proxy/pull/187) of the upstream repo which adds bearer token authentication
