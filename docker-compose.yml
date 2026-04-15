@@ -148,6 +148,26 @@ services:
       - "host.docker.internal:host-gateway"
     mem_limit: 512m
 
+  tg-watcher:
+    build:
+      context: .
+      dockerfile: tg-watcher/Dockerfile
+    container_name: tg-watcher
+    restart: unless-stopped
+    env_file:
+      - .env
+      - signal-bot.env
+      - tg-watcher.env
+    volumes:
+      - tg-watcher-data:/data
+    depends_on:
+      - signal-api
+    networks:
+      - ai-net
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    mem_limit: 512m
+
 networks:
   ai-net:
     driver: bridge
@@ -160,3 +180,4 @@ volumes:
   signal-bot-data:
   location-tracker-data:
   calendar-watcher-data:
+  tg-watcher-data:

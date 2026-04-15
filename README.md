@@ -12,6 +12,7 @@ Self-hosted LLM stack with privacy-focused web search and research tools. Runs o
 | location-tracker | 8084 | City-presence timeline service; exposes `get_location_at` MCP tool (bearer token required) |
 | pdf-inspector | 8086 | PDF text extraction via pdf-inspector (Rust); handles Unicode, multi-column, tables |
 | calendar-watcher | — | Polls calendar for meal and travel events; enriches with rating/menu/weather/maps; delivers briefings via Signal |
+| tg-watcher | — | Listens to a Telegram group as your user account; sends a daily LLM-generated brief via Signal |
 | MongoDB | — | LibreChat chat history storage |
 | LibreChat | 3000 | Web UI, accessible from any device |
 | signal-api | 9922 | Signal REST API (bbernhard/signal-cli-rest-api, native mode) |
@@ -62,9 +63,7 @@ Edit `.env` and set:
 - `MCP_PROXY_AUTH_TOKEN` — bearer token required to access location-tracker. Generate with `openssl rand -hex 32`.
 - `HOME_CITY` — your home city, used as fallback by location-tracker (e.g. `Scottsdale`).
 - `CALDAV_CALENDAR_NAMES` — comma-separated calendar names to track (e.g. `Travel`). Leave empty to track all calendars.
-- `CALENDAR_BRIEFING_RECIPIENT` — Signal phone number (international format) that receives meal and travel briefings.
 - `GOOGLE_PLACES_API_KEY` — Google Places API (New) key for venue ratings and addresses in meal briefings.
-- `SIGNAL_NUMBER` — the Signal number registered with signal-api (international format).
 
 **3. Configure models in `llama-swap.yaml`**
 
@@ -131,7 +130,9 @@ The account data is stored in the `signal-cli-data` volume and persists across r
 ```
 cp signal-bot.env.example signal-bot.env
 ```
-Set `SIGNAL_NUMBER` to your registered number (international format, e.g. `+14155551234`).
+Set `SIGNAL_NUMBER` to your registered Signal number (international format, e.g. `+14155551234`).
+
+Set `BRIEFING_RECIPIENT` to the Signal number that should receive all briefings (calendar-watcher, tg-watcher, etc.). This can be the same number.
 
 Optionally set `ALLOWED_NUMBERS` to restrict who can use the bot (comma-separated list). Leave unset to allow anyone who messages the number.
 
@@ -253,7 +254,49 @@ Polls CalDAV calendars and sends Signal briefings for:
 - **Meal events** — detected restaurant bookings get enriched with Google Places rating, menu URL, weather, and a Google Maps link. The calendar event is patched with a 🍽 emoji prefix, the Places-resolved address (if the location field was empty or vague), and a Maps URL.
 - **Travel anchors** — first flight or arrival event to a new city gets a weather forecast sent 24h before departure via Signal. The calendar event is patched with a ✈️ emoji prefix. Connecting flights (another flight departing within 6h) are skipped.
 
-Requires `CALDAV_BASE_URL`, `CALDAV_USERNAME`, `CALDAV_PASSWORD`, `CALDAV_CALENDAR_NAMES`, `CALENDAR_BRIEFING_RECIPIENT`, `GOOGLE_PLACES_API_KEY`, and `SIGNAL_NUMBER` in `.env`.
+Requires `CALDAV_BASE_URL`, `CALDAV_USERNAME`, `CALDAV_PASSWORD`, `CALDAV_CALENDAR_NAMES`, `GOOGLE_PLACES_API_KEY` in `.env`, and `SIGNAL_NUMBER`, `BRIEFING_RECIPIENT` in `signal-bot.env`.
+
+## tg-watcher
+
+Passively listens to a Telegram group using your own user account (no bot added to the group) and delivers a daily LLM-generated brief via Signal.
+
+- Collects all text messages into a local SQLite DB
+- Every morning at the configured time, summarises the last 24h with the local LLM and sends it to your Signal number
+- Messages older than 48h are pruned after each summary run
+
+### Setup
+
+**1. Get Telegram API credentials**
+
+Go to [https://my.telegram.org](https://my.telegram.org) → "API development tools" and create an app. Note your `api_id` and `api_hash`.
+
+**2. Find your group ID**
+
+Forward any message from the target group to [@userinfobot](https://t.me/userinfobot) on Telegram. It will reply with a negative numeric ID (e.g. `-1001234567890`).
+
+**3. Configure tg-watcher.env**
+```
+cp tg-watcher.env.example tg-watcher.env
+```
+Set `TG_API_ID`, `TG_API_HASH`, `TG_PHONE`, and `TG_GROUP`. Adjust `SUMMARY_CRON_HOUR`/`SUMMARY_CRON_MINUTE` (UTC) if needed — default is 12:00 UTC (5:00 AM MST).
+
+**4. One-time interactive login**
+
+Telethon requires an interactive login the first time to verify your phone number:
+```
+docker compose run --rm -it tg-watcher python auth.py
+```
+Enter the code Telegram sends you. The session is saved to the `tg-watcher-data` volume and persists across restarts — `TG_PHONE` can be removed from the env file after this.
+
+**5. Start**
+```
+docker compose up -d tg-watcher
+```
+
+**6. Test the summary without waiting**
+```
+docker compose exec tg-watcher python -c "from tg_watcher.summarizer import run_summary; run_summary()"
+```
 
 ## Notes
 

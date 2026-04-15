@@ -39,6 +39,6 @@ GOOGLE_PLACES_API_KEY: str = os.environ.get("GOOGLE_PLACES_API_KEY", "")
 # Signal
 SIGNAL_API_URL: str = os.environ.get("SIGNAL_API_URL", "http://signal-api:8080")
 SIGNAL_NUMBER: str = os.environ["SIGNAL_NUMBER"]
-CALENDAR_BRIEFING_RECIPIENT: str = os.environ["CALENDAR_BRIEFING_RECIPIENT"]
+CALENDAR_BRIEFING_RECIPIENT: str = os.environ["BRIEFING_RECIPIENT"]
 
 STATE_FILE: str = os.environ.get("STATE_FILE", "/data/calendar_state.json")

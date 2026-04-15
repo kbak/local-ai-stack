@@ -11,3 +11,5 @@ searxng-mcp/
 
 signal-bot.env
 .claude/
+
+tg-watcher.env
