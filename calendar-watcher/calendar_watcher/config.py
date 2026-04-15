@@ -25,8 +25,9 @@ INFERENCE_API_KEY: str = os.environ.get("INFERENCE_API_KEY", "none")
 
 SEARXNG_URL: str = os.environ.get("SEARXNG_URL", "http://searxng:8080")
 
-# MCP endpoints
-MCP_AUTH_TOKEN: str = os.environ.get("MCP_PROXY_AUTH_TOKEN", "")
+# MCP endpoints — location-tracker requires auth, mcp-proxy does not
+MCP_AUTH_TOKEN: str = os.environ.get("MCP_PROXY_AUTH_TOKEN", "")  # location-tracker only
+MCP_PROXY_AUTH_TOKEN: str = ""  # mcp-proxy has no auth
 MCP_PROXY_URL: str = os.environ.get("MCP_PROXY_URL", "http://mcp-proxy:8083")
 LOCATION_TRACKER_URL: str = os.environ.get(
     "LOCATION_TRACKER_URL", "http://location-tracker:8084/mcp"

@@ -18,7 +18,6 @@ from stack_shared.weather import get_weather
 from .classifier import ClassifyResult
 from .config import (
     GOOGLE_PLACES_API_KEY,
-    MCP_AUTH_TOKEN,
     MCP_PROXY_URL,
     SEARXNG_URL,
 )
@@ -166,7 +165,7 @@ def enrich(event: RawEvent, classification: ClassifyResult) -> tuple[str, str | 
     patch_address = formatted_address if is_vague_location(event.location) else None
 
     menu_url = _find_menu_url(venue, city)
-    weather = get_weather(city, event.start, mcp_proxy_url=MCP_PROXY_URL, mcp_auth_token=MCP_AUTH_TOKEN)
+    weather = get_weather(city, event.start, mcp_proxy_url=MCP_PROXY_URL, mcp_auth_token="")
     murl = maps_url(venue, city)
 
     try:

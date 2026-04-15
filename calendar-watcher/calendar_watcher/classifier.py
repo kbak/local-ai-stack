@@ -91,7 +91,7 @@ def classify(event: RawEvent) -> ClassifyResult:
         inference_model=INFERENCE_MODEL,
         searxng_url=SEARXNG_URL,
         location_tracker_url=LOCATION_TRACKER_URL,
-        mcp_auth_token=MCP_AUTH_TOKEN,
+        location_tracker_auth_token=MCP_AUTH_TOKEN,
         max_turns=8,
     )
 

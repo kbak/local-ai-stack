@@ -65,7 +65,7 @@ def _execute_tool(
     args: dict,
     searxng_url: str,
     location_tracker_url: str,
-    mcp_auth_token: str,
+    location_tracker_auth_token: str,
 ) -> str:
     try:
         if name == "search":
@@ -75,7 +75,7 @@ def _execute_tool(
                 location_tracker_url,
                 "get_location_at",
                 {"datetime_iso": args["datetime_iso"]},
-                auth_token=mcp_auth_token,
+                auth_token=location_tracker_auth_token,
             )
         else:
             return json.dumps({"error": f"Unknown tool: {name}"})
@@ -112,7 +112,7 @@ def run_agent(
     inference_model: str,
     searxng_url: str,
     location_tracker_url: str,
-    mcp_auth_token: str,
+    location_tracker_auth_token: str,
     max_turns: int = 20,
 ) -> str:
     """Run the LLM with tools until it produces a final text response."""
@@ -145,7 +145,7 @@ def run_agent(
                     args,
                     searxng_url=searxng_url,
                     location_tracker_url=location_tracker_url,
-                    mcp_auth_token=mcp_auth_token,
+                    location_tracker_auth_token=location_tracker_auth_token,
                 )
                 messages.append({
                     "role": "tool",

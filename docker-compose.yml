@@ -23,7 +23,9 @@ services:
     volumes:
       - ./mcp-proxy-config.json:/config.json
       - mcp-proxy-uv-cache:/root/.cache/uv
-    command: ["--host", "0.0.0.0", "--port", "8083", "--transport", "streamablehttp", "--named-server-config", "/config.json", "--pass-environment", "--auth-bearer-token", "${MCP_PROXY_AUTH_TOKEN}"]
+    environment:
+      MCP_PROXY_AUTH_TOKEN: ""
+    command: ["--host", "0.0.0.0", "--port", "8083", "--transport", "streamablehttp", "--named-server-config", "/config.json", "--pass-environment"]
     networks:
       - ai-net
     mem_limit: 1500m
