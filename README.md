@@ -8,9 +8,9 @@ Self-hosted LLM stack with privacy-focused web search and research tools. Runs o
 |---|---|---|
 | llama-swap | 8080 | Model manager — switches between llama-server instances on demand |
 | SearXNG | 8081 | Privacy-focused meta search engine |
-| mcp-proxy | 8083 | MCP tool server (16 tools via streamable HTTP) |
-| location-tracker | 8084 | City-presence timeline service; exposes `get_location_at` MCP tool |
-| meal-watcher | — | Polls calendar for meal events, enriches with rating/menu/weather, delivers briefing via Signal |
+| mcp-proxy | 8083 | MCP tool server (14 tools via streamable HTTP, no auth required) |
+| location-tracker | 8084 | City-presence timeline service; exposes `get_location_at` MCP tool (bearer token required) |
+| calendar-watcher | — | Polls calendar for meal and travel events; enriches with rating/menu/weather/maps; delivers briefings via Signal |
 | MongoDB | — | LibreChat chat history storage |
 | LibreChat | 3000 | Web UI, accessible from any device |
 | signal-api | 9922 | Signal REST API (bbernhard/signal-cli-rest-api, native mode) |
@@ -18,7 +18,7 @@ Self-hosted LLM stack with privacy-focused web search and research tools. Runs o
 
 ## MCP Tools
 
-All tools are exposed via mcp-proxy on port 8083 and protected by bearer token authentication (`MCP_PROXY_AUTH_TOKEN`). Most are available in both LibreChat and the Signal bot; caldav is LibreChat-only.
+All tools are exposed via mcp-proxy on port 8083 (no authentication required — internal Docker network only). location-tracker requires a bearer token (`MCP_PROXY_AUTH_TOKEN`).
 
 - **searxng** — web search (via local SearXNG)
 - **fetch** — fetch URL content
@@ -33,10 +33,8 @@ All tools are exposed via mcp-proxy on port 8083 and protected by bearer token a
 - **weather** — current weather and forecast
 - **currency** — exchange rates
 - **finance** — stock and financial data (yfinance)
-- **github** — read files, search code and repos, browse commits and issues (via official MCP server, requires `GITHUB_TOKEN`)
-- **caldav** — calendar access via CalDAV (LibreChat only); requires `CALDAV_BASE_URL`, `CALDAV_USERNAME`, `CALDAV_PASSWORD` in `.env`
+- **github** — read files, search code and repos, browse commits and issues (requires `GITHUB_TOKEN`)
 - **location-tracker** — `get_location_at(datetime)` — returns city, confidence, and source for any datetime; backed by CalDAV + local LLM + SearXNG. See [`location-tracker/README.md`](location-tracker/README.md).
-- **meal-watcher** — no MCP tool; polls calendar, classifies meal events, enriches with rating/menu/weather, delivers briefing via Signal. See [`meal-watcher/README.md`](meal-watcher/README.md).
 
 ## Requirements
 
@@ -59,11 +57,13 @@ cp .env.example .env
 Edit `.env` and set:
 - Strong random values for `JWT_SECRET` and `JWT_REFRESH_SECRET`
 - `GITHUB_TOKEN` — personal access token with no scopes (public repos) or `repo` scope (private). Needed for the GitHub MCP tool. Without it the tool still works but hits GitHub's unauthenticated rate limit (60 req/hr).
-- `CALDAV_BASE_URL`, `CALDAV_USERNAME`, `CALDAV_PASSWORD` — CalDAV server credentials, shared by the caldav MCP tool, location-tracker, and meal-watcher (e.g. Nextcloud: `https://your-nextcloud/remote.php/dav`).
-- `MCP_PROXY_AUTH_TOKEN` — bearer token required by all MCP clients to access mcp-proxy and internal MCP servers (location-tracker). Generate with `openssl rand -hex 32`.
-- `HOME_CITY` — your home city, used as fallback by location-tracker and as context for travel detection (e.g. `Scottsdale`).
-- `CALDAV_CALENDAR_NAMES` — comma-separated calendar names to track for location and meal events (e.g. `Travel`). Leave empty to track all calendars.
-- `MEAL_BRIEFING_RECIPIENT` — Signal phone number (international format) that receives meal briefings from meal-watcher.
+- `CALDAV_BASE_URL`, `CALDAV_USERNAME`, `CALDAV_PASSWORD` — CalDAV server credentials, shared by location-tracker and calendar-watcher (e.g. Nextcloud: `https://your-nextcloud/remote.php/dav`).
+- `MCP_PROXY_AUTH_TOKEN` — bearer token required to access location-tracker. Generate with `openssl rand -hex 32`.
+- `HOME_CITY` — your home city, used as fallback by location-tracker (e.g. `Scottsdale`).
+- `CALDAV_CALENDAR_NAMES` — comma-separated calendar names to track (e.g. `Travel`). Leave empty to track all calendars.
+- `CALENDAR_BRIEFING_RECIPIENT` — Signal phone number (international format) that receives meal and travel briefings.
+- `GOOGLE_PLACES_API_KEY` — Google Places API (New) key for venue ratings and addresses in meal briefings.
+- `SIGNAL_NUMBER` — the Signal number registered with signal-api (international format).
 
 **3. Configure models in `llama-swap.yaml`**
 
@@ -186,13 +186,13 @@ Received messages carry `groupId` as the raw `internal_id` (base64, e.g. `9JDGhR
 
 ## Goose CLI Agent
 
-[Goose](https://github.com/aaif-goose/goose) is a local AI agent for terminal workflows — shell commands, Docker tasks, file operations, and lightweight coding. It runs outside Docker alongside llama-swap and connects to the same models and MCP tools.
+[Goose](https://github.com/block/goose) is a local AI agent for terminal workflows — shell commands, Docker tasks, file operations, and lightweight coding. It runs outside Docker alongside llama-swap and connects to the same models and MCP tools.
 
 ### Setup
 
 **1. Download and install**
 
-Download `goose-x86_64-pc-windows-msvc.zip` from the [latest release](https://github.com/aaif-goose/goose/releases/latest), extract, and add to PATH.
+Download `goose-x86_64-pc-windows-msvc.zip` from the [latest release](https://github.com/block/goose/releases/latest), extract, and add to PATH.
 
 **2. Configure**
 
@@ -206,20 +206,28 @@ GOOSE_TOOLSHIM: true        # required for local models — bypasses llama-serve
 GOOSE_TELEMETRY_ENABLED: false
 ```
 
-Each MCP server is added as a separate `streamable_http` extension pointing at the mcp-proxy per-server paths:
+MCP tools are added as `streamable_http` extensions (except pdf which runs as a local stdio server):
 ```yaml
 extensions:
-  finance:
+  searxng:
     enabled: true
     type: streamable_http
-    name: finance
-    uri: http://127.0.0.1:8083/servers/finance/mcp
+    name: searxng
+    uri: http://127.0.0.1:8083/servers/searxng/mcp
     headers: {}
     timeout: 60
   # ... one entry per MCP server
+  pdf:
+    enabled: true
+    type: stdio
+    name: pdf
+    cmd: C:\Python313\python
+    args:
+      - C:\Users\kacper\mcp-pdf\server.py
+    envs: {}
 ```
 
-**Note:** mcp-proxy does not expose an aggregated endpoint — each server must be listed individually.
+**Note:** mcp-proxy does not expose an aggregated endpoint — each server must be listed individually. `wikipedia` is disabled due to JSON schema incompatibilities with local models (`GOOSE_TOOLSHIM: true` mitigates most but not all).
 
 **3. Start a session**
 ```
@@ -236,7 +244,16 @@ The toggle persists for the rest of the session.
 
 ### MCP tool compatibility
 
-Some MCP servers expose tools with `null` descriptions or `["string", "null"]` union types in their JSON schemas, which cause llama-server to crash when building grammar constraints. `GOOSE_TOOLSHIM: true` bypasses this by handling tool calls in the prompt layer instead. The `wikipedia` extension is disabled in the Goose config due to this issue.
+Some MCP servers expose tools with `null` descriptions or `["string", "null"]` union types in their JSON schemas, which cause llama-server to crash when building grammar constraints. `GOOSE_TOOLSHIM: true` bypasses this by handling tool calls in the prompt layer instead.
+
+## calendar-watcher
+
+Polls CalDAV calendars and sends Signal briefings for:
+
+- **Meal events** — detected restaurant bookings get enriched with Google Places rating, menu URL, weather, and a Google Maps link. The calendar event is patched with a 🍽 emoji prefix, the Places-resolved address (if the location field was empty or vague), and a Maps URL.
+- **Travel anchors** — first flight or arrival event to a new city gets a weather forecast sent 24h before departure via Signal. The calendar event is patched with a ✈️ emoji prefix. Connecting flights (another flight departing within 6h) are skipped.
+
+Requires `CALDAV_BASE_URL`, `CALDAV_USERNAME`, `CALDAV_PASSWORD`, `CALDAV_CALENDAR_NAMES`, `CALENDAR_BRIEFING_RECIPIENT`, `GOOGLE_PLACES_API_KEY`, and `SIGNAL_NUMBER` in `.env`.
 
 ## Notes
 
@@ -245,5 +262,5 @@ Some MCP servers expose tools with `null` descriptions or `["string", "null"]` u
 - SearXNG runs locally — no search queries leave your network
 - llama-swap unloads the current model when a different one is requested — only one model in VRAM at a time
 - signal-cli-data volume is shared between signal-api (read-write) and signal-bot (read-only)
-- mcp-proxy includes Node.js for the GitHub and CalDAV MCP servers; all other tools are pure Python via uvx
-- mcp-proxy is built from [PR #187](https://github.com/sparfenyuk/mcp-proxy/pull/187) of the upstream repo which adds bearer token authentication — not yet in an official release
+- mcp-proxy includes Node.js for the GitHub MCP server; all other tools are pure Python via uvx
+- mcp-proxy is built from [PR #187](https://github.com/sparfenyuk/mcp-proxy/pull/187) of the upstream repo which adds bearer token authentication
