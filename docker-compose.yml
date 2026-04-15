@@ -112,17 +112,17 @@ services:
       - "host.docker.internal:host-gateway"
     mem_limit: 512m
 
-  meal-watcher:
+  calendar-watcher:
     build:
       context: .
-      dockerfile: meal-watcher/Dockerfile
-    container_name: meal-watcher
+      dockerfile: calendar-watcher/Dockerfile
+    container_name: calendar-watcher
     restart: unless-stopped
     env_file:
       - .env
       - signal-bot.env
     volumes:
-      - meal-watcher-data:/data
+      - calendar-watcher-data:/data
     depends_on:
       - location-tracker
       - mcp-proxy
@@ -145,4 +145,4 @@ volumes:
   signal-cli-data:
   signal-bot-data:
   location-tracker-data:
-  meal-watcher-data:
+  calendar-watcher-data:

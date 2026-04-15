@@ -122,12 +122,6 @@ mcpServers:
     serverInstructions: false
     headers:
       Authorization: "Bearer ${MCP_PROXY_AUTH_TOKEN}"
-  caldav:
-    url: http://mcp-proxy:8083/servers/caldav/mcp
-    type: streamable-http
-    serverInstructions: false
-    headers:
-      Authorization: "Bearer ${MCP_PROXY_AUTH_TOKEN}"
   location-tracker:
     url: http://location-tracker:8084/mcp
     type: streamable-http

@@ -58,10 +58,6 @@
     "github": {
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-github"]
-    },
-    "caldav": {
-      "command": "node",
-      "args": ["/caldav-mcp/dist/index.js"]
     }
   }
 }

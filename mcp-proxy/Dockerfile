@@ -13,10 +13,6 @@ RUN git clone --branch feat/bearer-auth --depth 1 https://github.com/jsboige/mcp
     pip install --no-cache-dir /mcp-proxy-src && \
     rm -rf /mcp-proxy-src
 
-# Install caldav-mcp from source
-RUN git clone https://github.com/dominik1001/caldav-mcp.git /caldav-mcp && \
-    cd /caldav-mcp && npm install && npm run build
-
 # Pre-install all MCP packages at pinned versions so first connection doesn't time out
 RUN uvx mcp-server-fetch==2025.4.7 --help 2>/dev/null || true && \
     uvx wikipedia-mcp==2.0.0 --help 2>/dev/null || true && \
