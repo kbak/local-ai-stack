@@ -22,10 +22,10 @@ SUMMARY_CRON_MINUTE: int = int(os.environ.get("SUMMARY_CRON_MINUTE", "0"))
 # How many hours back to include in the daily brief
 SUMMARY_LOOKBACK_HOURS: int = int(os.environ.get("SUMMARY_LOOKBACK_HOURS", "24"))
 
-# LLM
-INFERENCE_BASE_URL: str = os.environ.get("INFERENCE_BASE_URL", "http://host.docker.internal:8080/v1")
-INFERENCE_API_KEY: str = os.environ.get("INFERENCE_API_KEY", "sk-no-key-required")
-INFERENCE_MODEL: str = os.environ.get("INFERENCE_MODEL", "qwen")
+# LLM — prefer LLM_* (signal-bot.env) with INFERENCE_* as fallback
+INFERENCE_BASE_URL: str = os.environ.get("LLM_BASE_URL") or os.environ.get("INFERENCE_BASE_URL", "http://host.docker.internal:8080/v1")
+INFERENCE_API_KEY: str = os.environ.get("LLM_API_KEY") or os.environ.get("INFERENCE_API_KEY", "sk-no-key-required")
+INFERENCE_MODEL: str = os.environ.get("LLM_MODEL") or os.environ.get("INFERENCE_MODEL", "qwen")
 
 # Signal
 SIGNAL_API_URL: str = os.environ.get("SIGNAL_API_URL", "http://signal-api:8080")

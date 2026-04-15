@@ -13,3 +13,4 @@ signal-bot.env
 .claude/
 
 tg-watcher.env
+rss-watcher.env

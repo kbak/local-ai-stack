@@ -1,30 +1,14 @@
-"""Send messages via signal-api REST endpoint."""
+"""Re-export from shared for backwards compatibility within this package."""
 
-from __future__ import annotations
-
-import logging
-
-import httpx
+from stack_shared.signal_client import send_message as _send_message
 
 from .config import CALENDAR_BRIEFING_RECIPIENT, SIGNAL_API_URL, SIGNAL_NUMBER
 
-log = logging.getLogger(__name__)
-
 
 def send_message(text: str) -> None:
-    to = CALENDAR_BRIEFING_RECIPIENT
-    try:
-        resp = httpx.post(
-            f"{SIGNAL_API_URL}/v2/send",
-            json={
-                "message": text,
-                "number": SIGNAL_NUMBER,
-                "recipients": [to],
-            },
-            timeout=15,
-        )
-        resp.raise_for_status()
-        log.info("Signal message sent to %s", to)
-    except Exception:
-        log.exception("Failed to send Signal message to %s", to)
-        raise
+    _send_message(
+        text,
+        signal_api_url=SIGNAL_API_URL,
+        signal_number=SIGNAL_NUMBER,
+        recipient=CALENDAR_BRIEFING_RECIPIENT,
+    )

@@ -13,6 +13,7 @@ Self-hosted LLM stack with privacy-focused web search and research tools. Runs o
 | pdf-inspector | 8086 | PDF text extraction via pdf-inspector (Rust); handles Unicode, multi-column, tables |
 | calendar-watcher | — | Polls calendar for meal and travel events; enriches with rating/menu/weather/maps; delivers briefings via Signal |
 | tg-watcher | — | Listens to a Telegram group as your user account; sends a daily LLM-generated brief via Signal |
+| rss-watcher | — | Fetches RSS feeds grouped by category; sends a twice-daily LLM-generated English news brief via Signal |
 | MongoDB | — | LibreChat chat history storage |
 | LibreChat | 3000 | Web UI, accessible from any device |
 | signal-api | 9922 | Signal REST API (bbernhard/signal-cli-rest-api, native mode) |
@@ -161,91 +162,7 @@ Available custom skills: arxiv, currency, finance, github, hackernews, patents, 
 
 The **github** skill calls the GitHub REST API directly (not via mcp-proxy) using `GITHUB_TOKEN` from the environment.
 
-### Patches applied to uoltz
-
-All patches are maintained in the [kbak/uoltz](https://github.com/kbak/uoltz) fork and applied directly to the source. See the fork's README for full details.
-
-**1. Disable skill attribution output** (`bot.py`)
-The block that prints which skills were used after each response is removed. It was noisy and not useful in a chat context.
-
-**2. Message acknowledgement via emoji reaction** (`signal_client.py`, `bot.py`)
-Instead of sending a `⏳ Got it, working on it...` text message as an acknowledgement, the bot now reacts to the incoming message with a 🤖 emoji via the signal-api reactions endpoint. This keeps the chat clean and provides immediate feedback without adding a noisy message to the thread. The `react()` method is added to `SignalClient`; `bot.py` is patched to call it instead of `send()` for acks, passing the original message's sender and timestamp.
-
-**3. Per-sender conversation history** (`agent.py`, `bot.py`)
-The original uoltz code maintains a single shared `Agent` instance, meaning all conversations share the same history and context window — users' messages get mixed together. The patch replaces the single `_agent` global with a `dict[str, Agent]` keyed by conversation ID: the sender's phone number for direct messages, or the group ID for group chats. Each conversation gets its own isolated history. Model or context window changes (via `/model`, `/context`) clear all per-sender agents so they are lazily recreated with the new settings on the next message.
-
-**4. Language-aware responses** (`agent.py`)
-The system prompt is extended with an instruction to always respond in the same language the user is currently writing in. This is particularly useful in multilingual households or groups.
-
-**5. Group mention detection** (`bot.py`)
-Signal delivers `@mentions` as a U+FFFC (object replacement character) in the message text, not as the literal prefix string. The patch threads the `mentions` array through `parse_messages` and checks whether the bot's own number appears in it. If it does, the leading U+FFFC character is stripped before passing the text to the agent.
-
-**6. Group ID format mismatch** (`signal_client.py`)
-Received messages carry `groupId` as the raw `internal_id` (base64, e.g. `9JDGhRIy...=`). The REST API's `/v2/send` endpoint requires the `group.XXX=` prefixed form returned by `/v1/groups/`. The patch adds a `_resolve_group_id()` helper that looks up the correct ID on demand, called automatically in `send()`.
-
-**7. Qwen thinking mode** (`agent.py`)
-`/no_think` is prepended to the system prompt to suppress chain-of-thought output tokens from Qwen3 models, keeping responses concise.
-
-## Goose CLI Agent
-
-[Goose](https://github.com/block/goose) is a local AI agent for terminal workflows — shell commands, Docker tasks, file operations, and lightweight coding. It runs outside Docker alongside llama-swap and connects to the same models and MCP tools.
-
-### Setup
-
-**1. Download and install**
-
-Download `goose-x86_64-pc-windows-msvc.zip` from the [latest release](https://github.com/block/goose/releases/latest), extract, and add to PATH.
-
-**2. Configure**
-
-Goose config lives at `%APPDATA%\Block\goose\config\`. The custom provider for llama-swap is in `custom_providers\custom_llama-swap.json` (created by the wizard or manually).
-
-Key settings in `config.yaml`:
-```yaml
-GOOSE_PROVIDER: custom_llama-swap
-GOOSE_MODEL: qwen           # or gemma4
-GOOSE_TOOLSHIM: true        # required for local models — bypasses llama-server's strict JSON Schema validation
-GOOSE_TELEMETRY_ENABLED: false
-```
-
-MCP tools are added as `streamable_http` extensions (except pdf which runs as a local stdio server):
-```yaml
-extensions:
-  searxng:
-    enabled: true
-    type: streamable_http
-    name: searxng
-    uri: http://127.0.0.1:8083/servers/searxng/mcp
-    headers: {}
-    timeout: 60
-  # ... one entry per MCP server
-  pdf:
-    enabled: true
-    type: streamable_http
-    name: pdf
-    uri: http://127.0.0.1:8086/mcp
-    headers: {}
-    timeout: 120
-```
-
-**Note:** mcp-proxy does not expose an aggregated endpoint — each server must be listed individually. `wikipedia` is disabled due to JSON schema incompatibilities with local models (`GOOSE_TOOLSHIM: true` mitigates most but not all).
-
-**3. Start a session**
-```
-goose session
-```
-
-### Thinking mode
-
-Qwen3 models support toggling chain-of-thought reasoning mid-session:
-- `/think` — enable thinking (default, ~20s per response for 35B model)
-- `/no_think` — disable thinking for fast responses (~1–2s)
-
-The toggle persists for the rest of the session.
-
-### MCP tool compatibility
-
-Some MCP servers expose tools with `null` descriptions or `["string", "null"]` union types in their JSON schemas, which cause llama-server to crash when building grammar constraints. `GOOSE_TOOLSHIM: true` bypasses this by handling tool calls in the prompt layer instead.
+For details on the patches applied to the uoltz fork, see the [kbak/uoltz README](https://github.com/kbak/uoltz).
 
 ## calendar-watcher
 
@@ -280,6 +197,8 @@ cp tg-watcher.env.example tg-watcher.env
 ```
 Set `TG_API_ID`, `TG_API_HASH`, `TG_PHONE`, and `TG_GROUP`. Adjust `SUMMARY_CRON_HOUR`/`SUMMARY_CRON_MINUTE` (UTC) if needed — default is 12:00 UTC (5:00 AM MST).
 
+LLM and Signal settings are inherited from `signal-bot.env` — no need to repeat them.
+
 **4. One-time interactive login**
 
 Telethon requires an interactive login the first time to verify your phone number:
@@ -296,6 +215,40 @@ docker compose up -d tg-watcher
 **6. Test the summary without waiting**
 ```
 docker compose exec tg-watcher python -c "from tg_watcher.summarizer import run_summary; run_summary()"
+```
+
+## rss-watcher
+
+Fetches RSS feeds grouped by category and delivers a twice-daily LLM-generated English news brief via Signal. Briefs fire at 00:05 and 12:05 UTC, covering items from the preceding 12 hours. Non-English articles are translated by the LLM.
+
+LLM and Signal settings are shared with signal-bot via `signal-bot.env` — no duplication needed.
+
+### Setup
+
+**1. Configure rss-watcher.env**
+```
+cp rss-watcher.env.example rss-watcher.env
+```
+
+Set `RSS_FEEDS` to a JSON object mapping category names to lists of feed URLs:
+```json
+{
+  "technology": ["https://feeds.arstechnica.com/arstechnica/index", "https://www.theverge.com/rss/index.xml"],
+  "general":    ["https://feeds.bbci.co.uk/news/rss.xml"],
+  "cars":       ["https://www.motortrend.com/feeds/all/"]
+}
+```
+
+Each category is summarised independently, so topic grouping is consistent within a category. The Signal message sections are separated by `---`.
+
+**2. Start**
+```
+docker compose up -d rss-watcher
+```
+
+**3. Test immediately without waiting**
+```
+docker compose exec rss-watcher python -c "from rss_watcher.briefer import run_news_brief; run_news_brief()"
 ```
 
 ## Notes

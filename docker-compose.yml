@@ -168,6 +168,23 @@ services:
       - "host.docker.internal:host-gateway"
     mem_limit: 512m
 
+  rss-watcher:
+    build:
+      context: .
+      dockerfile: rss-watcher/Dockerfile
+    container_name: rss-watcher
+    restart: unless-stopped
+    env_file:
+      - signal-bot.env
+      - rss-watcher.env
+    depends_on:
+      - signal-api
+    networks:
+      - ai-net
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    mem_limit: 256m
+
 networks:
   ai-net:
     driver: bridge

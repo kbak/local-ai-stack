@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timedelta, timezone
 
-from openai import OpenAI
+from stack_shared.llm_chat import chat
 
 from .config import (
     INFERENCE_API_KEY,
@@ -51,20 +51,15 @@ def run_summary() -> None:
     )
 
     log.info("Summarising %d messages via LLM...", len(messages))
-    client = OpenAI(base_url=INFERENCE_BASE_URL, api_key=INFERENCE_API_KEY)
-    response = client.chat.completions.create(
+    summary = chat(
+        _SYSTEM_PROMPT,
+        user_prompt,
+        base_url=INFERENCE_BASE_URL,
+        api_key=INFERENCE_API_KEY,
         model=INFERENCE_MODEL,
-        messages=[
-            {"role": "system", "content": _SYSTEM_PROMPT},
-            {"role": "user", "content": user_prompt},
-        ],
-        temperature=0.3,
     )
-    summary = (response.choices[0].message.content or "").strip()
 
-    brief = f"*Telegram daily brief*\n\n{summary}"
-    send_message(brief)
+    send_message(f"*Telegram daily brief*\n\n{summary}")
 
-    # Keep DB tidy — drop anything older than 48h
     prune_older_than(datetime.now(timezone.utc) - timedelta(hours=48))
     log.info("Brief sent and old messages pruned.")
