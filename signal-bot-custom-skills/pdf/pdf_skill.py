@@ -3,7 +3,7 @@
 import httpx
 from strands import tool
 
-MCP_URL = "http://mcp-proxy:8083/servers/pdf/mcp"
+MCP_URL = "http://pdf-inspector:8085/mcp"
 
 
 def _call_mcp(tool_name: str, arguments: dict, timeout: int = 30) -> str:
@@ -33,6 +33,6 @@ def read_pdf(source: str) -> str:
         source: URL or file path to the PDF.
     """
     try:
-        return _call_mcp("read_pdf_text", {"source": source})
+        return _call_mcp("read_pdf", {"source": source})
     except Exception as e:
         return f"PDF read failed: {e}"

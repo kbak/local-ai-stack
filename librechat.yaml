@@ -4,6 +4,7 @@ mcpSettings:
   allowedDomains:
     - "http://mcp-proxy:8083"
     - "http://location-tracker:8084"
+    - "http://pdf-inspector:8085"
   autoApprove: true
 
 endpoints:
@@ -66,10 +67,6 @@ mcpServers:
     url: http://mcp-proxy:8083/servers/hackernews/mcp
     type: streamable-http
     serverInstructions: false
-  pdf:
-    url: http://mcp-proxy:8083/servers/pdf/mcp
-    type: streamable-http
-    serverInstructions: false
   semantic-scholar:
     url: http://mcp-proxy:8083/servers/semantic-scholar/mcp
     type: streamable-http
@@ -92,6 +89,10 @@ mcpServers:
     serverInstructions: false
   github:
     url: http://mcp-proxy:8083/servers/github/mcp
+    type: streamable-http
+    serverInstructions: false
+  pdf-inspector:
+    url: http://pdf-inspector:8085/mcp
     type: streamable-http
     serverInstructions: false
   location-tracker:

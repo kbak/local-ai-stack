@@ -31,10 +31,6 @@
       "command": "uvx",
       "args": ["mcp-hn==0.1.0"]
     },
-    "pdf": {
-      "command": "uvx",
-      "args": ["mcp-pdf-reader==0.1.7"]
-    },
     "semantic-scholar": {
       "command": "uvx",
       "args": ["semantic-scholar-mcp==0.4.0"]

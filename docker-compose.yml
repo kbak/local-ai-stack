@@ -114,6 +114,18 @@ services:
       - "host.docker.internal:host-gateway"
     mem_limit: 512m
 
+  pdf-inspector:
+    build:
+      context: .
+      dockerfile: pdf-inspector/Dockerfile
+    container_name: pdf-inspector
+    restart: unless-stopped
+    ports:
+      - "8086:8085"
+    networks:
+      - ai-net
+    mem_limit: 512m
+
   calendar-watcher:
     build:
       context: .

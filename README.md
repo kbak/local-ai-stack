@@ -10,6 +10,7 @@ Self-hosted LLM stack with privacy-focused web search and research tools. Runs o
 | SearXNG | 8081 | Privacy-focused meta search engine |
 | mcp-proxy | 8083 | MCP tool server (14 tools via streamable HTTP, no auth required) |
 | location-tracker | 8084 | City-presence timeline service; exposes `get_location_at` MCP tool (bearer token required) |
+| pdf-inspector | 8086 | PDF text extraction via pdf-inspector (Rust); handles Unicode, multi-column, tables |
 | calendar-watcher | — | Polls calendar for meal and travel events; enriches with rating/menu/weather/maps; delivers briefings via Signal |
 | MongoDB | — | LibreChat chat history storage |
 | LibreChat | 3000 | Web UI, accessible from any device |
@@ -27,7 +28,7 @@ All tools are exposed via mcp-proxy on port 8083 (no authentication required —
 - **youtube** — YouTube transcript extraction
 - **time** — current time and timezone conversion
 - **hackernews** — Hacker News top stories
-- **pdf** — PDF text extraction
+- **pdf-inspector** — PDF text extraction (Rust, handles Unicode/multi-column/tables); available directly at port 8086, not via mcp-proxy
 - **semantic-scholar** — academic paper search
 - **patents** — patent search
 - **weather** — current weather and forecast
@@ -219,12 +220,11 @@ extensions:
   # ... one entry per MCP server
   pdf:
     enabled: true
-    type: stdio
+    type: streamable_http
     name: pdf
-    cmd: C:\Python313\python
-    args:
-      - C:\Users\kacper\mcp-pdf\server.py
-    envs: {}
+    uri: http://127.0.0.1:8086/mcp
+    headers: {}
+    timeout: 120
 ```
 
 **Note:** mcp-proxy does not expose an aggregated endpoint — each server must be listed individually. `wikipedia` is disabled due to JSON schema incompatibilities with local models (`GOOSE_TOOLSHIM: true` mitigates most but not all).
