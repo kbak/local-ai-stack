@@ -30,14 +30,17 @@ _state_lock = threading.Lock()
 @mcp.tool()
 def get_location_at(datetime_iso: str) -> dict:
     """
-    Return the user's city at the given ISO 8601 datetime.
+    Return the user's city at the given ISO 8601 datetime, or "now" for the current time.
 
     Returns: {city: str, confidence: "high"|"medium"|"low"|"explicit"|"fallback", source: str}
     """
-    try:
-        dt = datetime.fromisoformat(datetime_iso)
-    except ValueError:
-        return {"error": f"Invalid datetime: {datetime_iso}"}
+    if datetime_iso.strip().lower() == "now":
+        dt = datetime.now(timezone.utc)
+    else:
+        try:
+            dt = datetime.fromisoformat(datetime_iso)
+        except ValueError:
+            return {"error": f"Invalid datetime: {datetime_iso}"}
 
     with _state_lock:
         spans = list(_state.spans)

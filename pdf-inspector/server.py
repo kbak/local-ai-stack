@@ -96,7 +96,28 @@ def read_pdf(
 
 
 if __name__ == "__main__":
-    host = os.environ.get("HOST", "0.0.0.0")
-    port = int(os.environ.get("PORT", "8085"))
-    log.info("Starting pdf-inspector MCP server on %s:%d", host, port)
-    mcp.run(transport="streamable-http", host=host, port=port)
+    transport = os.environ.get("TRANSPORT", "stdio")
+
+    if transport == "stdio":
+        mcp.run(transport="stdio")
+    else:
+        import uvicorn
+        from starlette.applications import Starlette
+        from starlette.routing import Mount
+
+        host = os.environ.get("HOST", "0.0.0.0")
+        port = int(os.environ.get("PORT", "8085"))
+        log.info("Starting pdf-inspector MCP server on %s:%d", host, port)
+
+        http_app = mcp.http_app(path="/", transport="streamable-http")
+        sse_app = mcp.http_app(path="/", transport="sse")
+
+        app = Starlette(
+            routes=[
+                Mount("/mcp", app=http_app),
+                Mount("/sse", app=sse_app),
+            ],
+            lifespan=http_app.lifespan,
+        )
+
+        uvicorn.run(app, host=host, port=port)
