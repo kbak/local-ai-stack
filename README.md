@@ -18,6 +18,7 @@ Self-hosted LLM stack with privacy-focused web search and research tools. Runs o
 | LibreChat | 3000 | Web UI, accessible from any device |
 | signal-api | 9922 | Signal REST API (bbernhard/signal-cli-rest-api, native mode) |
 | signal-bot | — | Signal messenger bot powered by uoltz + local LLM |
+| yt-dlp-service | 8200 | Host-side yt-dlp download service (runs outside Docker) |
 
 ## MCP Tools
 
@@ -158,11 +159,54 @@ The bot polls for new messages every 1 second with a 1-second receive timeout, g
 
 Skills in `signal-bot-custom-skills/` are mounted into the container and auto-discovered at startup. Each skill is a directory with a `skill.yaml` and a Python file. The built-in `web_search` skill is disabled in favour of the local SearXNG instance.
 
-Available custom skills: arxiv, currency, finance, github, hackernews, patents, pdf, searxng, semantic_scholar, time, weather, wikipedia.
+Available custom skills: arxiv, currency, finance, github, hackernews, music_download, patents, pdf, searxng, semantic_scholar, time, weather, wikipedia.
 
 The **github** skill calls the GitHub REST API directly (not via mcp-proxy) using `GITHUB_TOKEN` from the environment.
 
+The **music_download** skill (`/music`) downloads songs from Shazam or Spotify links as high-quality MP3, trims non-music content from start/end, classifies into a configured directory, and sets ID3 tags including cover art. See setup below.
+
 For details on the patches applied to the uoltz fork, see the [kbak/uoltz README](https://github.com/kbak/uoltz).
+
+### Music download skill
+
+Downloads songs from Shazam/Spotify links (or screenshots of either app) as MP3 files into your local music library.
+
+**Usage**
+```
+/music https://shazam.com/track/...
+/music https://open.spotify.com/track/...
+/music house https://shazam.com/track/...     # inline genre hint
+```
+Or send a screenshot of Shazam/Spotify with `/music` as the caption.
+
+**Setup**
+
+1. **yt-dlp service** — runs on the host (outside Docker) to avoid YouTube IP blocks:
+   ```
+   cd yt-dlp-service
+   pip install -r requirements.txt
+   python server.py
+   ```
+   Listens on port 8200. Start this before the bot.
+
+2. **YouTube cookies** — export from Firefox while logged into YouTube (Brave doesn't work due to app-bound encryption):
+   ```
+   yt-dlp --cookies-from-browser firefox --cookies yt-dlp-service/youtube_cookies.txt --skip-download "https://www.youtube.com"
+   ```
+   Cookies expire after weeks/months — re-run this command when downloads start failing.
+
+3. **Music library volume** — set `MUSIC_HOST_DIR` in your environment or a root `.env` file to the host path of your music library:
+   ```
+   MUSIC_HOST_DIR=D:/backup/Music
+   ```
+   This is mounted at `/music` inside the signal-bot container.
+
+4. **Configure `signal-bot.env`**:
+   ```
+   MUSIC_DIRS=rock:Rock,top40:Top 40
+   MUSIC_CLASSIFY_PROMPT="rock -> rock; everything else -> top40"
+   YTDLP_SERVICE_URL=http://host.docker.internal:8200
+   ```
 
 ## calendar-watcher
 
