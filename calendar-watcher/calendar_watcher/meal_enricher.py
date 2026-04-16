@@ -17,7 +17,7 @@ from stack_shared.weather import get_weather
 
 from .classifier import ClassifyResult
 from .config import (
-    GOOGLE_PLACES_API_KEY,
+    GOOGLE_MAPS_API_KEY,
     MCP_PROXY_URL,
     SEARXNG_URL,
 )
@@ -107,14 +107,14 @@ def _find_menu_url(restaurant: str, city: str) -> str | None:
 
 def _places_lookup(venue: str, city: str) -> tuple[float | None, str | None]:
     """Return (rating, formatted_address) from Places API (New), or (None, None)."""
-    if not GOOGLE_PLACES_API_KEY:
+    if not GOOGLE_MAPS_API_KEY:
         return None, None
     try:
         resp = httpx.post(
             "https://places.googleapis.com/v1/places:searchText",
             headers={
                 "Content-Type": "application/json",
-                "X-Goog-Api-Key": GOOGLE_PLACES_API_KEY,
+                "X-Goog-Api-Key": GOOGLE_MAPS_API_KEY,
                 "X-Goog-FieldMask": "places.rating,places.formattedAddress",
             },
             json={"textQuery": f"{venue} {city}"},

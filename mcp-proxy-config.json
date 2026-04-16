@@ -54,6 +54,10 @@
     "github": {
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-github"]
+    },
+    "google-maps": {
+      "command": "uvx",
+      "args": ["google-maps-mcp-server==0.2.1"]
     }
   }
 }

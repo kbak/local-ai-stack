@@ -38,6 +38,7 @@ All tools are exposed via mcp-proxy on port 8083 (no authentication required —
 - **currency** — exchange rates
 - **finance** — stock and financial data (yfinance)
 - **github** — read files, search code and repos, browse commits and issues (requires `GITHUB_TOKEN`)
+- **google-maps** — place search, ratings, hours, geocoding, directions (requires `GOOGLE_MAPS_API_KEY`)
 - **location-tracker** — `get_location_at(datetime)` — returns city, confidence, and source for any datetime; backed by CalDAV + local LLM + SearXNG. See [`location-tracker/README.md`](location-tracker/README.md).
 
 ## Requirements
@@ -65,7 +66,7 @@ Edit `.env` and set:
 - `MCP_PROXY_AUTH_TOKEN` — bearer token required to access location-tracker. Generate with `openssl rand -hex 32`.
 - `HOME_CITY` — your home city, used as fallback by location-tracker (e.g. `Scottsdale`).
 - `CALDAV_CALENDAR_NAMES` — comma-separated calendar names to track (e.g. `Travel`). Leave empty to track all calendars.
-- `GOOGLE_PLACES_API_KEY` — Google Places API (New) key for venue ratings and addresses in meal briefings.
+- `GOOGLE_MAPS_API_KEY` — Google Places API (New) key for venue ratings and addresses in meal briefings.
 
 **3. Configure models in `llama-swap.yaml`**
 
@@ -215,7 +216,7 @@ Polls CalDAV calendars and sends Signal briefings for:
 - **Meal events** — detected restaurant bookings get enriched with Google Places rating, menu URL, weather, and a Google Maps link. The calendar event is patched with a 🍽 emoji prefix, the Places-resolved address (if the location field was empty or vague), and a Maps URL.
 - **Travel anchors** — first flight or arrival event to a new city gets a weather forecast sent 24h before departure via Signal. The calendar event is patched with a ✈️ emoji prefix. Connecting flights (another flight departing within 6h) are skipped.
 
-Requires `CALDAV_BASE_URL`, `CALDAV_USERNAME`, `CALDAV_PASSWORD`, `CALDAV_CALENDAR_NAMES`, `GOOGLE_PLACES_API_KEY` in `.env`, and `SIGNAL_NUMBER`, `BRIEFING_RECIPIENT` in `signal-bot.env`.
+Requires `CALDAV_BASE_URL`, `CALDAV_USERNAME`, `CALDAV_PASSWORD`, `CALDAV_CALENDAR_NAMES`, `GOOGLE_MAPS_API_KEY` in `.env`, and `SIGNAL_NUMBER`, `BRIEFING_RECIPIENT` in `signal-bot.env`.
 
 ## tg-watcher
 

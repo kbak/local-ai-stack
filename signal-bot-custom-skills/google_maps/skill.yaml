@@ -1,0 +1,12 @@
+name: google_maps
+description: >
+  Search for places, get details (ratings, hours, address), geocode addresses,
+  and get directions or travel times using Google Maps. Use for finding restaurants,
+  venues, POIs, or anything location-related.
+version: "1.0.0"
+enabled: true
+
+tools:
+  - "maps:search_places"
+  - "maps:get_directions"
+  - "maps:geocode"
