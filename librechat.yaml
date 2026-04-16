@@ -4,7 +4,7 @@ mcpSettings:
   allowedDomains:
     - "http://mcp-proxy:8083"
     - "http://location-tracker:8084"
-    - "http://pdf-inspector:8085"
+    - "http://pdf-inspector:8085/"
   autoApprove: true
 
 endpoints:
@@ -92,7 +92,7 @@ mcpServers:
     type: streamable-http
     serverInstructions: false
   pdf-inspector:
-    url: http://pdf-inspector:8085/mcp
+    url: http://pdf-inspector:8085/mcp/
     type: streamable-http
     serverInstructions: false
   location-tracker:

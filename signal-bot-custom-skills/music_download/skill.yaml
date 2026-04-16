@@ -1,0 +1,14 @@
+name: music_download
+description: >
+  Download music from Shazam or Spotify links (or screenshots/photos of either app)
+  as high-quality MP3. Automatically finds the song on YouTube, downloads it,
+  trims silence/ads from start and end, classifies it into the right music directory,
+  and sets ID3 metadata. Optionally accepts an inline classification hint.
+version: "1.0.0"
+enabled: true
+command: /music
+command_arg: input
+command_usage: "/music [genre] <shazam-or-spotify-url>"
+
+tools:
+  - "music:download_music"

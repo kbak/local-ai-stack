@@ -88,6 +88,7 @@ services:
       - ./signal-bot-custom-skills:/app/data/custom_skills
       - signal-bot-data:/app/data
       - signal-cli-data:/signal-cli-data:ro
+      - ${MUSIC_HOST_DIR:-D:/backup/Music}:/music
     depends_on:
       - signal-api
       - mcp-proxy
@@ -96,7 +97,7 @@ services:
       - ai-net
     extra_hosts:
       - "host.docker.internal:host-gateway"
-    mem_limit: 512m
+    mem_limit: 1500m
 
   location-tracker:
     build:

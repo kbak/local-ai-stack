@@ -8,7 +8,9 @@ WORKDIR /app
 
 # Clone our fork and install dependencies
 RUN git clone https://github.com/kbak/uoltz.git /uoltz
-RUN pip install --no-cache-dir -r /uoltz/app/requirements.txt
+RUN pip install --no-cache-dir -r /uoltz/app/requirements.txt && \
+    pip install --no-cache-dir mutagen && \
+    pip install --no-cache-dir -U yt-dlp
 
 # Copy uoltz app as base
 RUN cp -r /uoltz/app/. .
