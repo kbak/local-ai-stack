@@ -70,7 +70,7 @@ Edit `.env` and set:
 
 **3. Configure models in `llama-swap.yaml`**
 
-Edit `llama-swap.yaml` to set your models and their llama-server arguments. The default config includes Qwen3.5-35B-A3B and Gemma 4 31B, both using:
+Edit `llama-swap.yaml` to set your models and their llama-server arguments. The default config includes Qwen3.6-35B-A3B and Gemma 4 31B, both using:
 - `--n-gpu-layers 999` — full GPU offload
 - `--flash-attn on` — flash attention
 - `--batch-size 4096 --ubatch-size 4096` — large batches for fast prompt processing on long contexts
