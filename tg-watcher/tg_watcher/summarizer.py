@@ -1,21 +1,14 @@
-"""Pull last N hours of messages, ask LLM to summarize, send via Signal."""
+"""Fetch last N hours of Telegram messages and send a brief via Signal."""
 
 from __future__ import annotations
 
+import asyncio
 import logging
-from datetime import datetime, timedelta, timezone
 
-from stack_shared.llm_chat import chat
+from stack_shared.briefer import send_brief
 
-from .config import (
-    INFERENCE_API_KEY,
-    INFERENCE_BASE_URL,
-    INFERENCE_MODEL,
-    SUMMARY_LOOKBACK_HOURS,
-    TG_GROUP,
-)
-from .db import fetch_since, prune_older_than
-from .signal_client import send_message
+from .config import SUMMARY_LOOKBACK_HOURS, TG_GROUP
+from .fetcher import fetch_messages
 
 log = logging.getLogger(__name__)
 
@@ -34,32 +27,21 @@ a security professional would find valuable.\
 """
 
 
-def run_summary() -> None:
-    since = datetime.now(timezone.utc) - timedelta(hours=SUMMARY_LOOKBACK_HOURS)
-    messages = fetch_since(since)
-
+async def _run() -> None:
+    messages = await fetch_messages(SUMMARY_LOOKBACK_HOURS)
     if not messages:
         log.info("No messages in the last %dh — skipping brief", SUMMARY_LOOKBACK_HOURS)
         return
 
-    transcript = "\n".join(
-        f"[{m['date'][:16]}] {m['sender']}: {m['text']}" for m in messages
-    )
+    transcript = "\n".join(f"[{m['date'][:16]}] {m['sender']}: {m['text']}" for m in messages)
     user_prompt = (
         f"Here are the last {SUMMARY_LOOKBACK_HOURS} hours of messages "
         f"from the Telegram group '{TG_GROUP}':\n\n{transcript}"
     )
 
     log.info("Summarising %d messages via LLM...", len(messages))
-    summary = chat(
-        _SYSTEM_PROMPT,
-        user_prompt,
-        base_url=INFERENCE_BASE_URL,
-        api_key=INFERENCE_API_KEY,
-        model=INFERENCE_MODEL,
-    )
+    send_brief("Telegram daily brief", _SYSTEM_PROMPT, user_prompt)
 
-    send_message(f"*Telegram daily brief*\n\n{summary}")
 
-    prune_older_than(datetime.now(timezone.utc) - timedelta(hours=48))
-    log.info("Brief sent and old messages pruned.")
+def run_summary() -> None:
+    asyncio.run(_run())

@@ -12,9 +12,6 @@ TG_GROUP: str = os.environ["TG_GROUP"]
 # Session file path (persisted in Docker volume)
 TG_SESSION_FILE: str = os.environ.get("TG_SESSION_FILE", "/data/tg_session")
 
-# SQLite DB for message storage
-DB_PATH: str = os.environ.get("DB_PATH", "/data/messages.db")
-
 # Summary schedule — cron fields (default: 5 AM MST = 12:00 UTC)
 SUMMARY_CRON_HOUR: int = int(os.environ.get("SUMMARY_CRON_HOUR", "12"))
 SUMMARY_CRON_MINUTE: int = int(os.environ.get("SUMMARY_CRON_MINUTE", "0"))
@@ -22,12 +19,3 @@ SUMMARY_CRON_MINUTE: int = int(os.environ.get("SUMMARY_CRON_MINUTE", "0"))
 # How many hours back to include in the daily brief
 SUMMARY_LOOKBACK_HOURS: int = int(os.environ.get("SUMMARY_LOOKBACK_HOURS", "24"))
 
-# LLM — prefer LLM_* (signal-bot.env) with INFERENCE_* as fallback
-INFERENCE_BASE_URL: str = os.environ.get("LLM_BASE_URL") or os.environ.get("INFERENCE_BASE_URL", "http://host.docker.internal:8080/v1")
-INFERENCE_API_KEY: str = os.environ.get("LLM_API_KEY") or os.environ.get("INFERENCE_API_KEY", "sk-no-key-required")
-INFERENCE_MODEL: str = os.environ.get("LLM_MODEL") or os.environ.get("INFERENCE_MODEL", "qwen")
-
-# Signal
-SIGNAL_API_URL: str = os.environ.get("SIGNAL_API_URL", "http://signal-api:8080")
-SIGNAL_NUMBER: str = os.environ["SIGNAL_NUMBER"]
-BRIEFING_RECIPIENT: str = os.environ["BRIEFING_RECIPIENT"]

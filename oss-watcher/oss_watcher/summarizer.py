@@ -4,18 +4,11 @@ from __future__ import annotations
 
 import logging
 
-from stack_shared.llm_chat import chat
+from stack_shared.briefer import send_brief
 
-from .config import (
-    GITHUB_REPO,
-    DISCORD_CHANNEL_ID,
-    INFERENCE_API_KEY,
-    INFERENCE_BASE_URL,
-    INFERENCE_MODEL,
-)
+from .config import DISCORD_CHANNEL_ID, GITHUB_REPO
 from .discord_client import fetch_messages, format_transcript as discord_transcript
 from .github_client import fetch_activity, format_transcript as github_transcript
-from .signal_client import send_message
 
 log = logging.getLogger(__name__)
 
@@ -60,13 +53,5 @@ def run_summary() -> None:
         len(gh_activity["issues"]) + len(gh_activity["prs"]),
     )
 
-    summary = chat(
-        _SYSTEM_PROMPT,
-        user_prompt,
-        base_url=INFERENCE_BASE_URL,
-        api_key=INFERENCE_API_KEY,
-        model=INFERENCE_MODEL,
-    )
-
-    send_message(f"*OSS weekly brief*\n\n{summary}")
+    send_brief("OSS weekly brief", _SYSTEM_PROMPT, user_prompt)
     log.info("Brief sent.")

@@ -1,9 +1,4 @@
-"""tg-watcher entry point.
-
-Runs two things concurrently:
-  1. Telethon listener — streams new messages into SQLite.
-  2. APScheduler cron — fires daily summary at the configured UTC time.
-"""
+"""tg-watcher entry point — daily Telegram summary via APScheduler."""
 
 from __future__ import annotations
 
@@ -13,13 +8,13 @@ import logging
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from .config import SUMMARY_CRON_HOUR, SUMMARY_CRON_MINUTE
-from .listener import run_listener
 from .summarizer import run_summary
 
 log = logging.getLogger(__name__)
 
 
-def _schedule_summary(scheduler: AsyncIOScheduler) -> None:
+async def _main() -> None:
+    scheduler = AsyncIOScheduler()
     scheduler.add_job(
         run_summary,
         trigger="cron",
@@ -28,17 +23,11 @@ def _schedule_summary(scheduler: AsyncIOScheduler) -> None:
         id="daily_brief",
         replace_existing=True,
     )
-    log.info(
-        "Daily brief scheduled at %02d:%02d UTC", SUMMARY_CRON_HOUR, SUMMARY_CRON_MINUTE
-    )
-
-
-async def _main() -> None:
-    scheduler = AsyncIOScheduler()
-    _schedule_summary(scheduler)
+    log.info("Daily brief scheduled at %02d:%02d UTC", SUMMARY_CRON_HOUR, SUMMARY_CRON_MINUTE)
     scheduler.start()
 
-    await run_listener()  # blocks until disconnected
+    while True:
+        await asyncio.sleep(3600)
 
 
 def main() -> None:

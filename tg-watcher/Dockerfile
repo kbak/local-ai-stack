@@ -18,6 +18,4 @@ RUN uv export --frozen --no-dev --no-emit-project -o /tmp/requirements.txt && \
 COPY tg-watcher/tg_watcher/ ./tg_watcher/
 COPY tg-watcher/auth.py ./auth.py
 
-RUN mkdir -p /data
-
 CMD ["python", "-m", "tg_watcher.main"]
