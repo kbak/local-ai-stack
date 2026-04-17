@@ -26,7 +26,7 @@ sys.exit(0 if all_up else 1)
 done
 
 echo "Pre-loading default model (qwen)..."
-until curl -sf http://localhost:8080/v1/models/qwen/v1/chat/completions \
+until curl -sf http://localhost:8080/v1/chat/completions \
     -H "Content-Type: application/json" \
     -d '{"model":"qwen","messages":[{"role":"user","content":"hi"}],"max_tokens":1}' \
     >/dev/null 2>&1; do
