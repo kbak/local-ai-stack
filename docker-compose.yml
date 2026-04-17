@@ -97,7 +97,7 @@ services:
       - ai-net
     extra_hosts:
       - "host.docker.internal:host-gateway"
-    mem_limit: 1500m
+    mem_limit: 3500m
 
   location-tracker:
     build:
