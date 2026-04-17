@@ -2,7 +2,7 @@ listen: "0.0.0.0:8080"
 
 models:
   qwen:
-    cmd: llama-server --port ${PORT} -hf unsloth/Qwen3.6-35B-A3B-GGUF --hf-file Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf --n-gpu-layers 999 --parallel 1 --flash-attn on --cache-type-k q8_0 --cache-type-v q8_0 --batch-size 4096 --ubatch-size 1024 --ctx-size 262144
+    cmd: llama-server --port ${PORT} -hf unsloth/Qwen3.6-35B-A3B-GGUF --hf-file Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf --n-gpu-layers 999 --parallel 1 --flash-attn on --batch-size 4096 --ubatch-size 1024 --ctx-size 250000 --no-mmap
     ttl: 0
 
   qwen3.5:

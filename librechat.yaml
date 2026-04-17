@@ -96,8 +96,8 @@ mcpServers:
     type: streamable-http
     serverInstructions: false
   pdf-inspector:
-    url: http://pdf-inspector:8085/mcp/
-    type: streamable-http
+    url: http://pdf-inspector:8085/sse/
+    type: sse
     serverInstructions: false
   location-tracker:
     url: http://location-tracker:8084/mcp

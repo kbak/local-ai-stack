@@ -16,7 +16,7 @@ docker compose -f "$SCRIPT_DIR/docker-compose.yml" up -d --build
 
 echo "Waiting for all containers to be up..."
 until docker compose -f "$SCRIPT_DIR/docker-compose.yml" ps --format json \
-    | python3 -c "
+    | python -c "
 import sys, json
 states = [json.loads(l)['State'] for l in sys.stdin if l.strip()]
 all_up = all(s == 'running' for s in states)

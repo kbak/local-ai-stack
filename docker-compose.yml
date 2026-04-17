@@ -123,6 +123,8 @@ services:
     restart: unless-stopped
     ports:
       - "8086:8085"
+    environment:
+      TRANSPORT: http
     networks:
       - ai-net
     mem_limit: 512m
@@ -168,6 +170,24 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     mem_limit: 512m
+
+  oss-watcher:
+    build:
+      context: .
+      dockerfile: oss-watcher/Dockerfile
+    container_name: oss-watcher
+    restart: unless-stopped
+    env_file:
+      - .env
+      - signal-bot.env
+      - oss-watcher.env
+    depends_on:
+      - signal-api
+    networks:
+      - ai-net
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    mem_limit: 256m
 
   rss-watcher:
     build:
