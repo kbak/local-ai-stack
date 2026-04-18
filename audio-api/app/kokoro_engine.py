@@ -30,7 +30,17 @@ def load() -> None:
     os.environ["ONNX_PROVIDER"] = provider
     logger.info("Loading Kokoro ONNX %s (provider=%s)...", model_file.name, provider)
     _kokoro = Kokoro(str(model_file), str(voices_file))
-    logger.info("Kokoro ONNX loaded.")
+    logger.info("Kokoro ONNX loaded. Warming up CUDA kernels...")
+    try:
+        _kokoro.create(
+            "Warm up.",
+            voice=config.DEFAULT_VOICE,
+            speed=config.DEFAULT_SPEED,
+            lang=config.LANG_MAP.get(config.DEFAULT_LANG, "en-us"),
+        )
+        logger.info("Kokoro warmup complete.")
+    except Exception:
+        logger.exception("Kokoro warmup failed (non-fatal)")
 
 
 def is_ready() -> bool:

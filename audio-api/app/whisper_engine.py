@@ -26,7 +26,25 @@ def load() -> None:
         device=config.WHISPER_DEVICE,
         compute_type=config.WHISPER_COMPUTE_TYPE,
     )
-    logger.info("Whisper model loaded.")
+    logger.info("Whisper model loaded. Warming up CUDA kernels...")
+    _warmup()
+    logger.info("Whisper warmup complete.")
+
+
+def _warmup() -> None:
+    """Force CUDA kernel JIT/autotune by transcribing a short silent clip."""
+    import numpy as np
+    import soundfile as sf
+
+    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+        tmp_path = tmp.name
+    try:
+        silence = np.zeros(16000, dtype=np.float32)
+        sf.write(tmp_path, silence, 16000)
+        segments, _ = _model.transcribe(tmp_path)
+        list(segments)
+    finally:
+        Path(tmp_path).unlink(missing_ok=True)
 
 
 def is_ready() -> bool:

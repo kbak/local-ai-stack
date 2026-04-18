@@ -9,7 +9,9 @@ RUN ln -sf /usr/bin/python3 /usr/bin/python
 WORKDIR /app
 
 COPY audio-api/requirements.txt /app/requirements.txt
-RUN pip install --no-cache-dir -r /app/requirements.txt
+RUN pip install --no-cache-dir -r /app/requirements.txt && \
+    pip uninstall -y onnxruntime && \
+    pip install --no-cache-dir --force-reinstall onnxruntime-gpu==1.19.2
 
 RUN python -c "from faster_whisper import WhisperModel; WhisperModel('small', device='cpu', compute_type='int8')"
 

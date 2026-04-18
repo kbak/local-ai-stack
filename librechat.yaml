@@ -10,7 +10,7 @@ mcpSettings:
 speech:
   tts:
     openai:
-      url: "http://audio-api:8088/v1"
+      url: "http://audio-api:8088/v1/audio/speech"
       apiKey: "sk-no-key-required"
       model: "kokoro"
       voices:
