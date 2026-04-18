@@ -6,6 +6,14 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 echo "Starting llama-swap..."
 llama-swap --config "$SCRIPT_DIR/llama-swap.yaml" >/dev/null 2>&1 &
 
+echo "Pre-loading default model (qwen) before Docker stack..."
+until curl -sf http://localhost:8080/v1/chat/completions \
+    -H "Content-Type: application/json" \
+    -d '{"model":"qwen","messages":[{"role":"user","content":"hi"}],"max_tokens":1}' \
+    >/dev/null 2>&1; do
+    sleep 2
+done
+
 echo "Starting yt-dlp service..."
 cd "$SCRIPT_DIR/yt-dlp-service"
 python server.py >/dev/null 2>&1 &
@@ -25,12 +33,4 @@ sys.exit(0 if all_up else 1)
     sleep 2
 done
 
-echo "Pre-loading default model (qwen)..."
-until curl -sf http://localhost:8080/v1/chat/completions \
-    -H "Content-Type: application/json" \
-    -d '{"model":"qwen","messages":[{"role":"user","content":"hi"}],"max_tokens":1}' \
-    >/dev/null 2>&1; do
-    sleep 2
-done
-
-echo "Stack is up."
+echo "Stack is up. (signal-bot will warm up Whisper + Kokoro in background)"
