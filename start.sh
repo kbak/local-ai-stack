@@ -33,4 +33,9 @@ sys.exit(0 if all_up else 1)
     sleep 2
 done
 
-echo "Stack is up. (signal-bot will warm up Whisper + Kokoro in background)"
+echo "Waiting for audio-api to load Whisper + Kokoro..."
+until curl -sf http://localhost:8088/health >/dev/null 2>&1; do
+    sleep 2
+done
+
+echo "Stack is up."

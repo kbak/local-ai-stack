@@ -30,6 +30,27 @@ services:
       - ai-net
     mem_limit: 1500m
 
+  audio-api:
+    build:
+      context: .
+      dockerfile: audio-api/Dockerfile
+    container_name: audio-api
+    restart: unless-stopped
+    ports:
+      - "8088:8088"
+    env_file:
+      - ./audio-api.env
+    networks:
+      - ai-net
+    mem_limit: 3000m
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
   mongodb:
     image: mongo:7
     container_name: mongodb
@@ -54,6 +75,7 @@ services:
     depends_on:
       - mongodb
       - mcp-proxy
+      - audio-api
     networks:
       - ai-net
     extra_hosts:
@@ -93,18 +115,12 @@ services:
       - signal-api
       - mcp-proxy
       - searxng
+      - audio-api
     networks:
       - ai-net
     extra_hosts:
       - "host.docker.internal:host-gateway"
-    mem_limit: 3500m
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
+    mem_limit: 1500m
 
   location-tracker:
     build:
