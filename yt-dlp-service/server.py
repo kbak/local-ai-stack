@@ -93,13 +93,17 @@ async def download(req: DownloadRequest):
 
     logger.info("Serving %s (%s - %s)", mp3.name, artist, title)
 
+    # HTTP headers must be latin-1 — drop non-encodable chars (e.g. Polish diacritics)
+    def _latin1_safe(s: str) -> str:
+        return s.encode("latin-1", errors="replace").decode("latin-1")
+
     return FileResponse(
         path=str(mp3),
         media_type="audio/mpeg",
         filename=mp3.name,
         headers={
-            "X-Artist": artist,
-            "X-Title": title,
+            "X-Artist": _latin1_safe(artist),
+            "X-Title": _latin1_safe(title),
         },
         background=None,
     )
