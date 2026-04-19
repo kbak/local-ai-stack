@@ -38,4 +38,9 @@ until curl -sf http://localhost:8088/health >/dev/null 2>&1; do
     sleep 2
 done
 
+echo "Waiting for voice-agent..."
+until curl -sf http://localhost:8087/health >/dev/null 2>&1; do
+    sleep 2
+done
+
 echo "Stack is up."

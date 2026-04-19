@@ -80,7 +80,7 @@ speech:
       autoTranscribeAudio: true
     textToSpeech:
       engineTTS: "openai"
-      voice: "af_liam"
+      voice: "am_onyx"
       automaticPlayback: true
 
 endpoints:

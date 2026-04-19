@@ -51,6 +51,26 @@ services:
               count: 1
               capabilities: [gpu]
 
+  voice-agent:
+    build:
+      context: ./voice-agent
+      dockerfile: Dockerfile
+    container_name: voice-agent
+    restart: unless-stopped
+    ports:
+      - "8087:8087"
+    volumes:
+      - ./signal-bot-custom-skills:/app/skills:ro
+      - ./voice-agent/static:/app/static:ro
+    depends_on:
+      - audio-api
+      - mcp-proxy
+    networks:
+      - ai-net
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    mem_limit: 512m
+
   mongodb:
     image: mongo:7
     container_name: mongodb

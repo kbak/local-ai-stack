@@ -107,6 +107,47 @@ def synthesize(text: str, voice: str, lang: str, speed: float, response_format: 
     return _ffmpeg_encode(wav_bytes, response_format)
 
 
+_MAX_CHARS = 400  # Kokoro's voice embedding caps at 510 phoneme tokens; 400 chars is a safe margin.
+
+
+def _chunk_long(sentence: str, max_chars: int = _MAX_CHARS) -> list[str]:
+    """Split a sentence that exceeds Kokoro's token cap along commas/whitespace."""
+    if len(sentence) <= max_chars:
+        return [sentence]
+
+    import re
+    # Try commas/semicolons/colons first, then fall back to whitespace.
+    parts = re.split(r"(?<=[,;:])\s+", sentence)
+    chunks: list[str] = []
+    buf = ""
+    for p in parts:
+        if len(p) > max_chars:
+            # Still too long — hard-split on whitespace.
+            words = p.split()
+            sub = ""
+            for w in words:
+                candidate = (sub + " " + w).strip()
+                if len(candidate) > max_chars and sub:
+                    chunks.append(sub)
+                    sub = w
+                else:
+                    sub = candidate
+            if sub:
+                if buf:
+                    chunks.append(buf); buf = ""
+                chunks.append(sub)
+            continue
+        candidate = (buf + " " + p).strip()
+        if len(candidate) > max_chars and buf:
+            chunks.append(buf)
+            buf = p
+        else:
+            buf = candidate
+    if buf:
+        chunks.append(buf)
+    return [c for c in chunks if c]
+
+
 def synthesize_stream(
     text: str, voice: str, lang: str, speed: float, response_format: str
 ) -> Iterator[bytes]:
@@ -123,5 +164,10 @@ def synthesize_stream(
         sentences = [text]
 
     for sentence in sentences:
-        wav_bytes, _ = synthesize_wav(sentence, voice, lang, speed)
-        yield _ffmpeg_encode(wav_bytes, response_format)
+        for chunk in _chunk_long(sentence):
+            try:
+                wav_bytes, _ = synthesize_wav(chunk, voice, lang, speed)
+            except IndexError:
+                logger.warning("Kokoro token overflow on chunk of %d chars, skipping", len(chunk))
+                continue
+            yield _ffmpeg_encode(wav_bytes, response_format)
