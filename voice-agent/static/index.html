@@ -65,6 +65,7 @@
   <div class="row">
     <select id="voice" title="voice"></select>
     <button class="btn" id="auto" title="auto-listen after each reply">auto: off</button>
+    <button class="btn" id="barge" title="interrupt by speaking (best with headphones)">barge: off</button>
     <button class="btn" id="reset">new conversation</button>
     <button class="btn" id="interrupt">stop</button>
   </div>
@@ -78,11 +79,14 @@
   const interruptBtn = document.getElementById("interrupt");
   const voiceSel = document.getElementById("voice");
   const autoBtn = document.getElementById("auto");
+  const bargeBtn = document.getElementById("barge");
 
   const VOICE_STORAGE_KEY = "voice-agent.voice";
   const AUTO_STORAGE_KEY = "voice-agent.auto";
+  const BARGE_STORAGE_KEY = "voice-agent.barge";
 
   let conversationMode = localStorage.getItem(AUTO_STORAGE_KEY) === "1";
+  let bargeMode = localStorage.getItem(BARGE_STORAGE_KEY) === "1";
 
   let ws = null;
   let mediaRecorder = null;
@@ -108,12 +112,15 @@
   }
 
   function setState(s) {
+    const prev = state;
     state = s;
     micBtn.classList.remove("listening", "thinking", "speaking");
     if (s === "listening") { micBtn.classList.add("listening"); micBtn.textContent = "stop"; statusEl.textContent = "listening..."; }
     else if (s === "thinking") { micBtn.classList.add("thinking"); micBtn.textContent = "..."; statusEl.textContent = "thinking..."; }
     else if (s === "speaking") { micBtn.classList.add("speaking"); micBtn.textContent = "talk"; statusEl.textContent = "speaking"; }
     else { micBtn.textContent = "talk"; statusEl.textContent = "tap mic to start"; }
+    if (s === "speaking") startBargeListening();
+    else if (prev === "speaking") stopBargeListening();
   }
 
   function connect() {
@@ -202,33 +209,51 @@
     sourceBuffer = null; mediaSource = null; audioEl = null;
   }
 
-  async function startListening() {
+  async function startListening(existingStream, existingRecorder, seedChunks) {
     if (state !== "idle" && state !== "speaking") return;
     if (state === "speaking") {
       stopPlayback();
       if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "interrupt" }));
     }
 
-    try {
-      stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
-    } catch (e) {
-      statusEl.textContent = "mic access denied";
-      return;
+    if (existingStream) {
+      stream = existingStream;
+    } else {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+      } catch (e) {
+        statusEl.textContent = "mic access denied";
+        return;
+      }
     }
 
-    const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus") ? "audio/webm;codecs=opus"
-                   : MediaRecorder.isTypeSupported("audio/mp4") ? "audio/mp4"
-                   : "";
-    mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
-    audioChunks = [];
-    mediaRecorder.ondataavailable = (e) => { if (e.data && e.data.size > 0) audioChunks.push(e.data); };
-    mediaRecorder.onstop = () => {
-      const blob = new Blob(audioChunks, { type: mediaRecorder.mimeType || "audio/webm" });
+    if (existingRecorder) {
+      // Reuse the pre-roll recorder: keep it running, rewire its handlers, graft
+      // already-captured chunks as the head of the clip.
+      mediaRecorder = existingRecorder;
+      audioChunks = seedChunks || [];
+      mediaRecorder.ondataavailable = (e) => { if (e.data && e.data.size > 0) audioChunks.push(e.data); };
+      mediaRecorder.onstop = () => {
+        const blob = new Blob(audioChunks, { type: mediaRecorder.mimeType || "audio/webm" });
+        audioChunks = [];
+        stream.getTracks().forEach(t => t.stop()); stream = null;
+        sendAudio(blob);
+      };
+    } else {
+      const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus") ? "audio/webm;codecs=opus"
+                     : MediaRecorder.isTypeSupported("audio/mp4") ? "audio/mp4"
+                     : "";
+      mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
       audioChunks = [];
-      stream.getTracks().forEach(t => t.stop()); stream = null;
-      sendAudio(blob);
-    };
-    mediaRecorder.start();
+      mediaRecorder.ondataavailable = (e) => { if (e.data && e.data.size > 0) audioChunks.push(e.data); };
+      mediaRecorder.onstop = () => {
+        const blob = new Blob(audioChunks, { type: mediaRecorder.mimeType || "audio/webm" });
+        audioChunks = [];
+        stream.getTracks().forEach(t => t.stop()); stream = null;
+        sendAudio(blob);
+      };
+      mediaRecorder.start();
+    }
     setState("listening");
     startSilenceDetection(stream, () => stopListening());
   }
@@ -319,6 +344,59 @@
     analyser = null; vadSrc = null;
   }
 
+  // ── barge-in VAD: monitor mic during bot speech (no recording), trigger on voice ──
+  let bargeStream = null, bargeCtx = null, bargeAnalyser = null, bargeRaf = null, bargeSrc = null;
+  async function startBargeListening() {
+    if (!bargeMode) return;
+    if (bargeStream) return;
+    try {
+      bargeStream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+      });
+    } catch { return; }
+    bargeCtx = new (window.AudioContext || window.webkitAudioContext)();
+    bargeSrc = bargeCtx.createMediaStreamSource(bargeStream);
+    bargeAnalyser = bargeCtx.createAnalyser();
+    bargeAnalyser.fftSize = 2048;
+    bargeSrc.connect(bargeAnalyser);
+
+    const buf = new Float32Array(bargeAnalyser.fftSize);
+    // High threshold to reject speaker bleed. Requires 2 consecutive frames
+    // above threshold (~32ms at 60fps) to resist transient clicks/bumps.
+    const BARGE_THRESHOLD = 0.06;
+    let hotFrames = 0;
+
+    const tick = () => {
+      if (state !== "speaking" || !bargeMode) { stopBargeListening(); return; }
+      bargeAnalyser.getFloatTimeDomainData(buf);
+      let sum = 0;
+      for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
+      const rms = Math.sqrt(sum / buf.length);
+      if (rms > BARGE_THRESHOLD) {
+        hotFrames++;
+        if (hotFrames >= 2) {
+          // Hand stream to recorder immediately. No pre-roll → no echo capture.
+          const handoffStream = bargeStream;
+          bargeStream = null;
+          stopBargeListening();
+          startListening(handoffStream);
+          return;
+        }
+      } else {
+        hotFrames = 0;
+      }
+      bargeRaf = requestAnimationFrame(tick);
+    };
+    bargeRaf = requestAnimationFrame(tick);
+  }
+  function stopBargeListening() {
+    if (bargeRaf) cancelAnimationFrame(bargeRaf);
+    bargeRaf = null;
+    if (bargeStream) { bargeStream.getTracks().forEach(t => t.stop()); bargeStream = null; }
+    if (bargeCtx) { try { bargeCtx.close(); } catch {} bargeCtx = null; }
+    bargeAnalyser = null; bargeSrc = null;
+  }
+
   micBtn.addEventListener("click", () => {
     if (state === "listening") stopListening();
     else startListening();
@@ -352,6 +430,19 @@
     if (conversationMode && state === "idle") startListening();
   });
   renderAuto();
+
+  function renderBarge() {
+    bargeBtn.textContent = "barge: " + (bargeMode ? "on" : "off");
+    bargeBtn.classList.toggle("on", bargeMode);
+  }
+  bargeBtn.addEventListener("click", () => {
+    bargeMode = !bargeMode;
+    localStorage.setItem(BARGE_STORAGE_KEY, bargeMode ? "1" : "0");
+    renderBarge();
+    if (bargeMode && state === "speaking") startBargeListening();
+    else if (!bargeMode) stopBargeListening();
+  });
+  renderBarge();
 
   connect();
   loadVoices();
