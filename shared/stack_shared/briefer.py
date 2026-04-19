@@ -7,6 +7,7 @@ import os
 
 from .llm_chat import chat
 from .signal_client import send_message
+from .voice_note import send_text_and_voice_brief
 
 log = logging.getLogger(__name__)
 
@@ -31,5 +32,15 @@ def send_brief(
     recipient = recipient or os.environ["BRIEFING_RECIPIENT"]
 
     summary = chat(system_prompt, user_prompt, base_url=base_url, api_key=api_key, model=model)
-    send_message(f"*{title}*\n\n{summary}", signal_api_url=signal_api_url, signal_number=signal_number, recipient=recipient)
+    body = f"*{title}*\n\n{summary}"
+
+    if os.environ.get("SIGNAL_VOICE_BRIEF") == "1":
+        send_text_and_voice_brief(
+            body,
+            signal_api_url=signal_api_url,
+            signal_number=signal_number,
+            recipient=recipient,
+        )
+    else:
+        send_message(body, signal_api_url=signal_api_url, signal_number=signal_number, recipient=recipient)
     log.info("Brief '%s' sent.", title)

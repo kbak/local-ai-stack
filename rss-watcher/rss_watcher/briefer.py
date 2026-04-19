@@ -7,6 +7,7 @@ import os
 
 from stack_shared.llm_chat import chat
 from stack_shared.signal_client import send_message
+from stack_shared.voice_note import send_text_and_voice_brief
 
 from .config import RSS_FEEDS, RSS_LOOKBACK_HOURS
 from .fetcher import fetch_category
@@ -67,10 +68,18 @@ def run_news_brief() -> None:
         log.info("No news items across all categories — skipping signal message")
         return
 
-    send_message(
-        "*RSS News Brief*\n\n" + "\n\n---\n\n".join(parts),
-        signal_api_url=os.environ.get("SIGNAL_API_URL", "http://signal-api:8080"),
-        signal_number=os.environ["SIGNAL_NUMBER"],
-        recipient=os.environ["BRIEFING_RECIPIENT"],
-    )
+    body = "*RSS News Brief*\n\n" + "\n\n---\n\n".join(parts)
+    signal_api_url = os.environ.get("SIGNAL_API_URL", "http://signal-api:8080")
+    signal_number = os.environ["SIGNAL_NUMBER"]
+    recipient = os.environ["BRIEFING_RECIPIENT"]
+
+    if os.environ.get("SIGNAL_VOICE_BRIEF") == "1":
+        send_text_and_voice_brief(
+            body,
+            signal_api_url=signal_api_url,
+            signal_number=signal_number,
+            recipient=recipient,
+        )
+    else:
+        send_message(body, signal_api_url=signal_api_url, signal_number=signal_number, recipient=recipient)
     log.info("News brief sent.")
