@@ -11,13 +11,15 @@ Self-hosted LLM stack with privacy-focused web search and research tools. Runs o
 | mcp-proxy | 8083 | MCP tool server (14 tools via streamable HTTP, no auth required) |
 | location-tracker | 8084 | City-presence timeline service; exposes `get_location_at` MCP tool (bearer token required) |
 | pdf-inspector | 8086 | PDF text extraction via pdf-inspector (Rust); handles Unicode, multi-column, tables |
+| voice-agent | 8087 | Browser voice-chat UI with wake-word-free VAD, streaming TTS, voice picker, and full MCP tool access via strands |
+| audio-api | 8088 | Shared GPU-backed Whisper (STT) + Kokoro (TTS) service with an OpenAI-compatible API |
 | calendar-watcher | — | Polls calendar for meal and travel events; enriches with rating/menu/weather/maps; delivers briefings via Signal |
 | tg-watcher | — | Listens to a Telegram group as your user account; sends a daily LLM-generated brief via Signal |
 | rss-watcher | — | Fetches RSS feeds grouped by category; sends a twice-daily LLM-generated English news brief via Signal |
 | MongoDB | — | LibreChat chat history storage |
-| LibreChat | 3000 | Web UI, accessible from any device |
+| LibreChat | 3000 | Web UI, accessible from any device (speech tab wired to audio-api) |
 | signal-api | 9922 | Signal REST API (bbernhard/signal-cli-rest-api, native mode) |
-| signal-bot | — | Signal messenger bot powered by uoltz + local LLM |
+| signal-bot | — | Signal messenger bot powered by uoltz + local LLM (STT/TTS via audio-api) |
 | yt-dlp-service | 8200 | Host-side yt-dlp download service (runs outside Docker) |
 
 ## MCP Tools
@@ -112,6 +114,68 @@ http://<server-ip>:8083/servers/github/mcp
 # etc.
 ```
 
+## audio-api (shared STT/TTS)
+
+A single GPU-backed service exposing OpenAI-compatible endpoints — used by LibreChat, signal-bot, and voice-agent. No model duplication; Whisper and Kokoro are loaded once and stay warm.
+
+- `POST /v1/audio/transcriptions` — Whisper (faster-whisper) transcription
+- `POST /v1/audio/speech` — Kokoro TTS; supports `stream: true` for sentence-by-sentence chunks
+- `GET /v1/voices` — list of installed Kokoro voices
+- `GET /health` — returns 200 only once both models are loaded AND warmed up (CUDA kernels JIT-compiled). `start.sh` polls this before considering the stack ready.
+
+Defaults in `audio-api.env`:
+
+```
+WHISPER_MODEL=small
+WHISPER_DEVICE=cuda
+WHISPER_COMPUTE_TYPE=float16
+ONNX_PROVIDER=CUDAExecutionProvider
+DEFAULT_VOICE=am_onyx
+DEFAULT_LANG=a
+DEFAULT_SPEED=1.0
+```
+
+Both models run on the GPU. Post-warmup, first real request latency is ~0.7s. Long sentences are auto-chunked at commas/whitespace before hitting Kokoro's 510-token cap.
+
+## voice-agent (browser voice chat)
+
+A self-hosted voice-chat web UI at `http://<host>:8087` — tap the mic, talk, hear the answer. Same MCP tools LibreChat has, loaded via `signal-bot-custom-skills/` through the strands framework.
+
+**Features**
+- Browser-side RMS VAD — no push-to-talk, recording stops on ~1.2s of silence
+- Streaming MP3 TTS via MediaSource API — audio starts playing within ~200ms of the first sentence
+- **Conversation mode** (`auto: on`) — mic auto-reopens after each bot reply; one tap for a full back-and-forth
+- Voice picker — populated live from audio-api's `/v1/voices`, choice persists in localStorage
+- Interrupt / reset / per-session voice override
+- Fixed-position header/footer so mobile browser chrome doesn't eat the controls
+
+**Architecture**
+```
+browser ── WS ──► voice-agent ──► audio-api (STT)
+                       │
+                       ▼
+                 strands Agent (Qwen + all MCP tools)
+                       │
+                       ▼
+                  audio-api (TTS, streamed MP3) ──► browser
+```
+
+- 60s agent timeout with `invoke_async` — stop button truly cancels
+- `enable_thinking: false` passed via `chat_template_kwargs` so Qwen skips the reasoning phase in voice mode (much faster, no tool loops)
+- Static `./voice-agent/static/` is mounted live — CSS/JS edits apply without rebuild
+
+**Phone access via Tailscale**
+
+The PC has no mic, but your phone does. Serve over HTTPS (required for browser mic access):
+
+```
+tailscale serve --bg --https=8443 http://localhost:8087
+```
+
+Then open `https://<pc-name>.<tailnet>.ts.net:8443` on your phone.
+
+LibreChat serves on `:443` via Tailscale — voice-agent is on `:8443` to avoid the collision.
+
 ## Signal Bot
 
 A Signal messenger bot that routes messages through the local LLM with the same MCP tools available in LibreChat. Built on a [custom fork of uoltz](https://github.com/kbak/uoltz), cloned at Docker build time.
@@ -167,6 +231,10 @@ The **github** skill calls the GitHub REST API directly (not via mcp-proxy) usin
 The **music_download** skill (`/music`) downloads songs from Shazam or Spotify links as high-quality MP3, trims non-music content from start/end, classifies into a configured directory, and sets ID3 tags including cover art. See setup below.
 
 For details on the patches applied to the uoltz fork, see the [kbak/uoltz README](https://github.com/kbak/uoltz).
+
+### Voice messages
+
+Voice transcription and synthesis are delegated to **audio-api** over HTTP — signal-bot no longer bundles Whisper or Kokoro, has no GPU reservation, and stays under ~1.5GB of RAM. Set `AUDIO_API_URL=http://audio-api:8088` and pick a default voice with `TTS_VOICE=am_onyx` in `signal-bot.env`.
 
 ### Music download skill
 
@@ -304,3 +372,5 @@ docker compose exec rss-watcher python -c "from rss_watcher.briefer import run_n
 - llama-swap unloads the current model when a different one is requested — only one model in VRAM at a time
 - signal-cli-data volume is shared between signal-api (read-write) and signal-bot (read-only)
 - mcp-proxy includes Node.js for the GitHub MCP server; all other tools are pure Python via uvx
+- audio-api is the single GPU consumer for STT/TTS — signal-bot, LibreChat, and voice-agent all call it over HTTP
+- The consistent default voice across all services is `am_onyx` — set via `DEFAULT_VOICE` (audio-api.env), `TTS_VOICE` (signal-bot.env), `TTS_VOICE` env or `config.py` default (voice-agent), and `voice:` in `librechat.yaml`
