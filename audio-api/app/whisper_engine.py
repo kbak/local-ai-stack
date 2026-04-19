@@ -32,14 +32,15 @@ def load() -> None:
 
 
 def _warmup() -> None:
-    """Force CUDA kernel JIT/autotune by transcribing a short silent clip."""
+    """Force CUDA kernel JIT/autotune and size the CT2 workspace to a realistic
+    peak by transcribing a 30-second clip (Whisper's native window)."""
     import numpy as np
     import soundfile as sf
 
     with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
         tmp_path = tmp.name
     try:
-        silence = np.zeros(16000, dtype=np.float32)
+        silence = np.zeros(16000 * 30, dtype=np.float32)
         sf.write(tmp_path, silence, 16000)
         segments, _ = _model.transcribe(tmp_path)
         list(segments)

@@ -12,6 +12,8 @@ logger = logging.getLogger(__name__)
 
 _kokoro = None
 
+_MAX_CHARS = 400  # Kokoro's voice embedding caps at 510 phoneme tokens; 400 chars is a safe margin.
+
 
 def load() -> None:
     global _kokoro
@@ -32,8 +34,11 @@ def load() -> None:
     _kokoro = Kokoro(str(model_file), str(voices_file))
     logger.info("Kokoro ONNX loaded. Warming up CUDA kernels...")
     try:
+        # Full-length chunk so the ONNX Runtime CUDA arena sizes itself to the
+        # real peak working set at startup, not on the first real request.
+        warmup_text = ("The quick brown fox jumps over the lazy dog. " * 20)[:_MAX_CHARS]
         _kokoro.create(
-            "Warm up.",
+            warmup_text,
             voice=config.DEFAULT_VOICE,
             speed=config.DEFAULT_SPEED,
             lang=config.LANG_MAP.get(config.DEFAULT_LANG, "en-us"),
@@ -142,9 +147,6 @@ def synthesize(text: str, voice: str, lang: str, speed: float, response_format: 
     buf = io.BytesIO()
     sf.write(buf, combined, sample_rate, format="WAV")
     return _ffmpeg_encode(buf.getvalue(), response_format)
-
-
-_MAX_CHARS = 400  # Kokoro's voice embedding caps at 510 phoneme tokens; 400 chars is a safe margin.
 
 
 def _chunk_long(sentence: str, max_chars: int = _MAX_CHARS) -> list[str]:
