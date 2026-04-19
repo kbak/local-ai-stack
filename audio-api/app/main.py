@@ -28,7 +28,12 @@ def health() -> Response:
 
 @app.get("/v1/voices")
 def voices() -> dict:
-    return {"voices": kokoro_engine.list_voices()}
+    return {
+        "voices": kokoro_engine.list_voices(),
+        "default": config.DEFAULT_VOICE,
+        "lang": config.DEFAULT_LANG,
+        "speed": config.DEFAULT_SPEED,
+    }
 
 
 _CONTENT_TYPE_TO_SUFFIX = {

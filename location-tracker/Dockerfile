@@ -9,9 +9,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libssl-dev ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Install shared library
+# Install shared library editable so a compose bind-mount of ./shared:/shared:ro
+# picks up source changes without rebuilding the image.
 COPY shared/ /shared/
-RUN pip install --no-cache-dir /shared/
+RUN pip install --no-cache-dir -e /shared/
 
 # Export locked deps to requirements.txt, then install — no runtime uv needed
 # Exclude the local stack-shared path dep (already installed above)

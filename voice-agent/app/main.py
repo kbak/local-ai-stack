@@ -55,11 +55,11 @@ def index() -> FileResponse:
 @app.get("/voices")
 async def voices() -> JSONResponse:
     try:
-        voices = await audio_client.list_voices()
+        payload = await audio_client.list_voices()
     except Exception as e:
         logger.exception("Voice list failed")
-        return JSONResponse({"voices": [], "default": config.TTS_VOICE, "error": str(e)}, status_code=200)
-    return JSONResponse({"voices": voices, "default": config.TTS_VOICE})
+        return JSONResponse({"voices": [], "default": None, "error": str(e)}, status_code=200)
+    return JSONResponse(payload)
 
 
 AGENT_TIMEOUT_S = 60

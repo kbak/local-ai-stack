@@ -11,10 +11,6 @@ LLM_MAX_TOKENS = int(os.getenv("LLM_MAX_TOKENS", "4096"))
 
 SKILLS_DIR = Path(os.getenv("SKILLS_DIR", "/app/skills"))
 
-TTS_VOICE = os.getenv("TTS_VOICE", "am_onyx")
-TTS_LANG = os.getenv("TTS_LANG", "a")
-TTS_SPEED = float(os.getenv("TTS_SPEED", "1.0"))
-
 VOICE_SYSTEM_PROMPT = """\
 You are a voice assistant. Your responses are spoken aloud, not read.
 

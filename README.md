@@ -120,20 +120,22 @@ A single GPU-backed service exposing OpenAI-compatible endpoints — used by Lib
 
 - `POST /v1/audio/transcriptions` — Whisper (faster-whisper) transcription
 - `POST /v1/audio/speech` — Kokoro TTS; supports `stream: true` for sentence-by-sentence chunks
-- `GET /v1/voices` — list of installed Kokoro voices
+- `GET /v1/voices` — `{voices, default, lang, speed}` — list of installed Kokoro voices plus the current server-side defaults
 - `GET /health` — returns 200 only once both models are loaded AND warmed up (CUDA kernels JIT-compiled). `start.sh` polls this before considering the stack ready.
 
-Defaults in `audio-api.env`:
+Defaults in `audio-api.env` (**single source of truth** for voice/lang/speed):
 
 ```
 WHISPER_MODEL=small
 WHISPER_DEVICE=cuda
 WHISPER_COMPUTE_TYPE=float16
 ONNX_PROVIDER=CUDAExecutionProvider
-DEFAULT_VOICE=am_onyx
-DEFAULT_LANG=a
+DEFAULT_VOICE=bm_george
+DEFAULT_LANG=b
 DEFAULT_SPEED=1.0
 ```
+
+Callers (voice-agent, calendar-watcher, rss-watcher, etc.) omit `voice`/`lang`/`speed` from their requests so these defaults apply. Pass them explicitly only to override per-request. To change the stack-wide default voice, edit `DEFAULT_VOICE` here and `docker compose restart audio-api` — no other service needs updating. `signal-bot` is the one exception (it reads `TTS_VOICE` from `signal-bot.env` because the uoltz upstream expects it); `librechat.yaml` also pins a UI default under `speechTab.textToSpeech.voice`.
 
 Both models run on the GPU. Post-warmup, first real request latency is ~0.7s. Long sentences are auto-chunked at commas/whitespace before hitting Kokoro's 510-token cap.
 
@@ -234,7 +236,7 @@ For details on the patches applied to the uoltz fork, see the [kbak/uoltz README
 
 ### Voice messages
 
-Voice transcription and synthesis are delegated to **audio-api** over HTTP — signal-bot no longer bundles Whisper or Kokoro, has no GPU reservation, and stays under ~1.5GB of RAM. Set `AUDIO_API_URL=http://audio-api:8088` and pick a default voice with `TTS_VOICE=am_onyx` in `signal-bot.env`.
+Voice transcription and synthesis are delegated to **audio-api** over HTTP — signal-bot no longer bundles Whisper or Kokoro, has no GPU reservation, and stays under ~1.5GB of RAM. Set `AUDIO_API_URL=http://audio-api:8088` and pick a default voice with `TTS_VOICE=bm_george` in `signal-bot.env` (uoltz reads this var directly).
 
 ### Music download skill
 
@@ -373,4 +375,5 @@ docker compose exec rss-watcher python -c "from rss_watcher.briefer import run_n
 - signal-cli-data volume is shared between signal-api (read-write) and signal-bot (read-only)
 - mcp-proxy includes Node.js for the GitHub MCP server; all other tools are pure Python via uvx
 - audio-api is the single GPU consumer for STT/TTS — signal-bot, LibreChat, and voice-agent all call it over HTTP
-- The consistent default voice across all services is `am_onyx` — set via `DEFAULT_VOICE` (audio-api.env), `TTS_VOICE` (signal-bot.env), `TTS_VOICE` env or `config.py` default (voice-agent), and `voice:` in `librechat.yaml`
+- audio-api owns the default voice/lang/speed (`DEFAULT_VOICE` in `audio-api.env`). voice-agent and the watchers omit these fields so the server-side defaults apply; `signal-bot.env` still sets `TTS_VOICE` (uoltz reads it) and `librechat.yaml` pins a UI default. To swap voices stack-wide, change `DEFAULT_VOICE` and restart audio-api
+- `./shared/` is bind-mounted (`:ro`) into every watcher (`calendar-watcher`, `tg-watcher`, `oss-watcher`, `rss-watcher`, `location-tracker`) and installed editable — edit `shared/stack_shared/*.py` and `docker compose restart <watcher>` without rebuilding the image

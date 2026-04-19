@@ -40,17 +40,24 @@ async def synthesize_stream(
     speed: float | None = None,
     response_format: str = "mp3",
 ) -> AsyncIterator[bytes]:
-    """Stream TTS audio sentence-by-sentence from audio-api."""
+    """Stream TTS audio sentence-by-sentence from audio-api.
+
+    voice/lang/speed are omitted from the request when None so audio-api's
+    server-side DEFAULT_VOICE/DEFAULT_LANG/DEFAULT_SPEED apply.
+    """
     url = f"{config.AUDIO_API_URL.rstrip('/')}/v1/audio/speech"
-    payload = {
+    payload: dict = {
         "model": "kokoro",
         "input": text,
-        "voice": voice or config.TTS_VOICE,
-        "lang": lang or config.TTS_LANG,
-        "speed": speed if speed is not None else config.TTS_SPEED,
         "response_format": response_format,
         "stream": True,
     }
+    if voice is not None:
+        payload["voice"] = voice
+    if lang is not None:
+        payload["lang"] = lang
+    if speed is not None:
+        payload["speed"] = speed
     async with httpx.AsyncClient(timeout=120) as client:
         async with client.stream("POST", url, json=payload) as resp:
             resp.raise_for_status()

@@ -114,20 +114,27 @@ def chunk_for_voice(text: str, max_chars: int = MAX_CHARS) -> list[str]:
 def synthesize_opus(
     text: str,
     *,
-    voice: str,
     audio_api_url: str,
-    speed: float = 1.0,
+    voice: str | None = None,
+    speed: float | None = None,
 ) -> bytes:
-    """POST text to audio-api and return ogg/opus bytes."""
+    """POST text to audio-api and return ogg/opus bytes.
+
+    Voice/speed default to audio-api's server-side DEFAULT_VOICE/DEFAULT_SPEED
+    when not supplied — do not duplicate them here.
+    """
+    payload: dict = {
+        "model": "kokoro",
+        "input": text,
+        "response_format": "opus",
+    }
+    if voice is not None:
+        payload["voice"] = voice
+    if speed is not None:
+        payload["speed"] = speed
     resp = httpx.post(
         f"{audio_api_url}/v1/audio/speech",
-        json={
-            "model": "kokoro",
-            "input": text,
-            "voice": voice,
-            "response_format": "opus",
-            "speed": speed,
-        },
+        json=payload,
         timeout=_HTTP_TIMEOUT,
     )
     resp.raise_for_status()
@@ -171,7 +178,6 @@ def send_text_and_voice_brief(
     """Send the text brief, then synthesize and send voice-note chunks after it."""
     send_message(text, signal_api_url=signal_api_url, signal_number=signal_number, recipient=recipient)
 
-    voice = voice or os.environ.get("TTS_VOICE", "am_onyx")
     audio_api_url = audio_api_url or os.environ.get("AUDIO_API_URL", "http://audio-api:8088")
 
     stripped = strip_markdown(text)
@@ -180,7 +186,7 @@ def send_text_and_voice_brief(
 
     for i, chunk in enumerate(chunks, 1):
         try:
-            ogg = synthesize_opus(chunk, voice=voice, audio_api_url=audio_api_url)
+            ogg = synthesize_opus(chunk, audio_api_url=audio_api_url, voice=voice)
         except Exception:
             log.exception("TTS failed for chunk %d/%d — skipping", i, len(chunks))
             continue

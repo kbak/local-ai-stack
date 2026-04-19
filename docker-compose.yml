@@ -152,6 +152,7 @@ services:
       - .env
     volumes:
       - location-tracker-data:/data
+      - ./shared:/shared:ro
     networks:
       - ai-net
     extra_hosts:
@@ -183,6 +184,7 @@ services:
       - signal-bot.env
     volumes:
       - calendar-watcher-data:/data
+      - ./shared:/shared:ro
     depends_on:
       - location-tracker
       - mcp-proxy
@@ -206,6 +208,7 @@ services:
       - tg-watcher.env
     volumes:
       - tg-watcher-data:/data
+      - ./shared:/shared:ro
     depends_on:
       - signal-api
     networks:
@@ -224,6 +227,8 @@ services:
       - .env
       - signal-bot.env
       - oss-watcher.env
+    volumes:
+      - ./shared:/shared:ro
     depends_on:
       - signal-api
     networks:
@@ -241,6 +246,8 @@ services:
     env_file:
       - signal-bot.env
       - rss-watcher.env
+    volumes:
+      - ./shared:/shared:ro
     depends_on:
       - signal-api
     networks:

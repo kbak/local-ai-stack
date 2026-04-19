@@ -80,7 +80,7 @@ speech:
       autoTranscribeAudio: true
     textToSpeech:
       engineTTS: "openai"
-      voice: "am_onyx"
+      voice: "bm_george"
       automaticPlayback: true
 
 endpoints:
