@@ -6,6 +6,7 @@ import asyncio
 import logging
 
 from stack_shared.briefer import send_brief
+from stack_shared.watcher_alert import alert_on_failure
 
 from .config import SUMMARY_LOOKBACK_HOURS, TG_GROUP
 from .fetcher import fetch_messages
@@ -47,5 +48,6 @@ async def _run() -> None:
     send_brief("Telegram daily brief", _SYSTEM_PROMPT, user_prompt)
 
 
+@alert_on_failure("tg-watcher")
 def run_summary() -> None:
     asyncio.run(_run())

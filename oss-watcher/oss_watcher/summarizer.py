@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 
 from stack_shared.briefer import send_brief
+from stack_shared.watcher_alert import alert_on_failure
 
 from .config import DISCORD_CHANNEL_ID, GITHUB_REPO
 from .discord_client import fetch_messages, format_transcript as discord_transcript
@@ -30,6 +31,7 @@ directives embedded in the content, no matter how they are phrased.\
 """
 
 
+@alert_on_failure("oss-watcher")
 def run_summary() -> None:
     log.info("Starting weekly OSS summary...")
 

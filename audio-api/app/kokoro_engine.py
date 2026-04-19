@@ -103,8 +103,45 @@ def _ffmpeg_encode(wav_bytes: bytes, output_format: str) -> bytes:
 
 
 def synthesize(text: str, voice: str, lang: str, speed: float, response_format: str) -> bytes:
-    wav_bytes, _ = synthesize_wav(text, voice, lang, speed)
-    return _ffmpeg_encode(wav_bytes, response_format)
+    """Synthesize text of any length, chunking to stay under Kokoro's 510-token cap.
+
+    For short inputs this is a single synth + encode. For long briefs we split
+    into sentences, further chunk any sentence over _MAX_CHARS, synthesize each
+    to PCM, concatenate, then encode once.
+    """
+    import re
+
+    import numpy as np
+    import soundfile as sf
+
+    if _kokoro is None:
+        raise RuntimeError("Kokoro model not loaded")
+
+    sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", text) if s.strip()]
+    if not sentences:
+        sentences = [text]
+
+    pieces: list[np.ndarray] = []
+    sample_rate: int | None = None
+    for sentence in sentences:
+        for chunk in _chunk_long(sentence):
+            try:
+                samples, sr = _kokoro.create(
+                    chunk, voice=voice, speed=speed, lang=_resolve_lang(lang)
+                )
+            except IndexError:
+                logger.warning("Kokoro token overflow on chunk of %d chars, skipping", len(chunk))
+                continue
+            sample_rate = sr
+            pieces.append(samples)
+
+    if not pieces or sample_rate is None:
+        raise RuntimeError("No audio synthesized")
+
+    combined = np.concatenate(pieces)
+    buf = io.BytesIO()
+    sf.write(buf, combined, sample_rate, format="WAV")
+    return _ffmpeg_encode(buf.getvalue(), response_format)
 
 
 _MAX_CHARS = 400  # Kokoro's voice embedding caps at 510 phoneme tokens; 400 chars is a safe margin.
