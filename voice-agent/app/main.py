@@ -63,47 +63,134 @@ async def voices() -> JSONResponse:
 
 
 AGENT_TIMEOUT_S = 60
+MIN_SENTENCE_CHARS = 12
+MAX_SENTENCE_CHARS = 350
+_SENTENCE_ENDERS = (".", "!", "?", "\n")
+
+
+def _carve_sentence(buf: str) -> tuple[str | None, str]:
+    """Pull one ready-to-speak sentence off the front of buf.
+
+    Returns (sentence, remainder). sentence is None if nothing is ready yet.
+    A sentence is 'ready' when we see a terminator after >= MIN_SENTENCE_CHARS,
+    or the buffer grows past MAX_SENTENCE_CHARS (force a break).
+    """
+    if not buf:
+        return None, buf
+
+    for i, ch in enumerate(buf):
+        if ch in _SENTENCE_ENDERS and i + 1 >= MIN_SENTENCE_CHARS:
+            # Include trailing whitespace in the sentence we emit; skip for remainder.
+            j = i + 1
+            while j < len(buf) and buf[j].isspace():
+                j += 1
+            return buf[:j].strip(), buf[j:]
+
+    if len(buf) >= MAX_SENTENCE_CHARS:
+        # Force a break on the last whitespace to avoid mid-word cuts.
+        cut = buf.rfind(" ", MIN_SENTENCE_CHARS, MAX_SENTENCE_CHARS)
+        if cut == -1:
+            cut = MAX_SENTENCE_CHARS
+        return buf[:cut].strip(), buf[cut:].lstrip()
+
+    return None, buf
+
+
+async def _tts_worker(
+    ws: WebSocket,
+    queue: asyncio.Queue,
+    voice: str | None,
+    cancel: asyncio.Event,
+) -> None:
+    """Pull sentences off the queue, synthesize, forward bytes to WS."""
+    # Tell client to open MediaSource right away — browser setup overlaps with
+    # first Kokoro synth, shaving ~50-150ms off perceived time-to-first-audio.
+    await ws.send_json({"type": "audio_start", "format": "mp3"})
+    sent_audio = False
+    try:
+        while True:
+            sentence = await queue.get()
+            if sentence is None:  # sentinel
+                break
+            if cancel.is_set():
+                continue  # drain queue silently
+            try:
+                async for chunk in audio_client.synthesize_stream(
+                    sentence, voice=voice, response_format="mp3"
+                ):
+                    if cancel.is_set():
+                        break
+                    await ws.send_bytes(chunk)
+                    sent_audio = True
+            except Exception as e:
+                logger.exception("TTS synthesis failed for sentence")
+                await ws.send_json({"type": "error", "message": f"TTS error: {e}"})
+                break
+    finally:
+        try:
+            await ws.send_json({"type": "audio_end"})
+        except Exception:
+            pass
 
 
 async def _run_agent_and_stream_tts(ws: WebSocket, user_text: str, cancel: asyncio.Event, voice: str | None) -> None:
-    """Run the agent, then stream TTS of its reply back over the websocket."""
+    """Stream agent tokens; dispatch sentences to TTS as they complete."""
     a = agent.build()
 
+    tts_queue: asyncio.Queue = asyncio.Queue()
+    tts_task = asyncio.create_task(_tts_worker(ws, tts_queue, voice, cancel))
+
+    full_reply_parts: list[str] = []
+    buffer = ""
+
+    async def _consume_stream() -> None:
+        nonlocal buffer
+        async for event in a.stream_async(user_text):
+            if cancel.is_set():
+                break
+            delta = event.get("data") if isinstance(event, dict) else None
+            if not delta:
+                continue
+            buffer += delta
+            while True:
+                sentence, buffer = _carve_sentence(buffer)
+                if sentence is None:
+                    break
+                full_reply_parts.append(sentence)
+                await tts_queue.put(sentence)
+
     try:
-        result = await asyncio.wait_for(a.invoke_async(user_text), timeout=AGENT_TIMEOUT_S)
+        await asyncio.wait_for(_consume_stream(), timeout=AGENT_TIMEOUT_S)
     except asyncio.TimeoutError:
         logger.warning("Agent timed out after %ss", AGENT_TIMEOUT_S)
         await ws.send_json({"type": "error", "message": "Agent took too long, giving up."})
+        await tts_queue.put(None)
+        await tts_task
         return
     except asyncio.CancelledError:
         logger.info("Agent cancelled by user")
+        cancel.set()
+        await tts_queue.put(None)
+        await tts_task
         raise
     except Exception as e:
         logger.exception("Agent failed")
         await ws.send_json({"type": "error", "message": f"Agent error: {e}"})
+        await tts_queue.put(None)
+        await tts_task
         return
 
-    reply = str(result).strip() if result is not None else ""
-    if not reply:
-        reply = "Sorry, I didn't get anything."
+    # Flush any trailing buffered text as a final sentence.
+    tail = buffer.strip()
+    if tail:
+        full_reply_parts.append(tail)
+        await tts_queue.put(tail)
 
+    reply = " ".join(full_reply_parts).strip() or "Sorry, I didn't get anything."
     await ws.send_json({"type": "agent_text", "text": reply})
 
-    if cancel.is_set():
-        return
-
-    await ws.send_json({"type": "audio_start", "format": "mp3"})
-    try:
-        async for chunk in audio_client.synthesize_stream(reply, voice=voice, response_format="mp3"):
-            if cancel.is_set():
-                logger.info("TTS stream cancelled mid-flight")
-                break
-            await ws.send_bytes(chunk)
-    except Exception as e:
-        logger.exception("TTS stream failed")
-        await ws.send_json({"type": "error", "message": f"TTS error: {e}"})
-    finally:
-        await ws.send_json({"type": "audio_end"})
+    await tts_queue.put(None)
+    await tts_task
 
 
 @app.websocket("/ws")

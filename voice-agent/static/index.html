@@ -286,7 +286,7 @@
     vadSrc.connect(analyser);
     const buf = new Float32Array(analyser.fftSize);
     const SILENCE_THRESHOLD = 0.015;
-    const SILENCE_MS = 1200;
+    const SILENCE_MS = 700;
     const START_GRACE_MS = 600;
     const startedAt = performance.now();
     let silentSince = null;
