@@ -269,6 +269,8 @@ services:
     image: qdrant/qdrant:v1.12.4
     container_name: qdrant
     restart: unless-stopped
+    ports:
+      - "6333:6333"
     volumes:
       - ${MEMORY_DIR:?MEMORY_DIR must be set in .env}/qdrant:/qdrant/storage
     networks:
