@@ -224,13 +224,17 @@ The bot polls for new messages every 1 second with a 1-second receive timeout, g
 
 ### Custom skills
 
-Skills in `signal-bot-custom-skills/` are mounted into the container and auto-discovered at startup. Each skill is a directory with a `skill.yaml` and a Python file. The built-in `web_search` skill is disabled in favour of the local SearXNG instance.
+Skills in `signal-bot-custom-skills/` are mounted into the container at `/app/data/custom_skills` and auto-discovered at startup alongside uoltz's built-ins. Each skill is a directory with a `skill.yaml` and a Python file.
 
-Available custom skills: arxiv, currency, finance, github, hackernews, music_download, patents, pdf, searxng, semantic_scholar, time, weather, wikipedia.
+The uoltz fork ships with several built-ins disabled by default (`web_search`, `notes`, `rss_digest`, `shell`, `skill_builder`) — the stack intentionally keeps them off: web search, news digests, and host-side actions are handled by MCP tools and watcher services instead.
 
-The **github** skill calls the GitHub REST API directly (not via mcp-proxy) using `GITHUB_TOKEN` from the environment.
+Available custom skills: arxiv, currency, finance, github, google_maps, hackernews, music_download, patents, pdf, searxng, semantic_scholar, time, weather, wikipedia.
 
-The **music_download** skill (`/music`) downloads songs from Shazam or Spotify links as high-quality MP3, trims non-music content from start/end, classifies into a configured directory, and sets ID3 tags including cover art. See setup below.
+Most are thin MCP-client shims that call mcp-proxy on port 8083. A few do their own thing:
+
+- **github** — calls the GitHub REST API directly (not via mcp-proxy) using `GITHUB_TOKEN` from the environment.
+- **music_download** (`/music`) — downloads songs from Shazam or Spotify links as high-quality MP3, trims non-music content from start/end, classifies into a configured directory, and sets ID3 tags including cover art. See setup below.
+- **pdf** — calls the pdf-inspector service directly on port 8086.
 
 For details on the patches applied to the uoltz fork, see the [kbak/uoltz README](https://github.com/kbak/uoltz).
 
