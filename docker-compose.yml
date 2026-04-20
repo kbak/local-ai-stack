@@ -91,17 +91,20 @@ services:
       - .env
     volumes:
       - ./librechat.yaml:/app/librechat.yaml.template:ro
+      - ./librechat-render.js:/app/librechat-render.js:ro
       - librechat-data:/app/client/public/images
+      - ${MEMORY_DIR:?MEMORY_DIR must be set in .env}:/memory:ro
     depends_on:
       - mongodb
       - mcp-proxy
       - audio-api
+      - memory-mcp
     networks:
       - ai-net
     extra_hosts:
       - "host.docker.internal:host-gateway"
     mem_limit: 768m
-    entrypoint: ["/bin/sh", "-c", "node -e \"const fs=require('fs');fs.writeFileSync('/app/librechat.yaml',fs.readFileSync('/app/librechat.yaml.template','utf8').replace(/\\$\\{([^}]+)\\}/g,(_,k)=>process.env[k]||''))\" && exec node /app/api/server/index.js"]
+    entrypoint: ["/bin/sh", "-c", "node /app/librechat-render.js && exec node /app/api/server/index.js"]
 
   signal-api:
     image: bbernhard/signal-cli-rest-api
@@ -126,16 +129,22 @@ services:
     restart: unless-stopped
     env_file:
       - ./signal-bot.env
+    environment:
+      MEMORY_MCP_URL: http://memory-mcp:8089
+      MEMORY_DIR_MOUNT: /memory
+      MEMORY_DEFAULT_USER_ID: ${MEMORY_DEFAULT_USER_ID:-default}
     volumes:
       - ./signal-bot-custom-skills:/app/data/custom_skills
       - signal-bot-data:/app/data
       - signal-cli-data:/signal-cli-data:ro
       - ${MUSIC_HOST_DIR:-D:/backup/Music}:/music
+      - ${MEMORY_DIR:?MEMORY_DIR must be set in .env}:/memory:ro
     depends_on:
       - signal-api
       - mcp-proxy
       - searxng
       - audio-api
+      - memory-mcp
     networks:
       - ai-net
     extra_hosts:
@@ -255,6 +264,40 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     mem_limit: 256m
+
+  qdrant:
+    image: qdrant/qdrant:v1.12.4
+    container_name: qdrant
+    restart: unless-stopped
+    volumes:
+      - ${MEMORY_DIR:?MEMORY_DIR must be set in .env}/qdrant:/qdrant/storage
+    networks:
+      - ai-net
+    mem_limit: 1024m
+
+  memory-mcp:
+    build:
+      context: .
+      dockerfile: memory-mcp/Dockerfile
+    container_name: memory-mcp
+    restart: unless-stopped
+    ports:
+      - "8089:8089"
+    environment:
+      MEMORY_LLM_BASE_URL: http://host.docker.internal:8080/v1
+      MEMORY_LLM_MODEL: qwen
+      MEMORY_QDRANT_HOST: qdrant
+      MEMORY_QDRANT_PORT: "6333"
+      MEMORY_DEFAULT_USER_ID: ${MEMORY_DEFAULT_USER_ID:-default}
+    volumes:
+      - ${MEMORY_DIR:?MEMORY_DIR must be set in .env}:/memory
+    depends_on:
+      - qdrant
+    networks:
+      - ai-net
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    mem_limit: 3000m
 
 networks:
   ai-net:

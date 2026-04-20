@@ -5,6 +5,7 @@ mcpSettings:
     - "http://mcp-proxy:8083"
     - "http://location-tracker:8084"
     - "http://pdf-inspector:8085/"
+    - "http://memory-mcp:8089"
   autoApprove: true
 
 speech:
@@ -107,12 +108,16 @@ modelSpecs:
         endpoint: "llama.cpp"
         model: "qwen"
         maxContextTokens: 262144
+        promptPrefix: |
+${TIER1_MEMORY}
     - name: "gemma4"
       label: "Gemma 4 31B"
       preset:
         endpoint: "llama.cpp"
         model: "gemma4"
         maxContextTokens: 262144
+        promptPrefix: |
+${TIER1_MEMORY}
 
 mcpServers:
   searxng:
@@ -181,3 +186,7 @@ mcpServers:
     serverInstructions: false
     headers:
       Authorization: "Bearer ${MCP_PROXY_AUTH_TOKEN}"
+  memory:
+    url: http://memory-mcp:8089/mcp/mcp
+    type: streamable-http
+    serverInstructions: false

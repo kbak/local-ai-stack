@@ -43,4 +43,9 @@ until curl -sf http://localhost:8087/health >/dev/null 2>&1; do
     sleep 2
 done
 
+echo "Waiting for memory-mcp (bge-m3 + Mem0)..."
+until curl -sf http://localhost:8089/health >/dev/null 2>&1; do
+    sleep 2
+done
+
 echo "Stack is up."
