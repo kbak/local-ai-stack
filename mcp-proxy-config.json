@@ -56,8 +56,8 @@
       "args": ["-y", "@modelcontextprotocol/server-github"]
     },
     "google-maps": {
-      "command": "uvx",
-      "args": ["google-maps-mcp-server==0.2.1"]
+      "command": "uv",
+      "args": ["run", "--with", "google-maps-mcp-server==0.2.1", "python", "/opt/gmaps-searchtext-shim.py"]
     }
   }
 }

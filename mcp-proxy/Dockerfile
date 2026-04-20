@@ -13,8 +13,13 @@ RUN git clone --depth 1 https://github.com/sparfenyuk/mcp-proxy.git /mcp-proxy-s
     pip install --no-cache-dir /mcp-proxy-src && \
     rm -rf /mcp-proxy-src
 
+# Runtime shim that patches google-maps-mcp-server's PlacesTool to use
+# searchText instead of its broken searchNearby+keyword-filter combo.
+COPY gmaps-searchtext-shim.py /opt/gmaps-searchtext-shim.py
+
 # Pre-install all MCP packages at pinned versions so first connection doesn't time out
-RUN uvx mcp-server-fetch==2025.4.7 --help 2>/dev/null || true && \
+RUN uvx google-maps-mcp-server==0.2.1 --help 2>/dev/null || true && \
+    uvx mcp-server-fetch==2025.4.7 --help 2>/dev/null || true && \
     uvx wikipedia-mcp==2.0.0 --help 2>/dev/null || true && \
     uvx arxiv-mcp-server==0.4.11 --help 2>/dev/null || true && \
     uvx mcp-youtube-transcript==0.3.5 --help 2>/dev/null || true && \
