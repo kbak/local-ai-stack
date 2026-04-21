@@ -26,6 +26,12 @@ services:
     environment:
       MCP_PROXY_AUTH_TOKEN: ""
     command: ["--host", "0.0.0.0", "--port", "8083", "--transport", "streamablehttp", "--named-server-config", "/config.json", "--pass-environment"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8083/status', timeout=2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
     networks:
       - ai-net
     mem_limit: 1500m
@@ -95,10 +101,14 @@ services:
       - librechat-data:/app/client/public/images
       - ${MEMORY_DIR:?MEMORY_DIR must be set in .env}:/memory:ro
     depends_on:
-      - mongodb
-      - mcp-proxy
-      - audio-api
-      - memory-mcp
+      mongodb:
+        condition: service_started
+      mcp-proxy:
+        condition: service_healthy
+      audio-api:
+        condition: service_started
+      memory-mcp:
+        condition: service_started
     networks:
       - ai-net
     extra_hosts:
@@ -140,11 +150,16 @@ services:
       - ${MUSIC_HOST_DIR:-D:/backup/Music}:/music
       - ${MEMORY_DIR:?MEMORY_DIR must be set in .env}:/memory:ro
     depends_on:
-      - signal-api
-      - mcp-proxy
-      - searxng
-      - audio-api
-      - memory-mcp
+      signal-api:
+        condition: service_started
+      mcp-proxy:
+        condition: service_healthy
+      searxng:
+        condition: service_started
+      audio-api:
+        condition: service_started
+      memory-mcp:
+        condition: service_started
     networks:
       - ai-net
     extra_hosts:
