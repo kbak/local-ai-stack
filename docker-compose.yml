@@ -46,16 +46,11 @@ services:
       - "8088:8088"
     env_file:
       - ./audio-api.env
+    environment:
+      CUDA_VISIBLE_DEVICES: ${AUDIO_API_GPU:-0}
     networks:
       - ai-net
     mem_limit: 3000m
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
 
   voice-agent:
     build:
