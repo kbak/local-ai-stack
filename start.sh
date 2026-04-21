@@ -2,6 +2,7 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+WSL_SCRIPT_DIR="$(echo "$SCRIPT_DIR" | sed 's|^/\([a-z]\)/|/mnt/\1/|')"
 
 echo "Starting llama-swap..."
 llama-swap --config "$SCRIPT_DIR/llama-swap.yaml" >/dev/null 2>&1 &
@@ -20,10 +21,10 @@ python server.py >/dev/null 2>&1 &
 cd "$SCRIPT_DIR"
 
 echo "Starting Docker services..."
-docker compose -f "$SCRIPT_DIR/docker-compose.yml" up -d --build
+MSYS_NO_PATHCONV=1 wsl.exe -d Ubuntu-24.04 -- docker compose -f $WSL_SCRIPT_DIR/docker-compose.yml up -d
 
 echo "Waiting for all containers to be up..."
-until docker compose -f "$SCRIPT_DIR/docker-compose.yml" ps --format json \
+until MSYS_NO_PATHCONV=1 wsl.exe -d Ubuntu-24.04 -- docker compose -f $WSL_SCRIPT_DIR/docker-compose.yml ps --format json \
     | python -c "
 import sys, json
 states = [json.loads(l)['State'] for l in sys.stdin if l.strip()]
@@ -34,8 +35,8 @@ sys.exit(0 if all_up else 1)
 done
 
 echo "Waiting for audio-api to load Whisper + Kokoro..."
-until curl -sf http://localhost:8088/health >/dev/null 2>&1; do
-    sleep 2
+until MSYS_NO_PATHCONV=1 wsl.exe -d Ubuntu-24.04 -- docker logs audio-api 2>&1 | grep -q "Kokoro warmup complete"; do
+    sleep 3
 done
 
 echo "Waiting for voice-agent..."
