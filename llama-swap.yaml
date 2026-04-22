@@ -4,8 +4,6 @@ models:
   qwen3.6-27B-Q5_K_XL:
     cmd: llama-server --port ${PORT} -hf unsloth/Qwen3.6-27B-GGUF --hf-file Qwen3.6-27B-UD-Q5_K_XL.gguf --device CUDA0 --split-mode none --n-gpu-layers 999 --parallel 1 --flash-attn on --batch-size 4096 --ubatch-size 1024 --ctx-size 131072 --no-mmap
     ttl: 0
-    aliases:
-      - default
 
   qwen3.6-27B-Q6:
     cmd: llama-server --port ${PORT} -hf unsloth/Qwen3.6-27B-GGUF --hf-file Qwen3.6-27B-Q6.gguf --device CUDA0 --split-mode none --n-gpu-layers 999 --parallel 1 --flash-attn on --batch-size 4096 --ubatch-size 1024 --ctx-size 100000 --no-mmap
