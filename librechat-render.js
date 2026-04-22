@@ -27,9 +27,11 @@ function readIf(path) {
 
 // Raw (unindented) Tier 1 block — used for the agent instructions field.
 function buildTier1Raw() {
+  const soul = readIf('/memory/SOUL.md');
   const user = readIf('/memory/USER.md');
   const mem = readIf('/memory/MEMORY.md');
   const blocks = [];
+  if (soul) blocks.push('<soul>\n' + soul + '\n</soul>');
   if (user) blocks.push('<user_profile>\n' + user + '\n</user_profile>');
   if (mem) blocks.push('<memory>\n' + mem + '\n</memory>');
   return blocks.join('\n\n');
