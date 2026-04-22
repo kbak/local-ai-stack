@@ -16,6 +16,7 @@ tg-watcher.env
 rss-watcher.env
 oss-watcher.env
 audio-api.env
+receipt-watcher.env
 
 # YouTube cookies — contains session tokens, never commit
 yt-dlp-service/youtube_cookies.txt

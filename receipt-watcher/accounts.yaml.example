@@ -1,0 +1,34 @@
+# One entry per mailbox the service should watch.
+# Copy to accounts.yaml (gitignored) and fill in real values.
+#
+# Any IMAP server works. Requires an app-specific password:
+#   - Gmail / Google Workspace: https://myaccount.google.com/apppasswords
+#     (2-Step Verification must be on). Host: imap.gmail.com, port 993.
+#   - Fastmail: Settings → Privacy & Security → App Passwords.
+#     Host: imap.fastmail.com, port 993.
+#   - iCloud: https://appleid.apple.com → Sign-In & Security → App-Specific
+#     Passwords. Host: imap.mail.me.com, port 993.
+#
+# The app password goes in receipt-watcher.env under the name you put in
+# `password_env` for that account.
+
+accounts:
+  - name: work
+    auth:
+      host: imap.gmail.com
+      port: 993
+      username: you@workspace.example.com
+      password_env: WORK_IMAP_PASSWORD
+    sheet:
+      id: "REPLACE_WITH_GOOGLE_SHEET_ID"
+      tab: "2026"
+
+  - name: personal
+    auth:
+      host: imap.fastmail.com
+      port: 993
+      username: kacper@example.com
+      password_env: FASTMAIL_APP_PASSWORD
+    sheet:
+      id: "REPLACE_WITH_GOOGLE_SHEET_ID"
+      tab: "2026"

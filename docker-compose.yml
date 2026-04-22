@@ -215,6 +215,27 @@ services:
       - "host.docker.internal:host-gateway"
     mem_limit: 512m
 
+  receipt-watcher:
+    build:
+      context: .
+      dockerfile: receipt-watcher/Dockerfile
+    container_name: receipt-watcher
+    restart: unless-stopped
+    env_file:
+      - .env
+      - signal-bot.env
+      - receipt-watcher.env
+    volumes:
+      - receipt-watcher-data:/data
+      - ./receipt-watcher/accounts.yaml:/app/accounts.yaml:ro
+      - ./receipt-watcher/vendors.yaml:/app/vendors.yaml:ro
+      - ./shared:/shared:ro
+    networks:
+      - ai-net
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    mem_limit: 512m
+
   tg-watcher:
     build:
       context: .
@@ -323,4 +344,5 @@ volumes:
   signal-bot-data:
   location-tracker-data:
   calendar-watcher-data:
+  receipt-watcher-data:
   tg-watcher-data:

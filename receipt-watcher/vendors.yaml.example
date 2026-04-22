@@ -1,0 +1,13 @@
+# Whitelist of vendors whose emails the service extracts receipts from.
+# Any sender not matching one of these domains is silently ignored.
+# Matching is done on the sender's email domain (case-insensitive, exact match
+# or subdomain of a listed domain).
+#
+# Copy to vendors.yaml (gitignored) and fill in your real vendor list.
+
+vendors:
+  example-vendor:
+    domains:
+      - example.com
+    category: "Software subscription"
+    currency_hint: USD
