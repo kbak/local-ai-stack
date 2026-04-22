@@ -15,10 +15,16 @@ LLM_BASE_URL: str = os.environ["LLM_BASE_URL"]
 LLM_API_KEY: str = os.environ.get("LLM_API_KEY", "sk-no-key-required")
 LLM_MODEL: str = os.environ["LLM_MODEL"]
 
+SIGNAL_API_URL: str = os.environ.get("SIGNAL_API_URL", "http://signal-api:8080")
+SIGNAL_NUMBER: str | None = os.environ.get("SIGNAL_NUMBER")
+BRIEFING_RECIPIENT: str | None = os.environ.get("BRIEFING_RECIPIENT")
+
 INITIAL_LOOKBACK_HOURS = 72
 ACCOUNTS_FILE = "/app/accounts.yaml"
 VENDORS_FILE = "/app/vendors.yaml"
 STATE_FILE = "/data/receipt_state.json"
+SHEETS_KEY_FILE = "/app/secrets/sheets-key.json"
+AUDIT_LOG_FILE = "/data/receipts.jsonl"
 
 
 @dataclass

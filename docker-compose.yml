@@ -229,7 +229,10 @@ services:
       - receipt-watcher-data:/data
       - ./receipt-watcher/accounts.yaml:/app/accounts.yaml:ro
       - ./receipt-watcher/vendors.yaml:/app/vendors.yaml:ro
+      - ./receipt-watcher/secrets:/app/secrets:ro
       - ./shared:/shared:ro
+    depends_on:
+      - signal-api
     networks:
       - ai-net
     extra_hosts:

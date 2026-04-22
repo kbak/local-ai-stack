@@ -1,4 +1,6 @@
 accounts.yaml
 vendors.yaml
+secrets/*
+!secrets/README.txt
 __pycache__/
 *.pyc

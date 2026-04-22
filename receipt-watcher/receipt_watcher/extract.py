@@ -1,4 +1,4 @@
-"""Receipt extraction via Qwen3.6. Returns a structured receipt or a low-confidence marker."""
+"""Receipt extraction via LLM. Returns a structured receipt or a low-confidence marker."""
 
 from __future__ import annotations
 
@@ -26,26 +26,35 @@ Return a single JSON object with these fields:
 {
   "is_receipt": true | false,
   "confidence": "high" | "medium" | "low",
-  "vendor": "<canonical vendor name, e.g. 'Anthropic'>",
   "amount": <number, no currency symbol, e.g. 47.20>,
-  "currency": "<ISO 4217 code, e.g. 'USD'>",
   "date": "<YYYY-MM-DD, the charge/invoice date>",
-  "description": "<short human-readable line item, e.g. 'Claude API usage'>",
-  "invoice_number": "<invoice or receipt id, or null>",
-  "notes": "<anything unusual worth flagging, or null>"
+  "period": "pay-as-you-go" | "monthly" | "one-time",
+  "details": "<short distinguishing phrase, or empty string>",
+  "payment_method": "<card last-4, bank name, etc. as stated in the email, or empty string>"
 }
 
 Rules:
 - `is_receipt` = true ONLY for actual payment receipts / paid invoices / renewal
   confirmations with a charged amount. Marketing, usage alerts without a charge,
   plan-change emails without a charge, and password resets = false.
-- Set `confidence` = "low" if any of amount, currency, or date are missing or
-  unclear. The pipeline will leave low-confidence items in the inbox for manual
-  review, so err on the side of "low" when uncertain.
-- Dates must be absolute (YYYY-MM-DD). If the email only says "today" or "this
-  month", set confidence = "low".
-- Use the vendor hint below as the canonical vendor name unless the body clearly
-  says otherwise (e.g. a reseller).
+- `confidence` = "low" if amount or date are missing or unclear. The pipeline
+  leaves low-confidence items in the inbox for manual review, so err on the side
+  of "low" when uncertain.
+- `date` must be absolute (YYYY-MM-DD). If the email only says "today" or
+  "this month", set confidence = "low".
+- `period`:
+    - "monthly" for a recurring subscription renewal (Claude Pro, Amex Plat, X
+      premium, etc.).
+    - "pay-as-you-go" for metered / usage-based charges (Alchemy, Goldsky,
+      Cloudflare R2, API usage).
+    - "one-time" for a single non-recurring purchase (one-off domain renewal,
+      a single hardware order, etc.).
+- `details`: short free-form phrase distinguishing this charge if the email
+  has something worth capturing (e.g. "Claude Pro Max annual", "Subgraphs",
+  specific domains). Leave empty string if nothing stands out.
+- `payment_method`: ONLY fill if the email explicitly states it ("ending in
+  1234", "Visa ****5678", "charged to Mercury"). Do not guess. Empty string
+  otherwise.
 
 Respond with JSON only. No extra text, no code fences.
 """
@@ -54,15 +63,12 @@ Respond with JSON only. No extra text, no code fences.
 @dataclass
 class Receipt:
     is_receipt: bool
-    confidence: str            # "high" | "medium" | "low"
-    vendor: str
+    confidence: str                  # "high" | "medium" | "low"
     amount: float | None
-    currency: str
-    date: str                  # YYYY-MM-DD
-    description: str
-    invoice_number: str | None
-    notes: str | None
-    category: str              # from vendor config
+    date: str                        # YYYY-MM-DD (LLM-native; converted at write time)
+    period: str                      # "pay-as-you-go" | "monthly" | "one-time" | ""
+    details: str
+    payment_method_from_email: str   # empty if not present in body
     raw: dict = field(default_factory=dict)
 
 
@@ -80,7 +86,6 @@ def _html_to_text(html: str) -> str:
 
 def _build_user_prompt(msg: Message, vendor: Vendor) -> str:
     body = msg.body_text.strip() or _html_to_text(msg.body_html)
-    # Guard against runaway body sizes — keep it bounded.
     if len(body) > 20000:
         body = body[:20000] + "\n[...truncated...]"
 
@@ -90,9 +95,8 @@ def _build_user_prompt(msg: Message, vendor: Vendor) -> str:
         attachment_note = f"\nAttachments present (not inlined): {names}\n"
 
     return (
-        f"Vendor hint (from whitelist): {vendor.key} — canonical name should likely be "
-        f"'{vendor.key.title()}', category '{vendor.category}', "
-        f"currency hint '{vendor.currency_hint or '(none)'}'.\n\n"
+        f"Vendor (from whitelist): {vendor.key}\n"
+        f"Category: {vendor.category}\n\n"
         f"From: {msg.headers.from_addr}\n"
         f"Subject: {msg.headers.subject}\n"
         f"Date: {msg.headers.date.isoformat()}\n"
@@ -127,14 +131,11 @@ def extract(msg: Message, vendor: Vendor) -> Receipt:
         return Receipt(
             is_receipt=False,
             confidence="low",
-            vendor=vendor.key.title(),
             amount=None,
-            currency=vendor.currency_hint or "",
             date="",
-            description="",
-            invoice_number=None,
-            notes="extractor returned non-JSON",
-            category=vendor.category,
+            period="",
+            details="",
+            payment_method_from_email="",
             raw={"raw_text": raw},
         )
 
@@ -147,13 +148,10 @@ def extract(msg: Message, vendor: Vendor) -> Receipt:
     return Receipt(
         is_receipt=bool(data.get("is_receipt")),
         confidence=str(data.get("confidence", "low")).lower(),
-        vendor=str(data.get("vendor") or vendor.key.title()),
         amount=amount,
-        currency=str(data.get("currency") or vendor.currency_hint or ""),
         date=str(data.get("date") or ""),
-        description=str(data.get("description") or ""),
-        invoice_number=data.get("invoice_number") or None,
-        notes=data.get("notes") or None,
-        category=vendor.category,
+        period=str(data.get("period") or ""),
+        details=str(data.get("details") or ""),
+        payment_method_from_email=str(data.get("payment_method") or ""),
         raw=data,
     )

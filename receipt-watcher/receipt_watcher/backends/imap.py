@@ -93,4 +93,22 @@ class ImapBackend(EmailBackend):
             )
 
     def archive(self, ref: MessageRef) -> None:
-        raise NotImplementedError("archival not wired in scaffold phase")
+        """Remove from INBOX in a provider-appropriate way.
+
+        Gmail: remove the \\Inbox label (native archive; message stays in All Mail).
+        Other IMAP: MOVE to the pre-existing 'Archive' folder. Fails loudly if
+        the folder doesn't exist — we don't create folders silently.
+        """
+        uid = ref.backend_id
+        with self._open() as mb:
+            if _is_gmail(self._host):
+                # UID STORE <uid> -X-GM-LABELS (\Inbox)
+                typ, _data = mb.client.uid("STORE", uid, "-X-GM-LABELS", "(\\Inbox)")
+                if typ != "OK":
+                    raise RuntimeError(f"Gmail archive failed for uid={uid}: {typ}")
+            else:
+                mb.move([uid], "Archive")
+
+
+def _is_gmail(host: str) -> bool:
+    return host.lower() in ("imap.gmail.com", "imap.googlemail.com")
