@@ -91,7 +91,7 @@ endpoints:
       baseURL: "http://host.docker.internal:8080/v1"
       models:
         default: ["qwen", "gemma4"]
-        fetch: false
+        fetch: true
       titleConvo: false
       summarize: false
       forcePrompt: false
