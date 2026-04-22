@@ -12,10 +12,14 @@ Self-hosted LLM stack with privacy-focused web search and research tools. Runs o
 | location-tracker | 8084 | City-presence timeline service; exposes `get_location_at` MCP tool (bearer token required) |
 | pdf-inspector | 8086 | PDF text extraction via pdf-inspector (Rust); handles Unicode, multi-column, tables |
 | voice-agent | 8087 | Browser voice-chat UI with wake-word-free VAD, streaming TTS, voice picker, and full MCP tool access via strands |
-| audio-api | 8088 | Shared GPU-backed Whisper (STT) + Kokoro (TTS) service with an OpenAI-compatible API |
+| audio-api | 8088 | Shared GPU-backed Whisper (STT) + Kokoro (TTS) service with an OpenAI-compatible API (pinned to the 5060 Ti) |
+| memory-mcp | 8089 | Self-hosted agentic memory (Mem0 + bge-m3 + Qdrant) exposed as REST + MCP; Tier 2 of the hybrid memory architecture |
+| qdrant | 6333 | Vector store backing memory-mcp |
 | calendar-watcher | — | Polls calendar for meal and travel events; enriches with rating/menu/weather/maps; delivers briefings via Signal |
 | tg-watcher | — | Listens to a Telegram group as your user account; sends a daily LLM-generated brief via Signal |
 | rss-watcher | — | Fetches RSS feeds grouped by category; sends a twice-daily LLM-generated English news brief via Signal |
+| oss-watcher | — | Weekly LLM-generated summary of GitHub + Discord activity for an open-source project, delivered via Signal |
+| receipt-watcher | — | Polls email accounts, extracts receipts via LLM, appends to Google Sheets, archives the message |
 | MongoDB | — | LibreChat chat history storage |
 | LibreChat | 3000 | Web UI, accessible from any device (speech tab wired to audio-api) |
 | signal-api | 9922 | Signal REST API (bbernhard/signal-cli-rest-api, native mode) |
@@ -42,6 +46,7 @@ All tools are exposed via mcp-proxy on port 8083 (no authentication required —
 - **github** — read files, search code and repos, browse commits and issues (requires `GITHUB_TOKEN`)
 - **google-maps** — place search, ratings, hours, geocoding, directions (requires `GOOGLE_MAPS_API_KEY`)
 - **location-tracker** — `get_location_at(datetime)` — returns city, confidence, and source for any datetime; backed by CalDAV + local LLM + SearXNG. See [`location-tracker/README.md`](location-tracker/README.md).
+- **memory** — `remember(content)` / `search_memory(query, limit)` — agentic long-term memory via Mem0 + bge-m3 + Qdrant. Served from `memory-mcp` directly (not via mcp-proxy). LibreChat wires it as `http://memory-mcp:8089/mcp/mcp`; signal-bot talks to its REST surface.
 
 ## Requirements
 
@@ -72,11 +77,14 @@ Edit `.env` and set:
 
 **3. Configure models in `llama-swap.yaml`**
 
-Edit `llama-swap.yaml` to set your models and their llama-server arguments. The default config includes Qwen3.6-35B-A3B and Gemma 4 31B, both using:
+Edit `llama-swap.yaml` to set your models and their llama-server arguments. The default config ships several chat/agent models pinned to the 5090 (Qwen 3.6 27B at Q5 and Q6, Qwen 3.6 35B-A3B, Qwen 3.5 35B-A3B, Gemma 4 31B) plus `qwen-coder-1.5B` for tab-complete pinned to the 5060 Ti. The chat entries use:
 - `--n-gpu-layers 999` — full GPU offload
 - `--flash-attn on` — flash attention
-- `--batch-size 4096 --ubatch-size 4096` — large batches for fast prompt processing on long contexts
-- `--ctx-size 262144` — 256k context window
+- `--batch-size 4096 --ubatch-size 1024` — large batches for fast prompt processing on long contexts
+- `--device CUDA0 --split-mode none` — pin to the 5090 (change the index if your single-GPU host has only one card)
+- `--ctx-size` — 131k–262k depending on model
+
+See the `groups:` block at the bottom of the file for how the coder model is kept resident on the 5060 Ti alongside whatever the `main` group loads.
 
 **4. Start the Docker stack**
 ```
@@ -90,7 +98,7 @@ First startup takes a few minutes — mcp-proxy builds a custom image that pre-i
 llama-swap --config llama-swap.yaml
 ```
 
-llama-swap listens on port 8080 and launches llama-server on demand when a model is requested. Models stay loaded until manually unloaded or a different model is requested.
+llama-swap listens on port 8080 and launches llama-server on demand when a model is requested. Inside a group, requesting a different model swaps out the current one. Models in separate `persistent: true` groups stay resident alongside each other — used here to keep the autocomplete coder model on the 5060 Ti loaded concurrently with whatever chat model is running on the 5090.
 
 **6. Open LibreChat**
 
@@ -102,6 +110,49 @@ llama-swap has a built-in UI for monitoring and manually loading/unloading model
 ```
 http://localhost:8080/ui
 ```
+
+## GPU layout
+
+Two Blackwell GPUs are partitioned across services via `CUDA_VISIBLE_DEVICES` at the container level and `--device CUDA0/CUDA1` inside llama-swap:
+
+- **GPU 0 — RTX 5090 (32 GB):** llama-swap chat/agent models (Qwen, Gemma). One at a time within the `main` group.
+- **GPU 1 — RTX 5060 Ti (16 GB):** audio-api (Whisper + Kokoro) and the autocomplete coder model (`qwen-coder-1.5B`). Both stay resident.
+
+The `groups` block in `llama-swap.yaml` keeps the coder model in its own `persistent: true` group so chat-model swaps on the 5090 never evict it — tab-complete never pays a cold-start cost.
+
+## VS Code / Continue.dev
+
+Point [Continue.dev](https://continue.dev) at llama-swap for chat + tab-completion using the same models the rest of the stack uses. Drop this into `%USERPROFILE%\.continue\config.yaml`:
+
+```yaml
+name: Local Stack
+version: 1.0.0
+schema: v1
+
+models:
+  - name: Qwen 3.6 27B
+    provider: openai
+    model: qwen3.6-27B-Q5_K_XL
+    apiBase: http://127.0.0.1:8080/v1
+    apiKey: dummy
+    roles: [chat, edit, apply]
+
+  - name: Qwen Coder 1.5B
+    provider: openai
+    model: qwen-coder-1.5B
+    apiBase: http://127.0.0.1:8080/v1
+    apiKey: dummy
+    roles: [autocomplete]
+
+tabAutocompleteOptions:
+  maxPromptTokens: 2048
+  maxSuffixPercentage: 0.3
+  debounceDelay: 250
+  multilineCompletions: auto
+  useCache: true
+```
+
+The model `id`s must match the llama-swap.yaml entries exactly. `qwen-coder-1.5B` runs on the 5060 Ti at ~150 t/s (≈200–400 ms tab-complete latency); chat/edit/agent use Qwen 3.6 27B on the 5090.
 
 ## Connecting MCP tools from llama.cpp web UI
 
@@ -370,14 +421,68 @@ docker compose up -d rss-watcher
 docker compose exec rss-watcher python -c "from rss_watcher.briefer import run_news_brief; run_news_brief()"
 ```
 
+## memory-mcp
+
+Self-hosted agentic memory. Mem0 is the memory framework (extract → dedup → store), bge-m3 is the CPU embedding model, Qdrant is the vector store. Exposes a REST API *and* an MCP streamable-http server on the same port (8089).
+
+- REST: `/health`, `/v1/memory` (POST add, GET list), `/v1/memory/search`, `/v1/memory/{id}` DELETE. signal-bot's memory skill uses this surface.
+- MCP: `/mcp/mcp` (not `/mcp/`). LibreChat wires it as `http://memory-mcp:8089/mcp/mcp`.
+
+Memories live under `${MEMORY_DIR}` on the host. The directory also contains `USER.md` + `MEMORY.md`, which LibreChat and signal-bot inject as always-on Tier 1 memory — `librechat-render.js` pulls them into every agent's system prompt at container boot.
+
+## oss-watcher
+
+Weekly brief covering a single open-source project: merged PRs, notable open PRs, issues, and Discord discussion themes. Fires once a week (default: Monday 08:00 UTC) via APScheduler.
+
+### Setup
+
+**1. Configure `oss-watcher.env`**
+```
+cp oss-watcher.env.example oss-watcher.env
+```
+
+Required:
+- `GITHUB_REPO` — `owner/repo` to watch
+- `DISCORD_TOKEN` — Discord user token (Settings → Advanced → copy from network tab)
+- `DISCORD_CHANNEL_ID` — target channel (right-click → Copy Channel ID, requires Developer Mode)
+
+LLM and Signal settings are inherited from `signal-bot.env`.
+
+**2. Start**
+```
+docker compose up -d oss-watcher
+```
+
+## receipt-watcher
+
+Polls email accounts (Gmail API or plain IMAP), extracts receipt data from whitelisted vendors via the local LLM, appends rows to a Google Sheets expense sheet, and archives the message. Backend-agnostic — same pipeline against multiple accounts.
+
+### Setup
+
+**1. Configure `receipt-watcher.env`** (LLM + Signal settings inherited from `signal-bot.env`).
+
+**2. Populate the two YAML configs** in `receipt-watcher/`:
+- `accounts.yaml` — per-inbox auth (Gmail OAuth or IMAP app password) + sheet routing
+- `vendors.yaml` — global domain → vendor + category whitelist. Senders not in this list are skipped, so the service *is* the filter — no Gmail labels or IMAP rules needed.
+
+**3. Secrets** — drop Google service account JSON + Gmail OAuth tokens into `receipt-watcher/secrets/` (mounted read-only).
+
+**4. Start**
+```
+docker compose up -d receipt-watcher
+```
+
+Low-confidence extractions are left in the inbox with a Signal "review manually" alert rather than written to the sheet. The service never archives before the sheet write lands, so any failure leaves the email visible.
+
 ## Notes
 
 - LibreChat chat history is persisted in MongoDB (`mongodb-data` volume) — survives container restarts
 - MCP package cache is persisted — tool calls are fast after first use
 - SearXNG runs locally — no search queries leave your network
-- llama-swap unloads the current model when a different one is requested — only one model in VRAM at a time
+- llama-swap unloads the previous model within a group when another is requested; a separate persistent group on the 5060 Ti keeps the coder autocomplete model resident alongside whichever chat model the `main` group is running
 - signal-cli-data volume is shared between signal-api (read-write) and signal-bot (read-only)
 - mcp-proxy includes Node.js for the GitHub MCP server; all other tools are pure Python via uvx
 - audio-api is the single GPU consumer for STT/TTS — signal-bot, LibreChat, and voice-agent all call it over HTTP
 - audio-api owns the default voice/lang/speed (`DEFAULT_VOICE` in `audio-api.env`). voice-agent and the watchers omit these fields so the server-side defaults apply; `signal-bot.env` still sets `TTS_VOICE` (uoltz reads it) and `librechat.yaml` pins a UI default. To swap voices stack-wide, change `DEFAULT_VOICE` and restart audio-api
-- `./shared/` is bind-mounted (`:ro`) into every watcher (`calendar-watcher`, `tg-watcher`, `oss-watcher`, `rss-watcher`, `location-tracker`) and installed editable — edit `shared/stack_shared/*.py` and `docker compose restart <watcher>` without rebuilding the image
+- `./shared/` is bind-mounted (`:ro`) into every watcher (`calendar-watcher`, `tg-watcher`, `oss-watcher`, `rss-watcher`, `receipt-watcher`, `location-tracker`) and installed editable — edit `shared/stack_shared/*.py` and `docker compose restart <watcher>` without rebuilding the image
+- memory-mcp is the only service exposing both REST and MCP on a single port (8089). MCP clients use `/mcp/mcp`, REST clients use `/v1/memory`
