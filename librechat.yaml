@@ -90,34 +90,13 @@ endpoints:
       apiKey: "none"
       baseURL: "http://host.docker.internal:8080/v1"
       models:
-        default: ["qwen", "gemma4"]
+        default: ["qwen3.6-35B-A3B"]
         fetch: true
       titleConvo: false
       summarize: false
       forcePrompt: false
       modelDisplayLabel: "llama.cpp"
       maxContextTokens: 262144
-
-modelSpecs:
-  enforce: false
-  prioritize: true
-  list:
-    - name: "qwen"
-      label: "Qwen 3.5 35B"
-      preset:
-        endpoint: "llama.cpp"
-        model: "qwen"
-        maxContextTokens: 262144
-        promptPrefix: |
-${TIER1_MEMORY}
-    - name: "gemma4"
-      label: "Gemma 4 31B"
-      preset:
-        endpoint: "llama.cpp"
-        model: "gemma4"
-        maxContextTokens: 262144
-        promptPrefix: |
-${TIER1_MEMORY}
 
 mcpServers:
   searxng:
