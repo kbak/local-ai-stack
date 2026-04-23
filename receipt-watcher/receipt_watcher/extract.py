@@ -34,9 +34,17 @@ Return a single JSON object with these fields:
 }
 
 Rules:
-- `is_receipt` = true ONLY for actual payment receipts / paid invoices / renewal
-  confirmations with a charged amount. Marketing, usage alerts without a charge,
-  plan-change emails without a charge, and password resets = false.
+- `is_receipt` = true ONLY when the email confirms a charge that has already
+  happened. Look for past-tense language: "we charged", "payment received",
+  "invoice paid", "receipt for your payment", "thank you for your payment",
+  "your card was charged". An amount and a date alone are NOT enough.
+- `is_receipt` = false for ADVANCE notices about a future charge, even if they
+  state the amount and renewal date. Red flags: "auto-renewal notice",
+  "upcoming renewal", "will be charged", "renews on <future date>",
+  "your subscription will renew", "to avoid interruption". These are warnings,
+  not receipts — the user has not been charged yet.
+- Marketing, usage alerts without a charge, plan-change emails without a
+  charge, password resets, and failed-payment notices = false.
 - `confidence` = "low" if amount or date are missing or unclear. The pipeline
   leaves low-confidence items in the inbox for manual review, so err on the side
   of "low" when uncertain.

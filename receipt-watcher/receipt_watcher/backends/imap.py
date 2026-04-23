@@ -96,8 +96,10 @@ class ImapBackend(EmailBackend):
         """Remove from INBOX in a provider-appropriate way.
 
         Gmail: remove the \\Inbox label (native archive; message stays in All Mail).
-        Other IMAP: MOVE to the pre-existing 'Archive' folder. Fails loudly if
-        the folder doesn't exist — we don't create folders silently.
+        Other IMAP: MOVE to the pre-existing Archive folder. The folder may be
+        named 'Archive' or live under the personal namespace (e.g. Dovecot
+        exposes it as 'INBOX.Archive'). Fails loudly if no such folder exists —
+        we don't create folders silently.
         """
         uid = ref.backend_id
         with self._open() as mb:
@@ -107,7 +109,22 @@ class ImapBackend(EmailBackend):
                 if typ != "OK":
                     raise RuntimeError(f"Gmail archive failed for uid={uid}: {typ}")
             else:
-                mb.move([uid], "Archive")
+                target = _resolve_archive_folder(mb)
+                mb.move([uid], target)
+
+
+def _resolve_archive_folder(mb: MailBox) -> str:
+    """Find a folder whose last path segment equals 'Archive', case-insensitive.
+
+    Handles both plain 'Archive' and namespaced 'INBOX.Archive' / 'INBOX/Archive'
+    without hardcoding the server's personal-namespace prefix.
+    """
+    for info in mb.folder.list():
+        delim = info.delim or "/"
+        leaf = info.name.rsplit(delim, 1)[-1]
+        if leaf.lower() == "archive":
+            return info.name
+    raise RuntimeError("No 'Archive' folder found on server — create one to enable archival")
 
 
 def _is_gmail(host: str) -> bool:
