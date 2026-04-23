@@ -7,9 +7,9 @@ import logging
 from dataclasses import dataclass, field
 
 from bs4 import BeautifulSoup
-from openai import OpenAI
+from stack_shared.llm_chat import chat
 
-from .config import LLM_API_KEY, LLM_BASE_URL, LLM_MODEL, Vendor
+from .config import Vendor
 from .backends.base import Message
 
 log = logging.getLogger(__name__)
@@ -106,18 +106,8 @@ def _build_user_prompt(msg: Message, vendor: Vendor) -> str:
 
 
 def extract(msg: Message, vendor: Vendor) -> Receipt:
-    client = OpenAI(base_url=LLM_BASE_URL, api_key=LLM_API_KEY)
     user = _build_user_prompt(msg, vendor)
-
-    resp = client.chat.completions.create(
-        model=LLM_MODEL,
-        messages=[
-            {"role": "system", "content": _SYSTEM_PROMPT},
-            {"role": "user", "content": user},
-        ],
-        temperature=0.0,
-    )
-    raw = (resp.choices[0].message.content or "").strip()
+    raw = chat(_SYSTEM_PROMPT, user, temperature=0.0)
     if raw.startswith("```"):
         raw = raw.split("```", 2)[1]
         if raw.startswith("json"):

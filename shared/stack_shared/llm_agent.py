@@ -11,19 +11,11 @@ import json
 import logging
 
 import httpx
-from openai import OpenAI
+from stack_shared.llm_client import get_client
+from stack_shared.llm_model import resolve_model
 from stack_shared.mcp_client import call_mcp
 
 log = logging.getLogger(__name__)
-
-_client: OpenAI | None = None
-
-
-def _llm(base_url: str, api_key: str) -> OpenAI:
-    global _client
-    if _client is None:
-        _client = OpenAI(base_url=base_url, api_key=api_key)
-    return _client
 
 
 # ── Tool definitions ──────────────────────────────────────────────────────────
@@ -107,25 +99,30 @@ def run_agent(
     system_prompt: str,
     user_prompt: str,
     *,
-    inference_base_url: str,
-    inference_api_key: str,
-    inference_model: str,
+    inference_base_url: str | None = None,
+    inference_api_key: str | None = None,
+    inference_model: str | None = None,
     searxng_url: str,
     location_tracker_url: str,
     location_tracker_auth_token: str,
     max_turns: int = 20,
 ) -> str:
-    """Run the LLM with tools until it produces a final text response."""
+    """Run the LLM with tools until it produces a final text response.
+
+    `inference_*` kwargs are optional - they resolve from env / llama-swap
+    via the shared `llm_client` + `llm_model` helpers when omitted.
+    """
     messages = [
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": user_prompt},
     ]
 
-    llm = _llm(inference_base_url, inference_api_key)
+    llm = get_client(base_url=inference_base_url, api_key=inference_api_key)
+    model_id = inference_model or resolve_model(base_url=inference_base_url)
 
     for _ in range(max_turns):
         response = llm.chat.completions.create(
-            model=inference_model,
+            model=model_id,
             messages=messages,
             tools=_TOOLS,
             tool_choice="auto",

@@ -19,11 +19,8 @@ POLL_INTERVAL_MINUTES: int = int(os.environ.get("POLL_INTERVAL_MINUTES", "5"))
 LOOKBACK_DAYS: int = int(os.environ.get("LOOKBACK_DAYS", "30"))
 LOOKAHEAD_DAYS: int = int(os.environ.get("LOOKAHEAD_DAYS", "90"))
 
-INFERENCE_BASE_URL: str = os.environ.get(
-    "INFERENCE_BASE_URL", "http://host.docker.internal:8080/v1"
-)
-INFERENCE_MODEL: str = os.environ.get("INFERENCE_MODEL", "qwen")
-INFERENCE_API_KEY: str = os.environ.get("INFERENCE_API_KEY", "none")
+# LLM base_url / api_key / model are resolved by stack_shared helpers at
+# call time; no need to pin them here. See stack_shared/llm_model.py.
 
 SEARXNG_URL: str = os.environ.get("SEARXNG_URL", "http://searxng:8080")
 

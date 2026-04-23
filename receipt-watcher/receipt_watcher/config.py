@@ -11,9 +11,8 @@ import yaml
 POLL_INTERVAL_MINUTES: int = int(os.environ.get("POLL_INTERVAL_MINUTES", "5"))
 DRY_RUN: bool = os.environ.get("DRY_RUN", "true").strip().lower() != "false"
 
-LLM_BASE_URL: str = os.environ["LLM_BASE_URL"]
-LLM_API_KEY: str = os.environ.get("LLM_API_KEY", "sk-no-key-required")
-LLM_MODEL: str = os.environ["LLM_MODEL"]
+# LLM base_url / api_key / model are resolved by stack_shared helpers at
+# call time; no need to pin them here. See stack_shared/llm_model.py.
 
 SIGNAL_API_URL: str = os.environ.get("SIGNAL_API_URL", "http://signal-api:8080")
 SIGNAL_NUMBER: str | None = os.environ.get("SIGNAL_NUMBER")

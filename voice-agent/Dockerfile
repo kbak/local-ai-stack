@@ -6,11 +6,19 @@ RUN apt-get update && \
 
 WORKDIR /app
 
-COPY requirements.txt /app/requirements.txt
+COPY voice-agent/requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r /app/requirements.txt
 
-COPY app /app/app
-COPY static /app/static
+# Install stack_shared editable so a compose bind-mount of ./shared:/shared:ro
+# picks up source changes without rebuilding the image. --no-deps because
+# voice-agent's requirements.txt already provides what it needs (openai,
+# httpx) and stack_shared's transitive deps (apscheduler, caldav, etc.) are
+# unused here.
+COPY shared/ /shared/
+RUN pip install --no-cache-dir --no-deps -e /shared/
+
+COPY voice-agent/app /app/app
+COPY voice-agent/static /app/static
 
 EXPOSE 8087
 

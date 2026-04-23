@@ -2,6 +2,8 @@
 
 import logging
 
+from stack_shared.llm_client import env_api_key, env_base_url
+from stack_shared.llm_model import invalidate_cache, resolve_model
 from strands import Agent
 from strands.models.openai import OpenAIModel
 
@@ -24,8 +26,8 @@ def build() -> Agent:
     logger.info("Discovered %d skills, %d tools", len(_skill_names), len(_tools))
 
     model = OpenAIModel(
-        client_args={"base_url": config.LLM_BASE_URL, "api_key": config.LLM_API_KEY},
-        model_id=config.LLM_MODEL,
+        client_args={"base_url": env_base_url(), "api_key": env_api_key()},
+        model_id=resolve_model(),
         params={
             "temperature": config.LLM_TEMPERATURE,
             "max_tokens": config.LLM_MAX_TOKENS,
@@ -38,7 +40,9 @@ def build() -> Agent:
 
 
 def reset_conversation() -> None:
-    """Clear conversation history for a fresh session."""
+    """Clear conversation history AND force a re-resolve of the active model
+    on the next build. This way a session reset picks up whatever's currently
+    loaded in llama-swap - e.g. after the user swaps models via the UI."""
     global _agent
-    if _agent is not None and hasattr(_agent, "messages"):
-        _agent.messages = []
+    invalidate_cache()
+    _agent = None

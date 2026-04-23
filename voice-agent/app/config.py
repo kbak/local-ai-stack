@@ -3,9 +3,8 @@ from pathlib import Path
 
 AUDIO_API_URL = os.getenv("AUDIO_API_URL", "http://audio-api:8088")
 
-LLM_BASE_URL = os.getenv("LLM_BASE_URL", "http://host.docker.internal:8080/v1")
-LLM_API_KEY = os.getenv("LLM_API_KEY", "sk-no-key-required")
-LLM_MODEL = os.getenv("LLM_MODEL", "qwen")
+# LLM base_url / api_key / model are resolved at agent build time via
+# stack_shared helpers. Only temperature and max_tokens are pinned here.
 LLM_TEMPERATURE = float(os.getenv("LLM_TEMPERATURE", "0.7"))
 LLM_MAX_TOKENS = int(os.getenv("LLM_MAX_TOKENS", "4096"))
 

@@ -10,26 +10,15 @@ import json
 import logging
 
 import httpx
-from openai import OpenAI
+from stack_shared.llm_client import get_client
+from stack_shared.llm_model import resolve_model
 
 from .config import (
     HOME_CITY,
-    INFERENCE_API_KEY,
-    INFERENCE_BASE_URL,
-    INFERENCE_MODEL,
     SEARXNG_URL,
 )
 
 log = logging.getLogger(__name__)
-
-_client: OpenAI | None = None
-
-
-def _llm() -> OpenAI:
-    global _client
-    if _client is None:
-        _client = OpenAI(base_url=INFERENCE_BASE_URL, api_key=INFERENCE_API_KEY)
-    return _client
 
 
 _SYSTEM_PROMPT = f"""\
@@ -47,14 +36,14 @@ Rules:
   "arriving in X", "flying to X", "hotel [name] [city]".
 - Planning notes, ideas, wishful thinking ("plan summer in X", "thinking of going to X",
   "maybe X trip", "research X") = null. Not confirmed travel.
-- Local events — concerts, restaurants, meetings, errands, day trips — are NOT travel,
+- Local events - concerts, restaurants, meetings, errands, day trips - are NOT travel,
   even if they have an explicit venue address in another city.
 - A venue address or city in the LOCATION field does NOT make something travel.
   Use the event type (flight? hotel? confirmed booking?) to decide.
 - When in doubt, return null. False positives corrupt the timeline permanently.
 - "high": explicit flight with destination city, or confirmed hotel check-in with city.
 - "medium": "driving to X overnight", confirmed multi-night stay with city.
-- Do NOT use "low" — if confidence would be low, return null instead.
+- Do NOT use "low" - if confidence would be low, return null instead.
 - Use the search tool only if you need to identify an airport code or city name.
 - Return ONLY the JSON object, no extra text.
 """
@@ -97,9 +86,11 @@ def _searxng_search(query: str) -> str:
 
 def _run_tool_loop(messages: list[dict]) -> dict:
     """Run LLM with tool use until it returns a final answer."""
+    client = get_client()
+    model_id = resolve_model()
     for _ in range(5):  # max 5 turns
-        response = _llm().chat.completions.create(
-            model=INFERENCE_MODEL,
+        response = client.chat.completions.create(
+            model=model_id,
             messages=messages,
             tools=_TOOLS,
             tool_choice="auto",

@@ -13,23 +13,25 @@ import threading
 from typing import Any
 
 from mem0 import Memory
+from stack_shared.llm_model import resolve_model
 
 from . import config
 
 logger = logging.getLogger("memory-mcp.backend")
 
 _memory: Memory | None = None
+_resolved_model: str | None = None
 _write_queue: queue.Queue = queue.Queue()
 _worker_started = False
 _worker_lock = threading.Lock()
 
 
-def _build_config() -> dict:
+def _build_config(model_id: str) -> dict:
     return {
         "llm": {
             "provider": "openai",
             "config": {
-                "model": config.LLM_MODEL,
+                "model": model_id,
                 "openai_base_url": config.LLM_BASE_URL,
                 "api_key": config.LLM_API_KEY,
             },
@@ -59,13 +61,18 @@ def load() -> None:
     Called from FastAPI startup so model loading (bge-m3, ~1.2GB RAM) and
     Qdrant collection init happen before we accept requests.
     """
-    global _memory
+    global _memory, _resolved_model
     if _memory is not None:
         return
+    # Mem0 bakes the LLM model into its internal client at construction time,
+    # so we resolve once here. If llama-swap has no model loaded, this falls
+    # back to the largest non-coder in /v1/models (llama-swap will auto-load
+    # it on first chat call).
+    _resolved_model = config.LLM_MODEL or resolve_model(base_url=config.LLM_BASE_URL)
     logger.info("Initializing Mem0 (llm=%s via %s, embed=%s, qdrant=%s:%s)...",
-                config.LLM_MODEL, config.LLM_BASE_URL,
+                _resolved_model, config.LLM_BASE_URL,
                 config.EMBED_MODEL, config.QDRANT_HOST, config.QDRANT_PORT)
-    _memory = Memory.from_config(_build_config())
+    _memory = Memory.from_config(_build_config(_resolved_model))
     _start_worker()
     logger.info("Mem0 ready.")
 

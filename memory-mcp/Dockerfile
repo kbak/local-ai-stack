@@ -9,8 +9,15 @@ WORKDIR /app
 COPY memory-mcp/requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r /app/requirements.txt
 
+# Install stack_shared editable so a compose bind-mount of ./shared:/shared:ro
+# picks up source changes without rebuilding. --no-deps because memory-mcp
+# doesn't need apscheduler/caldav/icalendar from stack_shared's dep list;
+# httpx + openai come from its own requirements.
+COPY shared/ /shared/
+RUN pip install --no-cache-dir --no-deps -e /shared/
+
 # Bake bge-m3 into the image so first-run has no download delay.
-# ~2.3GB — matches the pattern used by audio-api (whisper + kokoro).
+# ~2.3GB - matches the pattern used by audio-api (whisper + kokoro).
 RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('BAAI/bge-m3')"
 
 COPY memory-mcp/app /app/app

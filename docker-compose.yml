@@ -54,8 +54,8 @@ services:
 
   voice-agent:
     build:
-      context: ./voice-agent
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: voice-agent/Dockerfile
     container_name: voice-agent
     restart: unless-stopped
     ports:
@@ -63,6 +63,7 @@ services:
     volumes:
       - ./signal-bot-custom-skills:/app/skills:ro
       - ./voice-agent/static:/app/static:ro
+      - ./shared:/shared:ro
     depends_on:
       - audio-api
       - mcp-proxy
@@ -321,12 +322,14 @@ services:
       - "8089:8089"
     environment:
       MEMORY_LLM_BASE_URL: http://host.docker.internal:8080/v1
-      MEMORY_LLM_MODEL: qwen
+      # MEMORY_LLM_MODEL intentionally unset - memory_backend resolves the
+      # largest non-coder model currently loaded in llama-swap at startup.
       MEMORY_QDRANT_HOST: qdrant
       MEMORY_QDRANT_PORT: "6333"
       MEMORY_DEFAULT_USER_ID: ${MEMORY_DEFAULT_USER_ID:-default}
     volumes:
       - ${MEMORY_DIR:?MEMORY_DIR must be set in .env}:/memory
+      - ./shared:/shared:ro
     depends_on:
       - qdrant
     networks:

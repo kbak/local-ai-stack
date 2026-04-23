@@ -17,14 +17,12 @@ LOCAL_TIMEZONE: str = os.environ.get("LOCAL_TIMEZONE", "America/Phoenix")
 POLL_INTERVAL_MINUTES: int = int(os.environ.get("POLL_INTERVAL_MINUTES", "5"))
 LOOKAHEAD_DAYS: int = int(os.environ.get("LOOKAHEAD_DAYS", "90"))
 
-# LLM — prefer LLM_* (signal-bot.env) with INFERENCE_* as fallback
-INFERENCE_BASE_URL: str = os.environ.get("LLM_BASE_URL") or os.environ.get("INFERENCE_BASE_URL", "http://host.docker.internal:8080/v1")
-INFERENCE_API_KEY: str = os.environ.get("LLM_API_KEY") or os.environ.get("INFERENCE_API_KEY", "sk-no-key-required")
-INFERENCE_MODEL: str = os.environ.get("LLM_MODEL") or os.environ.get("INFERENCE_MODEL", "qwen")
+# LLM base_url / api_key / model are resolved by stack_shared helpers at
+# call time; no need to pin them here. See stack_shared/llm_model.py.
 
 SEARXNG_URL: str = os.environ.get("SEARXNG_URL", "http://searxng:8080")
 
-# MCP endpoints — location-tracker requires auth, mcp-proxy does not
+# MCP endpoints - location-tracker requires auth, mcp-proxy does not
 MCP_AUTH_TOKEN: str = os.environ.get("MCP_PROXY_AUTH_TOKEN", "")  # location-tracker only
 MCP_PROXY_AUTH_TOKEN: str = ""  # mcp-proxy has no auth
 MCP_PROXY_URL: str = os.environ.get("MCP_PROXY_URL", "http://mcp-proxy:8083")
