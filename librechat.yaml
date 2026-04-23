@@ -111,10 +111,6 @@ mcpServers:
     url: http://mcp-proxy:8083/servers/fetch/mcp
     type: streamable-http
     serverInstructions: false
-  wikipedia:
-    url: http://mcp-proxy:8083/servers/wikipedia/mcp
-    type: streamable-http
-    serverInstructions: false
   arxiv:
     url: http://mcp-proxy:8083/servers/arxiv/mcp
     type: streamable-http
@@ -125,14 +121,6 @@ mcpServers:
     serverInstructions: false
   hackernews:
     url: http://mcp-proxy:8083/servers/hackernews/mcp
-    type: streamable-http
-    serverInstructions: false
-  semantic-scholar:
-    url: http://mcp-proxy:8083/servers/semantic-scholar/mcp
-    type: streamable-http
-    serverInstructions: false
-  patents:
-    url: http://mcp-proxy:8083/servers/patents/mcp
     type: streamable-http
     serverInstructions: false
   weather:

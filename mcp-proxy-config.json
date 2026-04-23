@@ -11,10 +11,6 @@
       "command": "uvx",
       "args": ["mcp-server-fetch==2025.4.7"]
     },
-    "wikipedia": {
-      "command": "uvx",
-      "args": ["wikipedia-mcp==2.0.0"]
-    },
     "arxiv": {
       "command": "uvx",
       "args": ["arxiv-mcp-server==0.4.11"]
@@ -31,14 +27,6 @@
       "command": "uvx",
       "args": ["mcp-hn==0.1.0"]
     },
-    "semantic-scholar": {
-      "command": "uvx",
-      "args": ["semantic-scholar-mcp==0.4.0"]
-    },
-    "patents": {
-      "command": "uvx",
-      "args": ["patent-mcp-server==0.8.0"]
-    },
     "weather": {
       "command": "uvx",
       "args": ["--from", "mcp-weather-server==0.6.1", "mcp_weather_server"]
@@ -52,8 +40,8 @@
       "args": ["yfinance-mcp-server==1.0.4"]
     },
     "github": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-github"]
+      "command": "python",
+      "args": ["/opt/gh-read-server.py"]
     },
     "google-maps": {
       "command": "uv",

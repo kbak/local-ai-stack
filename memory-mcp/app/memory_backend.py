@@ -144,6 +144,14 @@ def list_all(user_id: str, limit: int = 100) -> list[dict[str, Any]]:
     return result  # type: ignore[return-value]
 
 
+def get_by_id(memory_id: str) -> dict[str, Any] | None:
+    assert _memory is not None
+    try:
+        return _memory.get(memory_id=memory_id)
+    except Exception:
+        return None
+
+
 def delete(memory_id: str) -> None:
     assert _memory is not None
     _memory.delete(memory_id=memory_id)
