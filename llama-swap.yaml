@@ -21,16 +21,32 @@ models:
   # main chat model on the 5090. Small ctx + small batch so startup is fast and
   # VRAM footprint stays ~2 GB. Kept always-loaded so VS Code tab-complete never
   # pays a cold-start cost.
+  #
+  # CUDA_VISIBLE_DEVICES hides the 5090 from this subprocess entirely so
+  # llama.cpp can't allocate its default ~1.5 GB per-device context buffer on
+  # CUDA0. With only the 5060 Ti visible it reindexes to CUDA0 inside the
+  # process -- that's why --device is CUDA0 here, not CUDA1.
   qwen-coder-1.5B:
-    cmd: llama-server --port ${PORT} -hf bartowski/Qwen2.5-Coder-1.5B-Instruct-GGUF --hf-file Qwen2.5-Coder-1.5B-Instruct-Q5_K_M.gguf --device CUDA1 --split-mode none --n-gpu-layers 999 --parallel 1 --flash-attn on --batch-size 1024 --ubatch-size 256 --ctx-size 32768 --no-mmap
+    env:
+      - "CUDA_VISIBLE_DEVICES=${env.SECONDARY_GPU}"
+    cmd: llama-server --port ${PORT} -hf bartowski/Qwen2.5-Coder-1.5B-Instruct-GGUF --hf-file Qwen2.5-Coder-1.5B-Instruct-Q5_K_M.gguf --device CUDA0 --split-mode none --n-gpu-layers 999 --parallel 1 --flash-attn on --batch-size 1024 --ubatch-size 256 --ctx-size 32768 --no-mmap
+    ttl: 0
+
+  # Fallback chat model on the 5060 Ti. Stays loaded so signal-bot still works
+  # when the main 27B is evicted off the 5090 (e.g. for gaming).
+  # Same CUDA_VISIBLE_DEVICES trick as qwen-coder-1.5B above.
+  qwen3.5-9B:
+    env:
+      - "CUDA_VISIBLE_DEVICES=${env.SECONDARY_GPU}"
+    cmd: llama-server --port ${PORT} -hf unsloth/Qwen3.5-9B-GGUF --hf-file Qwen3.5-9B-Q4_K_M.gguf --device CUDA0 --split-mode none --n-gpu-layers 999 --parallel 1 --flash-attn on --batch-size 2048 --ubatch-size 512 --ctx-size 32768 --no-mmap
     ttl: 0
 
 # Two independent groups:
 #   - main (CUDA0 / 5090): one chat model at a time, swappable. exclusive=false
-#     so loading a main model does NOT unload the coder group.
-#   - coder (CUDA1 / 5060 Ti): always loaded, persistent so main-group swaps
-#     never evict it. swap=false so multiple coder models could coexist
-#     (we only have one today, but future-proof).
+#     so loading a main model does NOT unload the cuda1 group.
+#   - cuda1 (CUDA1 / 5060 Ti): coder + fallback chat model. Both always loaded,
+#     persistent so main-group swaps never evict them. swap=false so the two
+#     models coexist on the same GPU.
 groups:
   "main":
     swap: true
@@ -41,9 +57,10 @@ groups:
       - "qwen3.6-35B-A3B"
       - "gemma4-31B"
 
-  "coder":
+  "cuda1":
     swap: false
     exclusive: false
     persistent: true
     members:
       - "qwen-coder-1.5B"
+      - "qwen3.5-9B"

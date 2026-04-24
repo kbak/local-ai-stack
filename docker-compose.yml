@@ -47,7 +47,7 @@ services:
     env_file:
       - ./audio-api.env
     environment:
-      CUDA_VISIBLE_DEVICES: ${AUDIO_API_GPU:-0}
+      CUDA_VISIBLE_DEVICES: ${SECONDARY_GPU:-0}
     networks:
       - ai-net
     mem_limit: 3000m

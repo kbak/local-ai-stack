@@ -4,13 +4,20 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WSL_SCRIPT_DIR="$(echo "$SCRIPT_DIR" | sed 's|^/\([a-z]\)/|/mnt/\1/|')"
 
+# Export .env so llama-swap can resolve ${env.SECONDARY_GPU} in its config.
+# docker-compose reads .env on its own, but llama-swap is a host process and
+# only sees vars we export here.
+set -a
+. "$SCRIPT_DIR/.env"
+set +a
+
 echo "Starting llama-swap..."
 llama-swap --config "$SCRIPT_DIR/llama-swap.yaml" >/dev/null 2>&1 &
 
 echo "Pre-loading default model (qwen) before Docker stack..."
 until curl -sf http://localhost:8080/v1/chat/completions \
     -H "Content-Type: application/json" \
-    -d '{"model":"qwen","messages":[{"role":"user","content":"hi"}],"max_tokens":1}' \
+    -d '{"model":"qwen3.6-35B-A3B","messages":[{"role":"user","content":"hi"}],"max_tokens":1}' \
     >/dev/null 2>&1; do
     sleep 2
 done
@@ -37,6 +44,22 @@ done
 echo "Waiting for audio-api to load Whisper + Kokoro..."
 until MSYS_NO_PATHCONV=1 wsl.exe -d Ubuntu-24.04 -- docker logs audio-api 2>&1 | grep -q "Kokoro warmup complete"; do
     sleep 3
+done
+
+echo "Pre-loading qwen-coder-1.5B on 5060 Ti..."
+until curl -sf http://localhost:8080/v1/chat/completions \
+    -H "Content-Type: application/json" \
+    -d '{"model":"qwen-coder-1.5B","messages":[{"role":"user","content":"hi"}],"max_tokens":1}' \
+    >/dev/null 2>&1; do
+    sleep 2
+done
+
+echo "Pre-loading qwen3.5-9B-fallback on 5060 Ti..."
+until curl -sf http://localhost:8080/v1/chat/completions \
+    -H "Content-Type: application/json" \
+    -d '{"model":"qwen3.5-9B","messages":[{"role":"user","content":"hi"}],"max_tokens":1}' \
+    >/dev/null 2>&1; do
+    sleep 2
 done
 
 echo "Waiting for voice-agent..."
