@@ -190,6 +190,9 @@ def _process_meal(event, result, state: State, now: datetime) -> None:
 
     venue = result.venue or event.summary
     city = result.city or ""
+    # Prefer the precise LOCATION (existing or just-patched) for the Maps pin;
+    # fall back to "venue city". patch_event ignores new_url when URL is set.
+    map_query = patch_address or event.location.strip() or f"{venue} {city}"
     try:
         patch_event(
             event.uid,
@@ -198,7 +201,7 @@ def _process_meal(event, result, state: State, now: datetime) -> None:
             caldav_password=CALDAV_PASSWORD,
             new_summary_prefix="🍽",
             new_location=patch_address,
-            new_url=maps_url(venue, city) if not event.url else None,
+            new_url=maps_url(map_query),
         )
     except Exception:
         log.warning("CalDAV patch failed for '%s', continuing", event.summary)

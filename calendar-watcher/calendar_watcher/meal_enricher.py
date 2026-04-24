@@ -133,9 +133,8 @@ def _places_lookup(venue: str, city: str) -> tuple[float | None, str | None]:
 
 # ── Maps URL ──────────────────────────────────────────────────────────────────
 
-def maps_url(restaurant: str, city: str) -> str:
-    q = quote_plus(f"{restaurant} {city}")
-    return f"https://google.com/maps/search/?api=1&query={q}"
+def maps_url(query: str) -> str:
+    return f"https://google.com/maps/search/?api=1&query={quote_plus(query)}"
 
 
 # ── Location vagueness check ──────────────────────────────────────────────────
@@ -162,11 +161,16 @@ def enrich(event: RawEvent, classification: ClassifyResult) -> tuple[str, str | 
     log.info("Enriching meal '%s' in %s", venue, city)
 
     rating, formatted_address = _places_lookup(venue, city)
-    patch_address = formatted_address if is_vague_location(event.location) else None
+    # Prefix venue name onto LOCATION so Apple Calendar renders the map preview.
+    patch_address = (
+        f"{venue}, {formatted_address}"
+        if formatted_address and is_vague_location(event.location)
+        else None
+    )
 
     menu_url = _find_menu_url(venue, city)
     weather = get_weather(city, event.start, mcp_proxy_url=MCP_PROXY_URL, mcp_auth_token="")
-    murl = maps_url(venue, city)
+    murl = maps_url(f"{venue}, {formatted_address}" if formatted_address else f"{venue} {city}")
 
     try:
         import pytz
