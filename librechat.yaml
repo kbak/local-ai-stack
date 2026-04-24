@@ -6,6 +6,7 @@ mcpSettings:
     - "http://location-tracker:8084"
     - "http://pdf-inspector:8085/"
     - "http://memory-mcp:8089"
+    - "http://audio-api:8088"
   autoApprove: true
 
 speech:
@@ -155,5 +156,9 @@ mcpServers:
       Authorization: "Bearer ${MCP_PROXY_AUTH_TOKEN}"
   memory:
     url: http://memory-mcp:8089/mcp/mcp
+    type: streamable-http
+    serverInstructions: false
+  chatterbox:
+    url: http://audio-api:8088/mcp/mcp
     type: streamable-http
     serverInstructions: false

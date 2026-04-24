@@ -6,3 +6,5 @@ faster-whisper==1.0.3
 kokoro-onnx==0.4.6
 onnxruntime-gpu==1.19.2
 soundfile==0.12.1
+chatterbox-tts
+mcp==1.12.4

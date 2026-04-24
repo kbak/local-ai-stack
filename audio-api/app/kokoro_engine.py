@@ -1,12 +1,11 @@
 import io
 import logging
 import os
-import subprocess
 import tempfile
 from pathlib import Path
 from typing import Iterator
 
-from . import config
+from . import audio_encode, config
 
 logger = logging.getLogger(__name__)
 
@@ -83,30 +82,6 @@ def synthesize_wav(text: str, voice: str, lang: str, speed: float) -> tuple[byte
     return buf.getvalue(), sample_rate
 
 
-def _ffmpeg_encode(wav_bytes: bytes, output_format: str) -> bytes:
-    """Encode WAV bytes to another format via ffmpeg stdin/stdout."""
-    if output_format == "wav":
-        return wav_bytes
-
-    fmt_args = {
-        "ogg": ["-c:a", "libopus", "-b:a", "24k", "-vbr", "on", "-application", "voip", "-f", "ogg"],
-        "opus": ["-c:a", "libopus", "-b:a", "24k", "-vbr", "on", "-application", "voip", "-f", "ogg"],
-        "mp3": ["-c:a", "libmp3lame", "-b:a", "64k", "-f", "mp3"],
-        "flac": ["-c:a", "flac", "-f", "flac"],
-        "pcm": ["-f", "s16le", "-ac", "1", "-ar", "24000"],
-    }
-    if output_format not in fmt_args:
-        raise ValueError(f"Unsupported format: {output_format}")
-
-    proc = subprocess.run(
-        ["ffmpeg", "-y", "-i", "pipe:0", *fmt_args[output_format], "pipe:1"],
-        input=wav_bytes,
-        capture_output=True,
-        check=True,
-    )
-    return proc.stdout
-
-
 def synthesize(text: str, voice: str, lang: str, speed: float, response_format: str) -> bytes:
     """Synthesize text of any length, chunking to stay under Kokoro's 510-token cap.
 
@@ -146,7 +121,7 @@ def synthesize(text: str, voice: str, lang: str, speed: float, response_format: 
     combined = np.concatenate(pieces)
     buf = io.BytesIO()
     sf.write(buf, combined, sample_rate, format="WAV")
-    return _ffmpeg_encode(buf.getvalue(), response_format)
+    return audio_encode.encode(buf.getvalue(), response_format)
 
 
 def _chunk_long(sentence: str, max_chars: int = _MAX_CHARS) -> list[str]:
@@ -209,4 +184,4 @@ def synthesize_stream(
             except IndexError:
                 logger.warning("Kokoro token overflow on chunk of %d chars, skipping", len(chunk))
                 continue
-            yield _ffmpeg_encode(wav_bytes, response_format)
+            yield audio_encode.encode(wav_bytes, response_format)

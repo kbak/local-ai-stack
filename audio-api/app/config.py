@@ -13,3 +13,7 @@ DEFAULT_LANG = os.getenv("DEFAULT_LANG", "a")
 DEFAULT_SPEED = float(os.getenv("DEFAULT_SPEED", "1.0"))
 
 LANG_MAP = {"a": "en-us", "b": "en-gb"}
+
+# Chatterbox (voice cloning TTS)
+VOICE_SAMPLES_DIR = Path(os.getenv("VOICE_SAMPLES_DIR", "/app/voice-samples"))
+HF_HOME = os.getenv("HF_HOME", "/app/hf-cache")

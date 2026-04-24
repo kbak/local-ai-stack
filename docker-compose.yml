@@ -48,9 +48,14 @@ services:
       - ./audio-api.env
     environment:
       CUDA_VISIBLE_DEVICES: ${SECONDARY_GPU:-0}
+      HF_HOME: /app/hf-cache
+      VOICE_SAMPLES_DIR: /app/voice-samples
+    volumes:
+      - ${VOICE_SAMPLES_DIR:?VOICE_SAMPLES_DIR must be set in .env}:/app/voice-samples:ro
+      - audio-api-hf-cache:/app/hf-cache
     networks:
       - ai-net
-    mem_limit: 3000m
+    mem_limit: 8000m
 
   voice-agent:
     build:
@@ -143,7 +148,7 @@ services:
       - ./signal-bot-custom-skills:/app/data/custom_skills
       - signal-bot-data:/app/data
       - signal-cli-data:/signal-cli-data:ro
-      - ${MUSIC_HOST_DIR:-D:/backup/Music}:/music
+      - ${MUSIC_HOST_DIR:?MUSIC_HOST_DIR must be set in .env}:/music
       - ${MEMORY_DIR:?MEMORY_DIR must be set in .env}:/memory:ro
     depends_on:
       signal-api:
@@ -352,3 +357,4 @@ volumes:
   calendar-watcher-data:
   receipt-watcher-data:
   tg-watcher-data:
+  audio-api-hf-cache:

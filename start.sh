@@ -41,8 +41,8 @@ sys.exit(0 if all_up else 1)
     sleep 2
 done
 
-echo "Waiting for audio-api to load Whisper + Kokoro..."
-until MSYS_NO_PATHCONV=1 wsl.exe -d Ubuntu-24.04 -- docker logs audio-api 2>&1 | grep -q "Kokoro warmup complete"; do
+echo "Waiting for audio-api to load Whisper + Kokoro + Chatterbox..."
+until MSYS_NO_PATHCONV=1 wsl.exe -d Ubuntu-24.04 -- docker logs audio-api 2>&1 | grep -q "Chatterbox warmup complete"; do
     sleep 3
 done
 
@@ -50,14 +50,6 @@ echo "Pre-loading qwen-coder-1.5B on 5060 Ti..."
 until curl -sf http://localhost:8080/v1/chat/completions \
     -H "Content-Type: application/json" \
     -d '{"model":"qwen-coder-1.5B","messages":[{"role":"user","content":"hi"}],"max_tokens":1}' \
-    >/dev/null 2>&1; do
-    sleep 2
-done
-
-echo "Pre-loading qwen3.5-9B-fallback on 5060 Ti..."
-until curl -sf http://localhost:8080/v1/chat/completions \
-    -H "Content-Type: application/json" \
-    -d '{"model":"qwen3.5-9B","messages":[{"role":"user","content":"hi"}],"max_tokens":1}' \
     >/dev/null 2>&1; do
     sleep 2
 done

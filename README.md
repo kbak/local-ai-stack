@@ -8,11 +8,11 @@ Self-hosted LLM stack with privacy-focused web search and research tools. Runs o
 |---|---|---|
 | llama-swap | 8080 | Model manager — switches between llama-server instances on demand |
 | SearXNG | 8081 | Privacy-focused meta search engine |
-| mcp-proxy | 8083 | MCP tool server (14 tools via streamable HTTP, no auth required) |
+| mcp-proxy | 8083 | MCP tool server (11 tools via streamable HTTP, no auth required) |
 | location-tracker | 8084 | City-presence timeline service; exposes `get_location_at` MCP tool (bearer token required) |
 | pdf-inspector | 8086 | PDF text extraction via pdf-inspector (Rust); handles Unicode, multi-column, tables |
 | voice-agent | 8087 | Browser voice-chat UI with wake-word-free VAD, streaming TTS, voice picker, and full MCP tool access via strands |
-| audio-api | 8088 | Shared GPU-backed Whisper (STT) + Kokoro (TTS) service with an OpenAI-compatible API (pinned to the 5060 Ti) |
+| audio-api | 8088 | Shared GPU-backed Whisper (STT) + Kokoro (TTS) + Chatterbox (voice cloning) service with an OpenAI-compatible API (pinned to the secondary GPU) |
 | memory-mcp | 8089 | Self-hosted agentic memory (Mem0 + bge-m3 + Qdrant) exposed as REST + MCP; Tier 2 of the hybrid memory architecture |
 | qdrant | 6333 | Vector store backing memory-mcp |
 | calendar-watcher | — | Polls calendar for meal and travel events; enriches with rating/menu/weather/maps; delivers briefings via Signal |
@@ -32,21 +32,19 @@ All tools are exposed via mcp-proxy on port 8083 (no authentication required —
 
 - **searxng** — web search (via local SearXNG)
 - **fetch** — fetch URL content
-- **wikipedia** — Wikipedia search and lookup
 - **arxiv** — academic paper search
 - **youtube** — YouTube transcript extraction
 - **time** — current time and timezone conversion
 - **hackernews** — Hacker News top stories
 - **pdf-inspector** — PDF text extraction (Rust, handles Unicode/multi-column/tables); available directly at port 8086, not via mcp-proxy
-- **semantic-scholar** — academic paper search
-- **patents** — patent search
 - **weather** — current weather and forecast
 - **currency** — exchange rates
 - **finance** — stock and financial data (yfinance)
-- **github** — read files, search code and repos, browse commits and issues (requires `GITHUB_TOKEN`)
+- **github** — read-only access via the `gh` CLI: read files, search code and repos, browse commits/issues/PRs. Custom Python MCP server (`mcp-proxy/gh-read-server.py`) using a `GITHUB_TOKEN` injected into the `gh` config — no write paths exposed.
 - **google-maps** — place search, ratings, hours, geocoding, directions (requires `GOOGLE_MAPS_API_KEY`)
 - **location-tracker** — `get_location_at(datetime)` — returns city, confidence, and source for any datetime; backed by CalDAV + local LLM + SearXNG. See [`location-tracker/README.md`](location-tracker/README.md).
-- **memory** — `remember(content)` / `search_memory(query, limit)` — agentic long-term memory via Mem0 + bge-m3 + Qdrant. Served from `memory-mcp` directly (not via mcp-proxy). LibreChat wires it as `http://memory-mcp:8089/mcp/mcp`; signal-bot talks to its REST surface.
+- **memory** — `remember(content)` / `search_memory(query, limit)` / two-step `forget` — agentic long-term memory via Mem0 + bge-m3 + Qdrant. Served from `memory-mcp` directly (not via mcp-proxy). LibreChat wires it as `http://memory-mcp:8089/mcp/mcp`; signal-bot talks to its REST surface.
+- **chatterbox** — `clone_voice(text, voice, ...)` / `list_clone_voices()` — voice-cloning TTS. Served from `audio-api` at `http://audio-api:8088/mcp/mcp`. Reference samples live in the host directory configured by `VOICE_SAMPLES_DIR` and are referenced by filename stem (e.g. `joe` for `joe.wav`).
 
 ## Requirements
 
@@ -74,35 +72,45 @@ Edit `.env` and set:
 - `HOME_CITY` — your home city, used as fallback by location-tracker (e.g. `Scottsdale`).
 - `CALDAV_CALENDAR_NAMES` — comma-separated calendar names to track (e.g. `Travel`). Leave empty to track all calendars.
 - `GOOGLE_MAPS_API_KEY` — Google Places API (New) key for venue ratings and addresses in meal briefings.
+- `MEMORY_DIR` — absolute host path for memory storage (`USER.md`, `MEMORY.md`, Qdrant volume). Keep outside the repo.
+- `VOICE_SAMPLES_DIR` — absolute host path containing `.wav` reference samples for Chatterbox voice cloning. Mounted read-only into audio-api at `/app/voice-samples`. **Required** — no default.
+- `MUSIC_HOST_DIR` — absolute host path to your music library, mounted read-write into signal-bot at `/music`. **Required** — no default.
+- `SECONDARY_GPU` — index or UUID of the secondary GPU. Hosts audio-api and the always-resident `qwen-coder-1.5B` autocomplete model. Defaults to `0` for single-GPU hosts.
 
 **3. Configure models in `llama-swap.yaml`**
 
-Edit `llama-swap.yaml` to set your models and their llama-server arguments. The default config ships several chat/agent models pinned to the 5090 (Qwen 3.6 27B at Q5 and Q6, Qwen 3.6 35B-A3B, Qwen 3.5 35B-A3B, Gemma 4 31B) plus `qwen-coder-1.5B` for tab-complete pinned to the 5060 Ti. The chat entries use:
+Edit `llama-swap.yaml` to set your models and their llama-server arguments. The default config ships:
+
+- **Primary GPU (`main` group, swappable):** Qwen 3.6 27B at Q5 and Q6, Qwen 3.6 35B-A3B, Gemma 4 31B. One at a time.
+- **Secondary GPU (`cuda1` group, persistent):** `qwen-coder-1.5B` for FIM tab-complete — always loaded so tab-complete never pays a cold-start cost. Coexists on the same card with audio-api (Whisper + Kokoro + Chatterbox).
+- **`qwen3.5-9B`** is also defined in the `cuda1` group as a fallback chat model but is *not* auto-loaded — Chatterbox now occupies the secondary-GPU headroom that previously kept it warm. Request it explicitly via the OpenAI API or the llama-swap UI when the primary GPU is busy (e.g. evicted for gaming) and llama-swap will load it on demand.
+
+The chat entries use:
 - `--n-gpu-layers 999` — full GPU offload
 - `--flash-attn on` — flash attention
 - `--batch-size 4096 --ubatch-size 1024` — large batches for fast prompt processing on long contexts
-- `--device CUDA0 --split-mode none` — pin to the 5090 (change the index if your single-GPU host has only one card)
-- `--ctx-size` — 131k–262k depending on model
+- `--device CUDA0 --split-mode none` — pin to the primary GPU (change the index if your single-GPU host has only one card)
+- `--ctx-size` — 100k–262k depending on model
 
-See the `groups:` block at the bottom of the file for how the coder model is kept resident on the 5060 Ti alongside whatever the `main` group loads.
+The coder model pins itself to the secondary GPU via `CUDA_VISIBLE_DEVICES=${env.SECONDARY_GPU}` — `--device CUDA0` inside the subprocess then resolves to whichever physical card you set. See the `groups:` block at the bottom of the file for the full layout.
 
 **4. Start the Docker stack**
 ```
 docker compose up -d --build
 ```
 
-First startup takes a few minutes — mcp-proxy builds a custom image that pre-installs all MCP packages including the GitHub MCP server (requires Node.js, included in the image).
+First startup takes a few minutes — mcp-proxy builds a custom image that pre-installs all MCP packages and the `gh` CLI (used by the custom read-only GitHub MCP server at `mcp-proxy/gh-read-server.py`).
 
 **5. Start llama-swap**
 ```
 llama-swap --config llama-swap.yaml
 ```
 
-llama-swap listens on port 8080 and launches llama-server on demand when a model is requested. Inside a group, requesting a different model swaps out the current one. Models in separate `persistent: true` groups stay resident alongside each other — used here to keep the autocomplete coder model on the 5060 Ti loaded concurrently with whatever chat model is running on the 5090.
+llama-swap listens on port 8080 and launches llama-server on demand when a model is requested. Inside a group, requesting a different model swaps out the current one. Models in separate `persistent: true` groups stay resident alongside each other — used here to keep the autocomplete coder model on the secondary GPU loaded concurrently with whatever chat model is running on the primary GPU.
 
 **6. Open LibreChat**
 
-Navigate to `http://localhost:3000` (or `http://<server-ip>:3000` from another device) and register an account. Both models will appear in the model dropdown.
+Navigate to `http://localhost:3000` (or `http://<server-ip>:3000` from another device) and register an account. The `default` model in `librechat.yaml` is `qwen3.6-35B-A3B`; every model defined in `llama-swap.yaml` is fetched dynamically and shown in the model dropdown.
 
 ## llama-swap web UI
 
@@ -113,12 +121,14 @@ http://localhost:8080/ui
 
 ## GPU layout
 
-Two Blackwell GPUs are partitioned across services via `CUDA_VISIBLE_DEVICES` at the container level and `--device CUDA0/CUDA1` inside llama-swap:
+Two GPUs are partitioned across services via `CUDA_VISIBLE_DEVICES` (set at the container level for audio-api and per-model in llama-swap via `${env.SECONDARY_GPU}`):
 
-- **GPU 0 — RTX 5090 (32 GB):** llama-swap chat/agent models (Qwen, Gemma). One at a time within the `main` group.
-- **GPU 1 — RTX 5060 Ti (16 GB):** audio-api (Whisper + Kokoro) and the autocomplete coder model (`qwen-coder-1.5B`). Both stay resident.
+- **Primary GPU:** llama-swap chat/agent models (Qwen, Gemma). One at a time within the `main` group.
+- **Secondary GPU (`SECONDARY_GPU`):** audio-api (Whisper + Kokoro + Chatterbox) and the autocomplete coder model `qwen-coder-1.5B`, all resident together. The `qwen3.5-9B` fallback chat model also pins here when explicitly loaded.
 
-The `groups` block in `llama-swap.yaml` keeps the coder model in its own `persistent: true` group so chat-model swaps on the 5090 never evict it — tab-complete never pays a cold-start cost.
+The `groups` block in `llama-swap.yaml` keeps the coder model in its own `persistent: true` group so chat-model swaps on the primary GPU never evict it — tab-complete never pays a cold-start cost.
+
+Single-GPU hosts work fine: leave `SECONDARY_GPU=0` and everything coexists on one card (mind the VRAM budget).
 
 ## VS Code / Continue.dev
 
@@ -152,7 +162,9 @@ tabAutocompleteOptions:
   useCache: true
 ```
 
-The model `id`s must match the llama-swap.yaml entries exactly. `qwen-coder-1.5B` runs on the 5060 Ti at ~150 t/s (≈200–400 ms tab-complete latency); chat/edit/agent use Qwen 3.6 27B on the 5090.
+The model `id`s must match the llama-swap.yaml entries exactly. `qwen-coder-1.5B` runs on the secondary GPU at ~150 t/s (≈200–400 ms tab-complete latency); chat/edit/agent use Qwen 3.6 27B on the primary GPU.
+
+MCP servers can also be wired into Continue via per-server YAMLs in `.continue/mcpServers/` (committed in this repo: `github.yaml`, `searxng.yaml`, `time.yaml`).
 
 ## Connecting MCP tools from llama.cpp web UI
 
@@ -165,19 +177,28 @@ http://<server-ip>:8083/servers/github/mcp
 # etc.
 ```
 
-## audio-api (shared STT/TTS)
+## audio-api (shared STT/TTS + voice cloning)
 
-A single GPU-backed service exposing OpenAI-compatible endpoints — used by LibreChat, signal-bot, and voice-agent. No model duplication; Whisper and Kokoro are loaded once and stay warm.
+A single GPU-backed service exposing OpenAI-compatible endpoints — used by LibreChat, signal-bot, and voice-agent. Three models load once at startup and stay warm:
 
-- `POST /v1/audio/transcriptions` — Whisper (faster-whisper) transcription
+- **Whisper** (faster-whisper) — speech-to-text
+- **Kokoro** (kokoro-onnx) — fast streaming TTS, fixed voice library
+- **Chatterbox** — voice-cloning TTS; clones from a short reference `.wav`
+
+Endpoints:
+
+- `POST /v1/audio/transcriptions` — Whisper transcription (OpenAI-compatible)
 - `POST /v1/audio/speech` — Kokoro TTS; supports `stream: true` for sentence-by-sentence chunks
-- `GET /v1/voices` — `{voices, default, lang, speed}` — list of installed Kokoro voices plus the current server-side defaults
-- `GET /health` — returns 200 only once both models are loaded AND warmed up (CUDA kernels JIT-compiled). `start.sh` polls this before considering the stack ready.
+- `POST /v1/audio/clone` — Chatterbox voice cloning. Body: `{text, voice, exaggeration, cfg_weight, response_format}`. `voice` is a filename stem under `VOICE_SAMPLES_DIR` (e.g. `joe` → `joe.wav`) or an absolute `.wav` path; omit it for Chatterbox's built-in default voice. Output formats: `wav`, `mp3`, `ogg`/`opus`, `aac`/`m4a`, `flac`, `pcm`.
+- `GET /v1/voices` — `{voices, default, lang, speed}` — installed Kokoro voices plus the current server-side defaults
+- `GET /v1/voices/clone` — `{voices, voice_dir}` — `.wav` files discovered under `VOICE_SAMPLES_DIR`
+- `GET /health` — returns 200 only once all three models are loaded AND warmed up (CUDA kernels JIT-compiled). `start.sh` waits for `Chatterbox warmup complete` in the logs before considering audio-api ready.
+- `POST /mcp/mcp` — MCP streamable-http surface exposing `clone_voice` and `list_clone_voices` as tools (LibreChat wires this as the `chatterbox` server).
 
 Defaults in `audio-api.env` (**single source of truth** for voice/lang/speed):
 
 ```
-WHISPER_MODEL=small
+WHISPER_MODEL=distil-large-v3
 WHISPER_DEVICE=cuda
 WHISPER_COMPUTE_TYPE=float16
 ONNX_PROVIDER=CUDAExecutionProvider
@@ -188,7 +209,9 @@ DEFAULT_SPEED=1.0
 
 Callers (voice-agent, calendar-watcher, rss-watcher, etc.) omit `voice`/`lang`/`speed` from their requests so these defaults apply. Pass them explicitly only to override per-request. To change the stack-wide default voice, edit `DEFAULT_VOICE` here and `docker compose restart audio-api` — no other service needs updating. `signal-bot` is the one exception (it reads `TTS_VOICE` from `signal-bot.env` because the uoltz upstream expects it); `librechat.yaml` also pins a UI default under `speechTab.textToSpeech.voice`.
 
-Both models run on the GPU. Post-warmup, first real request latency is ~0.7s. Long sentences are auto-chunked at commas/whitespace before hitting Kokoro's 510-token cap.
+All three models run on the GPU. Post-warmup, first Kokoro request latency is ~0.7s; Chatterbox is heavier (≈seconds-per-sentence on first cold call, faster afterwards because the CUDA arena was pre-sized at warmup). Long sentences are auto-chunked at commas/whitespace before hitting Kokoro's 510-token cap.
+
+**Voice cloning samples.** Drop reference `.wav` files into the host directory you set as `VOICE_SAMPLES_DIR` (mounted read-only at `/app/voice-samples`). Five to fifteen seconds of clean speech per voice works well. The filename stem becomes the `voice` argument: `joe.wav` → `clone_voice(text=..., voice="joe")`.
 
 ## voice-agent (browser voice chat)
 
@@ -279,7 +302,7 @@ Skills in `signal-bot-custom-skills/` are mounted into the container at `/app/da
 
 The uoltz fork ships with several built-ins disabled by default (`web_search`, `notes`, `rss_digest`, `shell`, `skill_builder`) — the stack intentionally keeps them off: web search, news digests, and host-side actions are handled by MCP tools and watcher services instead.
 
-Available custom skills: arxiv, currency, finance, github, google_maps, hackernews, music_download, patents, pdf, searxng, semantic_scholar, time, weather, wikipedia.
+Available custom skills: arxiv, currency, finance, github, google_maps, hackernews, music_download, pdf, searxng, time, weather.
 
 Most are thin MCP-client shims that call mcp-proxy on port 8083. A few do their own thing:
 
@@ -474,15 +497,27 @@ docker compose up -d receipt-watcher
 
 Low-confidence extractions are left in the inbox with a Signal "review manually" alert rather than written to the sheet. The service never archives before the sheet write lands, so any failure leaves the email visible.
 
+## llm-kb-template
+
+A minimal scaffold for building an LLM-curated personal knowledge base. The folder contains:
+
+- `CLAUDE.md` — the schema and workflows the agent follows (rename to `AGENTS.md` for non-Claude tools)
+- `GUIDE.md` — step-by-step usage instructions
+- `raw/` — drop source documents here; the agent treats this directory as immutable
+- `wiki/` — agent-owned compiled wiki with frontmatter, `[[backlinks]]`, an `index.md`, and an append-only `log.md`
+- `outputs/` — generated reports, lint runs, query answers
+
+Workflow: copy the template into a new folder, customize the focus areas in `CLAUDE.md`, dump sources into `raw/`, then ask the agent to ingest, query, or run a monthly lint pass per the prompts in `GUIDE.md`. Standalone — not wired into the running stack.
+
 ## Notes
 
 - LibreChat chat history is persisted in MongoDB (`mongodb-data` volume) — survives container restarts
 - MCP package cache is persisted — tool calls are fast after first use
 - SearXNG runs locally — no search queries leave your network
-- llama-swap unloads the previous model within a group when another is requested; a separate persistent group on the 5060 Ti keeps the coder autocomplete model resident alongside whichever chat model the `main` group is running
+- llama-swap unloads the previous model within a group when another is requested; a separate persistent group on the secondary GPU keeps the coder autocomplete model resident alongside whichever chat model the `main` group is running
 - signal-cli-data volume is shared between signal-api (read-write) and signal-bot (read-only)
-- mcp-proxy includes Node.js for the GitHub MCP server; all other tools are pure Python via uvx
-- audio-api is the single GPU consumer for STT/TTS — signal-bot, LibreChat, and voice-agent all call it over HTTP
+- mcp-proxy bundles `uvx` for Python-based MCP servers and the `gh` CLI for the custom read-only GitHub server (`mcp-proxy/gh-read-server.py`). No Node.js dependency anymore
+- audio-api is the single GPU consumer for STT/TTS/voice-cloning — signal-bot, LibreChat, and voice-agent all call it over HTTP
 - audio-api owns the default voice/lang/speed (`DEFAULT_VOICE` in `audio-api.env`). voice-agent and the watchers omit these fields so the server-side defaults apply; `signal-bot.env` still sets `TTS_VOICE` (uoltz reads it) and `librechat.yaml` pins a UI default. To swap voices stack-wide, change `DEFAULT_VOICE` and restart audio-api
 - `./shared/` is bind-mounted (`:ro`) into every watcher (`calendar-watcher`, `tg-watcher`, `oss-watcher`, `rss-watcher`, `receipt-watcher`, `location-tracker`) and installed editable — edit `shared/stack_shared/*.py` and `docker compose restart <watcher>` without rebuilding the image
-- memory-mcp is the only service exposing both REST and MCP on a single port (8089). MCP clients use `/mcp/mcp`, REST clients use `/v1/memory`
+- memory-mcp and audio-api both expose REST + MCP on a single port. MCP clients use `/mcp/mcp` (audio-api: `clone_voice`; memory-mcp: `remember`, `search_memory`, two-step `forget`); REST clients use `/v1/...`
