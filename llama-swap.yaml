@@ -29,7 +29,7 @@ models:
   qwen-coder-1.5B:
     env:
       - "CUDA_VISIBLE_DEVICES=${env.SECONDARY_GPU}"
-    cmd: llama-server --port ${PORT} -hf bartowski/Qwen2.5-Coder-1.5B-Instruct-GGUF --hf-file Qwen2.5-Coder-1.5B-Instruct-Q5_K_M.gguf --device CUDA0 --split-mode none --n-gpu-layers 999 --parallel 1 --flash-attn on --batch-size 1024 --ubatch-size 256 --ctx-size 32768 --no-mmap
+    cmd: llama-server --port ${PORT} -hf bartowski/Qwen2.5-Coder-1.5B-Instruct-GGUF --hf-file Qwen2.5-Coder-1.5B-Instruct-Q5_K_M.gguf --device CUDA0 --split-mode none --n-gpu-layers 999 --parallel 1 --flash-attn on --batch-size 1024 --ubatch-size 256 --ctx-size 16384 --no-mmap
     ttl: 0
 
   # Fallback chat model on the 5060 Ti. Stays loaded so signal-bot still works
@@ -38,7 +38,7 @@ models:
   qwen3.5-4B:
     env:
       - "CUDA_VISIBLE_DEVICES=${env.SECONDARY_GPU}"
-    cmd: llama-server --port ${PORT} -hf unsloth/Qwen3.5-4B-GGUF --hf-file Qwen3.5-4B-Q5_K_M.gguf --device CUDA0 --split-mode none --n-gpu-layers 999 --parallel 1 --flash-attn on --batch-size 2048 --ubatch-size 512 --ctx-size 8192 --no-mmap
+    cmd: llama-server --port ${PORT} -hf unsloth/Qwen3.5-4B-GGUF --hf-file Qwen3.5-4B-Q5_K_M.gguf --device CUDA0 --split-mode none --n-gpu-layers 999 --parallel 1 --flash-attn on --batch-size 2048 --ubatch-size 512 --ctx-size 4096 --no-mmap
     ttl: 0
 
 # Two independent groups:
