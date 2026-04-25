@@ -6,10 +6,15 @@ RUN apt-get update && \
 
 WORKDIR /app
 
-RUN git clone https://github.com/kbak/uoltz.git /uoltz
+# Bump UOLTZ_REV (any new value) to force a fresh git clone of kbak/uoltz.
+# Otherwise Docker caches the clone layer indefinitely and pushes to the
+# fork won't be picked up by `docker compose build`.
+ARG UOLTZ_REV=2026-04-25b
+RUN echo "uoltz rev: ${UOLTZ_REV}" && git clone https://github.com/kbak/uoltz.git /uoltz
 RUN pip install --no-cache-dir -r /uoltz/app/requirements.txt && \
     pip install --no-cache-dir mutagen && \
-    pip install --no-cache-dir -U yt-dlp
+    pip install --no-cache-dir -U yt-dlp && \
+    pip install --no-cache-dir lingua-language-detector
 
 RUN cp -r /uoltz/app/. .
 

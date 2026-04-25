@@ -304,7 +304,7 @@ Skills in `signal-bot-custom-skills/` are mounted into the container at `/app/da
 
 The uoltz fork ships with several built-ins disabled by default (`web_search`, `notes`, `rss_digest`, `shell`, `skill_builder`) — the stack intentionally keeps them off: web search, news digests, and host-side actions are handled by MCP tools and watcher services instead.
 
-Available custom skills: arxiv, currency, finance, github, google_maps, hackernews, music_download, pdf, sample_download, searxng, time, voices_list, weather.
+Available custom skills: arxiv, currency, finance, github, google_maps, hackernews, music_download, pdf, sample_download, searxng, time, tts_clone, voices_list, weather.
 
 Most are thin MCP-client shims that call mcp-proxy on port 8083. A few do their own thing:
 
@@ -312,6 +312,7 @@ Most are thin MCP-client shims that call mcp-proxy on port 8083. A few do their 
 - **music_download** (`/music`) — downloads songs from Shazam or Spotify links as high-quality MP3, trims non-music content from start/end, classifies into a configured directory, and sets ID3 tags including cover art. See setup below.
 - **sample_download** (`/sample`) — downloads a short clip from a YouTube link and saves it as a `.wav` voice sample for cloning. See setup below.
 - **voices_list** (`/voices`) — lists the voice samples currently saved under `VOICE_SAMPLES_DIR`.
+- **tts_clone** (`/tts`) — synthesises a Signal voice note from text using one of your saved voice samples. Auto-detects the language (`lingua`) or accepts an explicit ISO code as the first token. Voice hint is greedy fuzzy-matched against `VOICE_SAMPLES_DIR`. See setup below.
 - **pdf** — calls the pdf-inspector service directly on port 8086.
 
 Shared helpers used by `music_download` and `sample_download` (yt-dlp client, filename utilities, LLM client) live in `signal-bot-custom-skills/_shared/`. The skill loader skips underscore-prefixed directories, so `_shared/` is import-only.
@@ -382,6 +383,29 @@ Timestamps may be `hh:mm:ss`, `mm:ss`, or `ss`. The bot auto-names the saved fil
 **Setup**
 
 Reuses the same yt-dlp service as `/music` (see above) — no extra services. `VOICE_SAMPLES_DIR` must be set in `.env`; it is mounted read-write into signal-bot at `/app/voice-samples` (and read-only into audio-api at the same path).
+
+### TTS clone skill
+
+Synthesises a Signal voice note from text using Chatterbox voice cloning. Sends back as an ogg/opus voice attachment (the bubble-with-play-button kind, not a file).
+
+**Usage**
+```
+/tts <voice-hint> <text>            # auto-detect text language
+/tts <lang> <voice-hint> <text>     # force language (en, pl, de, fr, ...)
+/tts <name>.wav <text>              # explicit voice file, no fuzzy match
+```
+Examples:
+```
+/tts barack obama Hello there. This is a cloning test.
+/tts pl barack obama Cześć, to jest test.
+/tts barack This is a single-token prefix that uniquely matches barack_obama.wav.
+```
+
+The voice hint is greedy fuzzy-matched against the filename stems under `VOICE_SAMPLES_DIR` (case-insensitive, diacritic-insensitive, accepts any subset of the words in the stem — so `obama`, `barack`, or `barack obama` all hit `barack_obama.wav`). Whatever's left after the match is the text.
+
+The first token is treated as a 2-letter ISO language code only if it's exactly two characters AND in Chatterbox's supported set (`ar, da, de, el, en, es, fi, fr, he, hi, it, ja, ko, ms, nl, no, pl, pt, ru, sv, sw, tr, zh`). Otherwise auto-detect runs. Text is capped at ~2700 chars (~3 minutes of speech).
+
+This skill needs the `signal` and `sender` kwargs that the `kbak/uoltz` fork injects into direct skills (since the bot's standard reply path only sends text). Other forks would need a small `bot.py` patch — see [the upstream commit](https://github.com/kbak/uoltz/commit/0423314) for the 2-line change.
 
 ## calendar-watcher
 

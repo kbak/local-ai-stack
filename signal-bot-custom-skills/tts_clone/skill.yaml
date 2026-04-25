@@ -1,0 +1,15 @@
+name: tts_clone
+description: >
+  Synthesize a Signal voice note using Chatterbox voice cloning. First token
+  may be an ISO language code (en, pl, de, ...) to force the language;
+  otherwise the language is auto-detected. Next word(s) match a voice sample
+  under VOICE_SAMPLES_DIR (greedy fuzzy match; `name.wav` for an explicit
+  match). The rest is the text to synthesize.
+version: "1.0.0"
+enabled: true
+command: /tts
+command_arg: input
+command_usage: "/tts [lang] <voice-hint> <text>     (e.g. /tts pl barack obama Cześć!)"
+
+tools:
+  - "tts:tts_clone"
