@@ -14,7 +14,8 @@ Self-hosted LLM stack with privacy-focused web search and research tools. Runs o
 | voice-agent | 8087 | Browser voice-chat UI with wake-word-free VAD, streaming TTS, voice picker, and full MCP tool access via strands |
 | audio-api | 8088 | Shared GPU-backed Whisper (STT) + Kokoro (TTS) + Chatterbox (voice cloning) service with an OpenAI-compatible API (pinned to the secondary GPU) |
 | memory-mcp | 8089 | Self-hosted agentic memory (Mem0 + bge-m3 + Qdrant) exposed as REST + MCP; Tier 2 of the hybrid memory architecture |
-| image-gen | 7801 | On-demand SwarmUI image generation (Flux.1-dev). Profile-gated — bring up via `./img.sh`, expects the primary GPU to be free of the main chat model |
+| image-gen | 7801 | On-demand image-generation engine (SwarmUI + Flux.1-dev). Profile-gated. Treated as an API; humans should not visit this port |
+| image-gen-ui | 7802 | ChatGPT-style frontend for image-gen — the UI you actually open. Static nginx, talks to image-gen on 7801 |
 | qdrant | 6333 | Vector store backing memory-mcp |
 | calendar-watcher | — | Polls calendar for meal and travel events; enriches with rating/menu/weather/maps; delivers briefings via Signal |
 | tg-watcher | — | Listens to a Telegram group as your user account; sends a daily LLM-generated brief via Signal |
@@ -257,16 +258,19 @@ LibreChat serves on `:443` via Tailscale — voice-agent is on `:8443` to avoid 
 
 ## image-gen (on-demand image generation)
 
-A profile-gated SwarmUI container for sporadic image generation. The UI presents a clean prompt-only "Generate" tab — ComfyUI runs as a hidden backend, no node graph is exposed.
+Two profile-gated containers that come up together:
+
+- **`image-gen`** (port 7801) — the engine. SwarmUI fronting a hidden ComfyUI backend; pure JSON API, no human UI exposed.
+- **`image-gen-ui`** (port 7802) — a tiny nginx-served static frontend in the spirit of ChatGPT/Claude: prompt textarea, four-image grid per prompt, click for full size, history persisted in localStorage. Talks to the engine over its WebSocket API.
 
 **Use it on demand**, after manually unloading the main chat model:
 ```
 curl -s http://localhost:8080/unload     # frees the primary GPU
-./img.sh                                  # foreground; Ctrl+C stops cleanly
+./img.sh                                  # foreground; Ctrl+C stops both
 ```
-Then open `http://localhost:7801`.
+Then open **`http://localhost:7802`**. (Don't bother with 7801 — it's the engine, not for humans.)
 
-The launcher prints VRAM status before and after, warns if a main-group LLM is still resident, and ensures the container is stopped on exit (Ctrl+C, error, or shell close).
+The launcher prints VRAM status before and after, warns if a main-group LLM is still resident, and ensures both containers are stopped on exit (Ctrl+C, error, or shell close).
 
 ### Hardware
 
@@ -302,9 +306,15 @@ huggingface-cli download Comfy-Org/flux1-schnell ae.safetensors \
 The first `./img.sh` does a one-time setup inside SwarmUI:
 - ComfyUI backend is fetched and a Python venv is created with cu128 PyTorch wheels (~5 minutes).
 - SwarmUI auto-detects the model files in `${IMAGE_DIR}` and registers them.
-- Open `http://localhost:7801` and SwarmUI's wizard finishes the first-time setup (admin password, default model = Flux.1-dev fp8).
+- The first time you visit `http://localhost:7801` directly (only needed once), SwarmUI's setup wizard runs — pick `just_self`, backend `comfyui`, theme of your choice, **set Flux.1-dev fp8 as the default model**.
+
+After that, never visit 7801 again. Open `http://localhost:7802` and the custom UI handles the rest.
 
 Subsequent launches are fast — both ComfyUI and SwarmUI start in seconds. Output images are persisted to the `image-gen-output` Docker volume.
+
+### Editing the UI
+
+`image-gen-ui/static/` is bind-mounted read-only into the nginx container, so HTML/CSS/JS edits apply with a hard refresh (Ctrl+Shift+R) — no rebuild needed. The backend SwarmUI URL is computed from the page origin (`<host>:7801`), so the UI works unchanged whether accessed via `localhost`, the LAN IP, or a Tailscale name.
 
 ## Signal Bot
 

@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
-# On-demand image generation. Brings up the SwarmUI container in the
-# foreground; Ctrl+C stops it cleanly. Expects the primary GPU (5090) to be
-# free of the main llama-swap chat model — manually unload it first via:
+# On-demand image generation. Brings up the SwarmUI engine + custom UI
+# in the foreground; Ctrl+C stops both cleanly. Expects the primary GPU
+# (5090) to be free of the main llama-swap chat model — manually unload
+# it first via:
 #   curl -s http://localhost:8080/unload
+#
+# Open http://localhost:7802 to use the UI.
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -14,7 +17,7 @@ COMPOSE_FILE="$WSL_SCRIPT_DIR/docker-compose.yml"
 cleanup() {
     echo
     echo "Stopping image-gen..."
-    MSYS_NO_PATHCONV=1 $DOCKER compose -f "$COMPOSE_FILE" --profile image stop image-gen >/dev/null 2>&1 || true
+    MSYS_NO_PATHCONV=1 $DOCKER compose -f "$COMPOSE_FILE" --profile image stop image-gen image-gen-ui >/dev/null 2>&1 || true
     echo "VRAM after shutdown:"
     wsl.exe -d Ubuntu-24.04 -- nvidia-smi --query-gpu=index,name,memory.used,memory.total --format=csv,noheader,nounits
 }
@@ -54,8 +57,12 @@ if [ -n "$MAIN_LOADED" ]; then
     esac
 fi
 
-echo "Starting image-gen (Ctrl+C to stop)..."
-echo "UI will be at http://localhost:7801 once 'Program is running' appears."
+echo "Starting image-gen + image-gen-ui (Ctrl+C to stop)..."
+echo "UI: http://localhost:7802 (engine API: http://localhost:7801)"
 echo
 
-MSYS_NO_PATHCONV=1 $DOCKER compose -f "$COMPOSE_FILE" --profile image up image-gen
+# --build rebuilds image-gen / image-gen-ui only if their Dockerfiles or
+# build context changed (layer cache makes no-op rebuilds ~1s). Naming the
+# services explicitly is required — bare `compose build` would try to
+# rebuild every service in the file regardless of the --profile filter.
+MSYS_NO_PATHCONV=1 $DOCKER compose -f "$COMPOSE_FILE" --profile image up --build image-gen image-gen-ui

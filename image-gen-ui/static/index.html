@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="color-scheme" content="light dark">
+    <title>Image</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <h1>Image</h1>
+        <button id="clearBtn" type="button" title="Clear history" aria-label="Clear history">Clear</button>
+    </header>
+
+    <main id="feed" aria-live="polite"></main>
+
+    <form id="composer" autocomplete="off">
+        <textarea
+            id="prompt"
+            placeholder="Describe an image..."
+            rows="1"
+            required
+            spellcheck="true"
+            autocapitalize="sentences"
+            autofocus></textarea>
+        <button id="genBtn" type="submit" aria-label="Generate">
+            <svg class="icon-send" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <line x1="12" y1="19" x2="12" y2="5"></line>
+                <polyline points="5 12 12 5 19 12"></polyline>
+            </svg>
+            <svg class="icon-stop" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"
+                 aria-hidden="true">
+                <rect x="5" y="5" width="14" height="14" rx="2"></rect>
+            </svg>
+        </button>
+    </form>
+
+    <dialog id="lightbox" aria-label="Full size image">
+        <img id="lightboxImg" alt="">
+    </dialog>
+
+    <script src="app.js"></script>
+</body>
+</html>

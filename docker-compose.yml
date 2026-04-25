@@ -200,11 +200,12 @@ services:
       - ai-net
     mem_limit: 512m
 
-  # On-demand image generation. SwarmUI fronts a hidden ComfyUI backend
-  # (prompt-only "Generate" tab — no node graph exposed). Profile-gated so
-  # it does not start with the default stack; bring it up explicitly via
-  # ./img.sh, which expects the primary GPU (5090) to be free of the main
-  # llama-swap chat model.
+  # On-demand image generation. SwarmUI is the engine; image-gen-ui is the
+  # human-facing frontend. SwarmUI's own UI is not exposed for general use —
+  # treat http://localhost:7801 as the API endpoint only and visit
+  # http://localhost:7802 for actual image generation. Profile-gated so this
+  # does not start with the default stack; bring it up via ./img.sh, which
+  # expects the primary GPU (5090) to be free of the main llama-swap model.
   image-gen:
     build:
       context: .
@@ -212,7 +213,7 @@ services:
     image: stack-image-gen
     container_name: image-gen
     profiles: ["image"]
-    restart: "no"
+    restart: unless-stopped
     ports:
       - "7801:7801"
     environment:
@@ -226,6 +227,28 @@ services:
     networks:
       - ai-net
     mem_limit: 16000m
+
+  # Custom ChatGPT-style frontend that talks directly to SwarmUI's JSON API
+  # on port 7801. Static files only (nginx). Bind-mounts ./image-gen-ui/static
+  # so HTML/CSS/JS edits apply without rebuilding.
+  image-gen-ui:
+    build:
+      context: .
+      dockerfile: image-gen-ui/Dockerfile
+    image: stack-image-gen-ui
+    container_name: image-gen-ui
+    profiles: ["image"]
+    restart: unless-stopped
+    ports:
+      - "7802:7802"
+    volumes:
+      - ./image-gen-ui/static:/usr/share/nginx/html:ro
+      - ./image-gen-ui/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - image-gen
+    networks:
+      - ai-net
+    mem_limit: 64m
 
   calendar-watcher:
     build:
