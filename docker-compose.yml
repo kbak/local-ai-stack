@@ -200,6 +200,33 @@ services:
       - ai-net
     mem_limit: 512m
 
+  # On-demand image generation. SwarmUI fronts a hidden ComfyUI backend
+  # (prompt-only "Generate" tab — no node graph exposed). Profile-gated so
+  # it does not start with the default stack; bring it up explicitly via
+  # ./img.sh, which expects the primary GPU (5090) to be free of the main
+  # llama-swap chat model.
+  image-gen:
+    build:
+      context: .
+      dockerfile: image-gen/Dockerfile
+    image: stack-image-gen
+    container_name: image-gen
+    profiles: ["image"]
+    restart: "no"
+    ports:
+      - "7801:7801"
+    environment:
+      CUDA_VISIBLE_DEVICES: ${PRIMARY_GPU:-0}
+      HF_HOME: /opt/swarmui/dlbackend/hf-cache
+    volumes:
+      - ${IMAGE_DIR:?IMAGE_DIR must be set in .env}:/opt/swarmui/Models
+      - image-gen-data:/opt/swarmui/Data
+      - image-gen-output:/opt/swarmui/Output
+      - image-gen-dlbackend:/opt/swarmui/dlbackend
+    networks:
+      - ai-net
+    mem_limit: 16000m
+
   calendar-watcher:
     build:
       context: .
@@ -360,3 +387,6 @@ volumes:
   receipt-watcher-data:
   tg-watcher-data:
   audio-api-hf-cache:
+  image-gen-data:
+  image-gen-output:
+  image-gen-dlbackend:

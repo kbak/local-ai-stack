@@ -14,6 +14,7 @@ Self-hosted LLM stack with privacy-focused web search and research tools. Runs o
 | voice-agent | 8087 | Browser voice-chat UI with wake-word-free VAD, streaming TTS, voice picker, and full MCP tool access via strands |
 | audio-api | 8088 | Shared GPU-backed Whisper (STT) + Kokoro (TTS) + Chatterbox (voice cloning) service with an OpenAI-compatible API (pinned to the secondary GPU) |
 | memory-mcp | 8089 | Self-hosted agentic memory (Mem0 + bge-m3 + Qdrant) exposed as REST + MCP; Tier 2 of the hybrid memory architecture |
+| image-gen | 7801 | On-demand SwarmUI image generation (Flux.1-dev). Profile-gated — bring up via `./img.sh`, expects the primary GPU to be free of the main chat model |
 | qdrant | 6333 | Vector store backing memory-mcp |
 | calendar-watcher | — | Polls calendar for meal and travel events; enriches with rating/menu/weather/maps; delivers briefings via Signal |
 | tg-watcher | — | Listens to a Telegram group as your user account; sends a daily LLM-generated brief via Signal |
@@ -253,6 +254,57 @@ tailscale serve --bg --https=8443 http://localhost:8087
 Then open `https://<pc-name>.<tailnet>.ts.net:8443` on your phone.
 
 LibreChat serves on `:443` via Tailscale — voice-agent is on `:8443` to avoid the collision.
+
+## image-gen (on-demand image generation)
+
+A profile-gated SwarmUI container for sporadic image generation. The UI presents a clean prompt-only "Generate" tab — ComfyUI runs as a hidden backend, no node graph is exposed.
+
+**Use it on demand**, after manually unloading the main chat model:
+```
+curl -s http://localhost:8080/unload     # frees the primary GPU
+./img.sh                                  # foreground; Ctrl+C stops cleanly
+```
+Then open `http://localhost:7801`.
+
+The launcher prints VRAM status before and after, warns if a main-group LLM is still resident, and ensures the container is stopped on exit (Ctrl+C, error, or shell close).
+
+### Hardware
+
+Runs on the primary GPU (`PRIMARY_GPU` in `.env`, defaults to `0`). Built against `nvidia/cuda:12.8.1-runtime-ubuntu24.04` so it works on Blackwell (RTX 5090 / 5060 Ti — older `cu126` images crash with `no kernel image is available`). At fp8 the model uses ~12 GB; at fp16 closer to ~28 GB.
+
+### One-time model setup
+
+Drop the Flux.1-dev fp8 weights and the Comfy-Org text encoders into `${IMAGE_DIR}` on the host (the path you set in `.env`). All four files are ungated — no HuggingFace token required.
+
+```
+${IMAGE_DIR}/
+├── unet/flux1-dev-fp8.safetensors                  (~12 GB)
+├── vae/ae.safetensors                              (~335 MB)
+├── clip/clip_l.safetensors                         (~250 MB)
+└── clip/t5xxl_fp8_e4m3fn.safetensors               (~4.9 GB)
+```
+
+Quick download via `huggingface-cli`:
+```
+huggingface-cli download Comfy-Org/flux1-dev flux1-dev-fp8.safetensors \
+    --local-dir ${IMAGE_DIR}/unet
+huggingface-cli download Comfy-Org/Lumina_Text_Encoders \
+    t5xxl_fp8_e4m3fn.safetensors clip_l.safetensors \
+    --local-dir ${IMAGE_DIR}/clip
+huggingface-cli download Comfy-Org/flux1-schnell ae.safetensors \
+    --local-dir ${IMAGE_DIR}/vae
+```
+
+(Adjust to match the file layout your build of SwarmUI expects — SwarmUI's first-launch wizard will offer to download Flux for you and lay the directory out automatically. The list above is what you'd get.)
+
+### First launch
+
+The first `./img.sh` does a one-time setup inside SwarmUI:
+- ComfyUI backend is fetched and a Python venv is created with cu128 PyTorch wheels (~5 minutes).
+- SwarmUI auto-detects the model files in `${IMAGE_DIR}` and registers them.
+- Open `http://localhost:7801` and SwarmUI's wizard finishes the first-time setup (admin password, default model = Flux.1-dev fp8).
+
+Subsequent launches are fast — both ComfyUI and SwarmUI start in seconds. Output images are persisted to the `image-gen-output` Docker volume.
 
 ## Signal Bot
 
