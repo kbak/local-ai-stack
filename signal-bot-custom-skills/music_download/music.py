@@ -9,17 +9,25 @@ from pathlib import Path
 
 from strands import tool
 
-# Ensure sibling modules (metadata, classify, trim) are importable
-_SKILL_DIR = str(Path(__file__).parent)
-if _SKILL_DIR not in sys.path:
-    sys.path.insert(0, _SKILL_DIR)
-# Ensure sibling-skill `_shared/` package is importable
+# Sibling-skill `_shared/` package (top-level import root for shared helpers)
 _CUSTOM_SKILLS_ROOT = str(Path(__file__).parent.parent)
 if _CUSTOM_SKILLS_ROOT not in sys.path:
     sys.path.insert(0, _CUSTOM_SKILLS_ROOT)
 
 from _shared.files import artist_title_filename, unique_path  # noqa: E402
+from _shared.skill_loader import load_sibling  # noqa: E402
 from _shared.ytdlp import download_audio  # noqa: E402
+
+# Namespaced sibling loads — avoid collision with same-named modules in other skills.
+_metadata_mod = load_sibling(__file__, "metadata")
+_classify_mod = load_sibling(__file__, "classify")
+_trim_mod = load_sibling(__file__, "trim")
+resolve_from_text = _metadata_mod.resolve_from_text
+resolve_from_image = _metadata_mod.resolve_from_image
+SongMeta = _metadata_mod.SongMeta
+classify = _classify_mod.classify
+load_music_dirs = _classify_mod.load_music_dirs
+trim_audio = _trim_mod.trim_audio
 
 logger = logging.getLogger(__name__)
 
@@ -108,9 +116,6 @@ def download_music(input: str, images: list | None = None, status_fn=None) -> st
                May also be an artist/title string if URL parsing failed upstream.
         images: Optional list of OpenAI-format image content blocks (from bot image handling).
     """
-    from metadata import resolve_from_text, resolve_from_image
-    from classify import classify, load_music_dirs
-    from trim import trim_audio
 
     def status(msg: str):
         logger.info(msg)
@@ -167,7 +172,6 @@ def download_music(input: str, images: list | None = None, status_fn=None) -> st
 
         # If we have no structured meta, use what yt-dlp returned
         if meta is None:
-            from metadata import SongMeta
             artist = yt_artist or "Unknown"
             title_tag = yt_title or Path(raw_mp3).stem
             meta = SongMeta(artist=artist, title=title_tag)

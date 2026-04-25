@@ -26,7 +26,11 @@ from dataclasses import dataclass, field
 from mcp import ClientSession
 from mcp.client.streamable_http import streamablehttp_client
 
-from prompts import PERSONA_LOOKUP_PROMPT, SOUL
+from _shared.skill_loader import load_sibling
+
+_prompts = load_sibling(__file__, "prompts")
+PERSONA_LOOKUP_PROMPT = _prompts.PERSONA_LOOKUP_PROMPT
+SOUL = _prompts.SOUL
 
 logger = logging.getLogger(__name__)
 

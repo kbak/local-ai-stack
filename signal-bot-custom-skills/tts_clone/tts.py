@@ -8,17 +8,16 @@ from pathlib import Path
 import httpx
 from strands import tool
 
-# Sibling skill modules
-_SKILL_DIR = str(Path(__file__).parent)
-if _SKILL_DIR not in sys.path:
-    sys.path.insert(0, _SKILL_DIR)
-# Sibling-skill `_shared/` package
+# Sibling-skill `_shared/` package (top-level import root for shared helpers)
 _CUSTOM_SKILLS_ROOT = str(Path(__file__).parent.parent)
 if _CUSTOM_SKILLS_ROOT not in sys.path:
     sys.path.insert(0, _CUSTOM_SKILLS_ROOT)
 
-import lang as lang_mod  # noqa: E402
 from _shared import voice_match as match_mod  # noqa: E402
+from _shared.skill_loader import load_sibling  # noqa: E402
+
+# Namespaced sibling load — avoids collision if another skill ships a `lang.py`.
+lang_mod = load_sibling(__file__, "lang")
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +72,15 @@ def _clone_audio(text: str, voice: str | None, language: str) -> bytes:
 
 
 @tool
-def tts_clone(input: str, status_fn=None, signal=None, sender: str | None = None) -> str:
+def tts_clone(
+    input: str,
+    status_fn=None,
+    signal=None,
+    sender: str | None = None,
+    target_author: str | None = None,
+    target_ts: int | None = None,
+    images: list | None = None,
+) -> str:
     """Synthesize a Signal voice note from text using a cloned voice.
 
     Usage:

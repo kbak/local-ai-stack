@@ -13,20 +13,18 @@ from pathlib import Path
 
 from strands import tool
 
-# Sibling skill modules
-_SKILL_DIR = str(Path(__file__).parent)
-if _SKILL_DIR not in sys.path:
-    sys.path.insert(0, _SKILL_DIR)
-# Sibling-skill `_shared/` package
+# Sibling-skill `_shared/` package (top-level import root for shared helpers)
 _CUSTOM_SKILLS_ROOT = str(Path(__file__).parent.parent)
 if _CUSTOM_SKILLS_ROOT not in sys.path:
     sys.path.insert(0, _CUSTOM_SKILLS_ROOT)
 
 from _shared.files import unique_path  # noqa: E402
+from _shared.skill_loader import load_sibling  # noqa: E402
 from _shared.ytdlp import download_audio  # noqa: E402
 
-import naming  # noqa: E402
-import parse as parse_input  # noqa: E402
+# Namespaced sibling loads — keeps parse.py from colliding with roast/parse.py.
+naming = load_sibling(__file__, "naming")
+parse_input = load_sibling(__file__, "parse")
 
 logger = logging.getLogger(__name__)
 

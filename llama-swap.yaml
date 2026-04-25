@@ -35,10 +35,10 @@ models:
   # Fallback chat model on the 5060 Ti. Stays loaded so signal-bot still works
   # when the main 27B is evicted off the 5090 (e.g. for gaming).
   # Same CUDA_VISIBLE_DEVICES trick as qwen-coder-1.5B above.
-  qwen3.5-9B:
+  qwen3.5-4B:
     env:
       - "CUDA_VISIBLE_DEVICES=${env.SECONDARY_GPU}"
-    cmd: llama-server --port ${PORT} -hf unsloth/Qwen3.5-9B-GGUF --hf-file Qwen3.5-9B-Q4_K_M.gguf --device CUDA0 --split-mode none --n-gpu-layers 999 --parallel 1 --flash-attn on --batch-size 2048 --ubatch-size 512 --ctx-size 32768 --no-mmap
+    cmd: llama-server --port ${PORT} -hf unsloth/Qwen3.5-4B-GGUF --hf-file Qwen3.5-4B-Q5_K_M.gguf --device CUDA0 --split-mode none --n-gpu-layers 999 --parallel 1 --flash-attn on --batch-size 2048 --ubatch-size 512 --ctx-size 8192 --no-mmap
     ttl: 0
 
 # Two independent groups:
@@ -63,4 +63,4 @@ groups:
     persistent: true
     members:
       - "qwen-coder-1.5B"
-      - "qwen3.5-9B"
+      - "qwen3.5-4B"

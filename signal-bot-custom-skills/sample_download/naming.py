@@ -77,7 +77,7 @@ def from_title(title: str, artist: str = "") -> str:
     if artist:
         user += f"\nUploader/Artist: {artist}"
 
-    raw = chat(system, user, max_tokens=24, temperature=0.0)
+    raw = chat(system, user, max_tokens=64, temperature=0.0)
     if not raw:
         return _slug_fallback(title)
 

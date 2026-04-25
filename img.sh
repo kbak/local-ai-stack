@@ -36,7 +36,7 @@ data = json.load(sys.stdin)
 # in cmd is on the primary GPU. cuda1 group entries have CUDA_VISIBLE_DEVICES
 # in their env but that's not in /running output, so fall back to model name
 # matching the known small-model patterns instead.
-SECONDARY_PATTERNS = ('coder', 'qwen3.5-9B')
+SECONDARY_PATTERNS = ('coder', 'qwen3.5-4B')
 main = [m for m in data.get('running', [])
         if not any(p.lower() in m.get('model', '').lower() for p in SECONDARY_PATTERNS)]
 if main:

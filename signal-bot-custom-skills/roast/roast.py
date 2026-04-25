@@ -20,11 +20,7 @@ import httpx
 from openai import AsyncOpenAI
 from strands import tool
 
-# Sibling skill modules
-_SKILL_DIR = str(Path(__file__).parent)
-if _SKILL_DIR not in sys.path:
-    sys.path.insert(0, _SKILL_DIR)
-# Sibling-skill `_shared/` package
+# Sibling-skill `_shared/` package (top-level import root for shared helpers)
 _CUSTOM_SKILLS_ROOT = str(Path(__file__).parent.parent)
 if _CUSTOM_SKILLS_ROOT not in sys.path:
     sys.path.insert(0, _CUSTOM_SKILLS_ROOT)
@@ -32,11 +28,19 @@ if _CUSTOM_SKILLS_ROOT not in sys.path:
 if "/app" not in sys.path:
     sys.path.insert(0, "/app")
 
-import audio as audio_mod  # noqa: E402
-import cache as persona_cache  # noqa: E402
-import parse as parse_input  # noqa: E402
-from agent_loop import connect_mcp, generate_topic, resolve_persona, run_battle  # noqa: E402
 from _shared import voice_match  # noqa: E402
+from _shared.skill_loader import load_sibling  # noqa: E402
+
+# Sibling modules — loaded under namespaced sys.modules keys to avoid
+# colliding with same-named files in other skills (e.g. sample_download/parse.py).
+audio_mod = load_sibling(__file__, "audio")
+persona_cache = load_sibling(__file__, "cache")
+parse_input = load_sibling(__file__, "parse")
+_agent_loop = load_sibling(__file__, "agent_loop")
+connect_mcp = _agent_loop.connect_mcp
+generate_topic = _agent_loop.generate_topic
+resolve_persona = _agent_loop.resolve_persona
+run_battle = _agent_loop.run_battle
 
 logger = logging.getLogger(__name__)
 
@@ -185,8 +189,8 @@ def _detect_language(transcript: list[tuple[str, str, str]], forced: str | None)
         return forced
     blob = " ".join(text for _, _, text in transcript)
     try:
-        sys.path.insert(0, str(Path(__file__).parent.parent / "tts_clone"))
-        import lang as lang_mod
+        from _shared.skill_loader import load_from_skill
+        lang_mod = load_from_skill(Path(__file__).parent.parent / "tts_clone", "lang")
         return lang_mod.detect(blob)
     except Exception:
         return "en"
