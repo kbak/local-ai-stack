@@ -59,6 +59,8 @@
     const promptEl   = document.getElementById("prompt");
     const genBtn     = document.getElementById("genBtn");
     const expandBtn  = document.getElementById("expandBtn");
+    const modelBtn   = document.getElementById("modelBtn");
+    const modelLabel = modelBtn.querySelector(".model-label");
     const clearBtn   = document.getElementById("clearBtn");
     const lightbox   = document.getElementById("lightbox");
     const lightImg   = document.getElementById("lightboxImg");
@@ -72,6 +74,9 @@
     let userAborted  = false;
     let expanding    = false;
     let expandAbort  = null;
+    let modelLoaded  = null;   // null = unknown, true/false once we've polled.
+    let modelWorking = false;
+    let modelPollTimer = null;
 
     // ── History persistence ─────────────────────────────────────────────
     function loadHistory() {
@@ -407,6 +412,151 @@
         try { activeSocket.close(1000, "user-aborted"); } catch {}
     }
 
+    // ── Model load/unload ───────────────────────────────────────────────
+    /** Ask SwarmUI which Stable-Diffusion-class models are currently loaded
+     *  on any backend. Returns the loaded model name, or null. */
+    async function fetchLoadedModel() {
+        if (!sessionId) return null;
+        const resp = await fetch(`${API_BASE}/ListLoadedModels`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ session_id: sessionId }),
+        });
+        if (!resp.ok) throw new Error(`ListLoadedModels ${resp.status}`);
+        const data = await resp.json();
+        const models = data?.models || [];
+        if (!models.length) return null;
+        const m = models[0];
+        return (m && (m.title || m.name)) || null;
+    }
+
+    function setModelButton(state, text) {
+        modelBtn.dataset.state = state;
+        modelLabel.textContent = text;
+        if (state === "loaded") {
+            modelBtn.title = "Click to unload (free VRAM)";
+            modelBtn.setAttribute("aria-label", "Unload model");
+        } else if (state === "unloaded") {
+            modelBtn.title = "Click to load model into VRAM";
+            modelBtn.setAttribute("aria-label", "Load model");
+        } else if (state === "working") {
+            modelBtn.title = text;
+            modelBtn.setAttribute("aria-label", text);
+        } else {
+            modelBtn.title = "Model status unknown";
+            modelBtn.setAttribute("aria-label", "Model status unknown");
+        }
+    }
+
+    async function refreshModelStatus() {
+        try {
+            await ensureBootstrapped();
+        } catch {
+            setModelButton("unknown", "offline");
+            return;
+        }
+        try {
+            const loaded = await fetchLoadedModel();
+            modelLoaded = !!loaded;
+            if (loaded) {
+                setModelButton("loaded", "Unload");
+            } else {
+                setModelButton("unloaded", "Load");
+            }
+        } catch (err) {
+            console.warn("ListLoadedModels failed:", err);
+            setModelButton("unknown", "?");
+        }
+    }
+
+    async function loadModel() {
+        modelWorking = true;
+        modelBtn.disabled = true;
+        setModelButton("working", "Loading…");
+        try {
+            await ensureBootstrapped();
+            // SelectModel blocks until the load is complete (or fails).
+            const resp = await fetch(`${API_BASE}/SelectModel`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ session_id: sessionId, model: modelName }),
+            });
+            if (!resp.ok) {
+                const body = await resp.text().catch(() => "");
+                throw new Error(`SelectModel ${resp.status}: ${body.slice(0, 200)}`);
+            }
+            const data = await resp.json();
+            if (data.error) throw new Error(data.error);
+        } catch (err) {
+            console.error("Model load failed:", err);
+            alert(`Model load failed: ${err.message}`);
+        } finally {
+            modelWorking = false;
+            modelBtn.disabled = false;
+            await refreshModelStatus();
+        }
+    }
+
+    async function unloadModel() {
+        modelWorking = true;
+        modelBtn.disabled = true;
+        setModelButton("working", "Unloading…");
+        try {
+            await ensureBootstrapped();
+            const resp = await fetch(`${API_BASE}/FreeBackendMemory`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    session_id: sessionId,
+                    system_ram: false,   // VRAM only.
+                    backend:    "all",
+                }),
+            });
+            if (!resp.ok) {
+                const body = await resp.text().catch(() => "");
+                throw new Error(`FreeBackendMemory ${resp.status}: ${body.slice(0, 200)}`);
+            }
+            const data = await resp.json();
+            if (data.error) throw new Error(data.error);
+        } catch (err) {
+            console.error("Model unload failed:", err);
+            alert(`Model unload failed: ${err.message}`);
+        } finally {
+            modelWorking = false;
+            modelBtn.disabled = false;
+            await refreshModelStatus();
+        }
+    }
+
+    function onModelButtonClick() {
+        if (modelWorking) return;
+        if (busy) return;
+        if (modelLoaded) {
+            unloadModel();
+        } else {
+            // Covers both "definitely unloaded" and "unknown" — in the unknown
+            // case, attempting a load will either succeed or surface a real
+            // error, which is more useful than a silent no-op.
+            loadModel();
+        }
+    }
+
+    function startModelPolling() {
+        // Cheap call (in-memory), but skip when the tab isn't visible.
+        const tick = async () => {
+            if (document.hidden || modelWorking) return;
+            await refreshModelStatus();
+        };
+        // Initial fetch + a slow background poll so external changes
+        // (e.g. user touched the SwarmUI UI directly) eventually reflect.
+        tick();
+        if (modelPollTimer) clearInterval(modelPollTimer);
+        modelPollTimer = setInterval(tick, 10000);
+        document.addEventListener("visibilitychange", () => {
+            if (!document.hidden) tick();
+        });
+    }
+
     // ── Prompt expansion (llama-swap) ───────────────────────────────────
     /** Extract a parameter-count hint from a model id like "qwen3.5-4B" -> 4.
      *  Returns Infinity when no count is found so unparseable ids sort last
@@ -530,6 +680,8 @@
         genBtn.title = b ? "Stop generation" : "Generate";
         // Expansion makes no sense mid-generation; gray it out.
         expandBtn.disabled = b;
+        // Don't let the user yank the model out from under an in-flight gen.
+        modelBtn.disabled = b || modelWorking;
     }
 
     async function handleSubmit(prompt) {
@@ -600,6 +752,7 @@
     });
 
     expandBtn.addEventListener("click", expandPrompt);
+    modelBtn.addEventListener("click", onModelButtonClick);
 
     clearBtn.addEventListener("click", () => {
         if (busy) return;
@@ -614,7 +767,11 @@
     renderHistory();
     autoresize();
     // Pre-warm session + model lookup so the first prompt feels instant.
-    ensureBootstrapped().catch((err) => {
-        console.warn("SwarmUI bootstrap deferred:", err.message);
-    });
+    ensureBootstrapped()
+        .then(() => startModelPolling())
+        .catch((err) => {
+            console.warn("SwarmUI bootstrap deferred:", err.message);
+            // Try polling anyway; refreshModelStatus will retry bootstrap.
+            startModelPolling();
+        });
 })();

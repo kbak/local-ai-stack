@@ -203,16 +203,16 @@ services:
   # On-demand image generation. SwarmUI is the engine; image-gen-ui is the
   # human-facing frontend. SwarmUI's own UI is not exposed for general use —
   # treat http://localhost:7801 as the API endpoint only and visit
-  # http://localhost:7802 for actual image generation. Profile-gated so this
-  # does not start with the default stack; bring it up via ./img.sh, which
-  # expects the primary GPU (5090) to be free of the main llama-swap model.
+  # http://localhost:7802 for actual image generation. Containers run
+  # always-on but VRAM is only consumed once the user loads a model from
+  # the UI (or makes a generation request, which triggers a lazy load).
+  # Use ./img.sh when you want to rebuild after editing the Dockerfile.
   image-gen:
     build:
       context: .
       dockerfile: image-gen/Dockerfile
     image: stack-image-gen
     container_name: image-gen
-    profiles: ["image"]
     restart: unless-stopped
     ports:
       - "7801:7801"
@@ -237,7 +237,6 @@ services:
       dockerfile: image-gen-ui/Dockerfile
     image: stack-image-gen-ui
     container_name: image-gen-ui
-    profiles: ["image"]
     restart: unless-stopped
     ports:
       - "7802:7802"

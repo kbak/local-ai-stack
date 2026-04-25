@@ -10,7 +10,14 @@
 <body>
     <header>
         <h1>Image</h1>
-        <button id="clearBtn" type="button" title="Clear history" aria-label="Clear history">Clear</button>
+        <div class="header-actions">
+            <button id="modelBtn" type="button" title="Load model"
+                    aria-label="Load model" data-state="unknown">
+                <span class="model-dot" aria-hidden="true"></span>
+                <span class="model-label">…</span>
+            </button>
+            <button id="clearBtn" type="button" title="Clear history" aria-label="Clear history">Clear</button>
+        </div>
     </header>
 
     <main id="feed" aria-live="polite"></main>

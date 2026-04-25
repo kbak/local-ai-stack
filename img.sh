@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
-# On-demand image generation. Brings up the SwarmUI engine + custom UI
-# in the foreground; Ctrl+C stops both cleanly. Expects the primary GPU
-# (5090) to be free of the main llama-swap chat model — manually unload
-# it first via:
-#   curl -s http://localhost:8080/unload
+# Dev helper: rebuild image-gen / image-gen-ui after a Dockerfile change
+# and bring them up in the foreground so you can watch SwarmUI's logs.
+# Ctrl+C stops both cleanly. The containers are normally always-on (started
+# by start.sh) — this script is only useful when you've edited a Dockerfile
+# or want to tail logs interactively.
 #
-# Open http://localhost:7802 to use the UI.
+# Open http://localhost:7802 to use the UI. Load/unload the model via the
+# button in the UI header.
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -14,55 +15,11 @@ WSL_SCRIPT_DIR="$(echo "$SCRIPT_DIR" | sed 's|^/\([a-z]\)/|/mnt/\1/|')"
 DOCKER="wsl.exe -d Ubuntu-24.04 -- docker"
 COMPOSE_FILE="$WSL_SCRIPT_DIR/docker-compose.yml"
 
-cleanup() {
-    echo
-    echo "Stopping image-gen..."
-    MSYS_NO_PATHCONV=1 $DOCKER compose -f "$COMPOSE_FILE" --profile image stop image-gen image-gen-ui >/dev/null 2>&1 || true
-    echo "VRAM after shutdown:"
-    wsl.exe -d Ubuntu-24.04 -- nvidia-smi --query-gpu=index,name,memory.used,memory.total --format=csv,noheader,nounits
-}
-trap cleanup EXIT
-
-echo "VRAM before launch:"
-wsl.exe -d Ubuntu-24.04 -- nvidia-smi --query-gpu=index,name,memory.used,memory.total --format=csv,noheader,nounits
-echo
-
-# Warn if a main-group llama-swap model is currently loaded
-RUNNING_JSON="$(curl -sf http://localhost:8080/running 2>/dev/null || echo '{"running":[]}')"
-MAIN_LOADED="$(echo "$RUNNING_JSON" | python -c "
-import json, sys
-data = json.load(sys.stdin)
-# Heuristic: anything with --device CUDA0 and no CUDA_VISIBLE_DEVICES override
-# in cmd is on the primary GPU. cuda1 group entries have CUDA_VISIBLE_DEVICES
-# in their env but that's not in /running output, so fall back to model name
-# matching the known small-model patterns instead.
-SECONDARY_PATTERNS = ('coder', 'qwen3.5-4B')
-main = [m for m in data.get('running', [])
-        if not any(p.lower() in m.get('model', '').lower() for p in SECONDARY_PATTERNS)]
-if main:
-    print(','.join(m['model'] for m in main))
-" 2>/dev/null || echo "")"
-
-if [ -n "$MAIN_LOADED" ]; then
-    echo "WARNING: main-group model(s) currently loaded on primary GPU:"
-    echo "    $MAIN_LOADED"
-    echo
-    echo "Image-gen needs ~28 GB on the primary GPU. Unload first:"
-    echo "    curl -s http://localhost:8080/unload"
-    echo
-    read -r -p "Continue anyway? [y/N] " ans
-    case "$ans" in
-        [yY]|[yY][eE][sS]) ;;
-        *) exit 1 ;;
-    esac
-fi
-
-echo "Starting image-gen + image-gen-ui (Ctrl+C to stop)..."
+echo "Rebuilding + starting image-gen + image-gen-ui in foreground (Ctrl+C to stop)..."
 echo "UI: http://localhost:7802 (engine API: http://localhost:7801)"
 echo
 
-# --build rebuilds image-gen / image-gen-ui only if their Dockerfiles or
-# build context changed (layer cache makes no-op rebuilds ~1s). Naming the
-# services explicitly is required — bare `compose build` would try to
-# rebuild every service in the file regardless of the --profile filter.
-MSYS_NO_PATHCONV=1 $DOCKER compose -f "$COMPOSE_FILE" --profile image up --build image-gen image-gen-ui
+# --build rebuilds only if Dockerfiles or build context changed (layer cache
+# makes no-op rebuilds ~1s). Naming services explicitly so other always-on
+# services aren't restarted.
+MSYS_NO_PATHCONV=1 $DOCKER compose -f "$COMPOSE_FILE" up --build image-gen image-gen-ui
