@@ -183,15 +183,15 @@ A single GPU-backed service exposing OpenAI-compatible endpoints — used by Lib
 
 - **Whisper** (faster-whisper) — speech-to-text
 - **Kokoro** (kokoro-onnx) — fast streaming TTS, fixed voice library
-- **Chatterbox** — voice-cloning TTS; clones from a short reference `.wav`
+- **Chatterbox** — voice-cloning TTS; clones from a short reference `.wav` in English plus 22 other languages
 
 Endpoints:
 
 - `POST /v1/audio/transcriptions` — Whisper transcription (OpenAI-compatible)
 - `POST /v1/audio/speech` — Kokoro TTS; supports `stream: true` for sentence-by-sentence chunks
-- `POST /v1/audio/clone` — Chatterbox voice cloning. Body: `{text, voice, exaggeration, cfg_weight, response_format}`. `voice` is a filename stem under `VOICE_SAMPLES_DIR` (e.g. `joe` → `joe.wav`) or an absolute `.wav` path; omit it for Chatterbox's built-in default voice. Output formats: `wav`, `mp3`, `ogg`/`opus`, `aac`/`m4a`, `flac`, `pcm`.
+- `POST /v1/audio/clone` — Chatterbox voice cloning. Body: `{text, voice, language, exaggeration, cfg_weight, response_format}`. `voice` is a filename stem under `VOICE_SAMPLES_DIR` (e.g. `joe` → `joe.wav`) or an absolute `.wav` path; omit it for Chatterbox's built-in default voice. `language` defaults to `"en"` and routes to the English-only model; any other code routes to the multilingual model (`ar, da, de, el, es, fi, fr, he, hi, it, ja, ko, ms, nl, no, pl, pt, ru, sv, sw, tr, zh`). The reference voice can be in any language — only `text`'s language matters. Output formats: `wav`, `mp3`, `ogg`/`opus`, `aac`/`m4a`, `flac`, `pcm`.
 - `GET /v1/voices` — `{voices, default, lang, speed}` — installed Kokoro voices plus the current server-side defaults
-- `GET /v1/voices/clone` — `{voices, voice_dir}` — `.wav` files discovered under `VOICE_SAMPLES_DIR`
+- `GET /v1/voices/clone` — `{voices, voice_dir, languages}` — `.wav` files discovered under `VOICE_SAMPLES_DIR` and the language codes accepted by `/v1/audio/clone`
 - `GET /health` — returns 200 only once all three models are loaded AND warmed up (CUDA kernels JIT-compiled). `start.sh` waits for `Chatterbox warmup complete` in the logs before considering audio-api ready.
 - `POST /mcp/mcp` — MCP streamable-http surface exposing `clone_voice` and `list_clone_voices` as tools (LibreChat wires this as the `chatterbox` server).
 
@@ -211,7 +211,9 @@ Callers (voice-agent, calendar-watcher, rss-watcher, etc.) omit `voice`/`lang`/`
 
 All three models run on the GPU. Post-warmup, first Kokoro request latency is ~0.7s; Chatterbox is heavier (≈seconds-per-sentence on first cold call, faster afterwards because the CUDA arena was pre-sized at warmup). Long sentences are auto-chunked at commas/whitespace before hitting Kokoro's 510-token cap.
 
-**Voice cloning samples.** Drop reference `.wav` files into the host directory you set as `VOICE_SAMPLES_DIR` (mounted read-only at `/app/voice-samples`). Five to fifteen seconds of clean speech per voice works well. The filename stem becomes the `voice` argument: `joe.wav` → `clone_voice(text=..., voice="joe")`.
+**Chatterbox dual-model layout.** audio-api loads two Chatterbox variants — the English-only model and the 23-language multilingual model — but they **share the same `s3gen` vocoder and `VoiceEncoder` instances on the GPU**. Only the T3 transformer (~2.1 GB) and tokenizer differ between them, so the combined VRAM footprint is ~5.5 GB instead of ~7 GB for two independent loads. The English model handles `language="en"`; everything else goes through the multilingual model. The first non-English request is slightly slower (multilingual T3 kernels JIT on first use); subsequent ones run at steady state.
+
+**Voice cloning samples.** Drop reference `.wav` files into the host directory you set as `VOICE_SAMPLES_DIR` (mounted read-only at `/app/voice-samples`). Five to fifteen seconds of clean speech per voice works well. The filename stem becomes the `voice` argument: `joe.wav` → `clone_voice(text=..., voice="joe")`. The reference clip's language doesn't have to match `text`'s language — Chatterbox extracts speaker timbre from the audio prompt and synthesises whatever you ask in the target language.
 
 ## voice-agent (browser voice chat)
 

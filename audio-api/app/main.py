@@ -25,6 +25,7 @@ mcp = FastMCP("audio-api")
 def clone_voice(
     text: str,
     voice: str = "",
+    language: str = "en",
     exaggeration: float = 0.5,
     cfg_weight: float = 0.5,
     response_format: str = "wav",
@@ -41,6 +42,12 @@ def clone_voice(
         voice: Filename stem under the voice-samples directory (e.g. "joe"
                for joe.wav), OR an absolute .wav path, OR empty for the
                built-in default voice.
+        language: ISO code for the language of `text`. Defaults to "en"
+               (routed through the English-only model). Other supported
+               codes (ar, da, de, el, es, fi, fr, he, hi, it, ja, ko, ms,
+               nl, no, pl, pt, ru, sv, sw, tr, zh) route through the
+               multilingual model. The reference voice can be in any
+               language — only `text`'s language matters.
         exaggeration: 0.0–1.0. Higher values push more expressive prosody.
         cfg_weight: Classifier-free guidance weight, 0.0–1.0. Higher values
                     track the reference voice more strictly.
@@ -61,12 +68,15 @@ def clone_voice(
         audio_bytes = chatterbox_engine.synthesize(
             text=text,
             voice=voice or None,
+            language=language,
             exaggeration=exaggeration,
             cfg_weight=cfg_weight,
             response_format=response_format,
         )
     except FileNotFoundError as e:
         return {"error": str(e), "available_voices": chatterbox_engine.list_voices()}
+    except ValueError as e:
+        return {"error": str(e), "supported_languages": chatterbox_engine.supported_languages()}
     except Exception as e:
         logger.exception("clone_voice failed")
         return {"error": str(e)}
@@ -75,6 +85,7 @@ def clone_voice(
         "format": response_format,
         "media_type": audio_encode.media_type_for(response_format),
         "voice": voice or "default",
+        "language": language,
         "audio_base64": base64.b64encode(audio_bytes).decode("ascii"),
         "bytes": len(audio_bytes),
     }
@@ -143,6 +154,7 @@ def clone_voices() -> dict:
     return {
         "voices": chatterbox_engine.list_voices(),
         "voice_dir": str(config.VOICE_SAMPLES_DIR),
+        "languages": chatterbox_engine.supported_languages(),
     }
 
 
@@ -232,6 +244,7 @@ def speech(req: SpeechRequest) -> Response:
 class CloneRequest(BaseModel):
     text: str
     voice: Optional[str] = None
+    language: str = "en"
     exaggeration: float = 0.5
     cfg_weight: float = 0.5
     response_format: Literal["wav", "ogg", "opus", "mp3", "flac", "aac", "m4a", "pcm"] = "wav"
@@ -246,12 +259,15 @@ def clone(req: CloneRequest) -> Response:
         audio_bytes = chatterbox_engine.synthesize(
             text=req.text,
             voice=req.voice,
+            language=req.language,
             exaggeration=req.exaggeration,
             cfg_weight=req.cfg_weight,
             response_format=req.response_format,
         )
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.exception("Voice cloning failed")
         raise HTTPException(status_code=500, detail=str(e))
