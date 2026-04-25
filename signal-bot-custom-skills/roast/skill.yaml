@@ -1,0 +1,15 @@
+name: roast
+description: >
+  LLM-driven roast battle between two famous people, delivered as a Signal
+  voice note. Personas are auto-resolved (with MCP-tool research) and cached
+  on disk; voices are matched against VOICE_SAMPLES_DIR. The agent loop
+  preserves the original duel.py mechanics — repetition detection, periodic
+  pivots, stall recovery via forced tool calls.
+version: "1.0.0"
+enabled: true
+command: /roast
+command_arg: input
+command_usage: "/roast [lang] <person1>, <person2> [turns] [topic...]"
+
+tools:
+  - "roast:roast"

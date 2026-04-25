@@ -151,6 +151,7 @@ services:
       - ${MUSIC_HOST_DIR:?MUSIC_HOST_DIR must be set in .env}:/music
       - ${VOICE_SAMPLES_DIR:?VOICE_SAMPLES_DIR must be set in .env}:/app/voice-samples
       - ${MEMORY_DIR:?MEMORY_DIR must be set in .env}:/memory:ro
+      - ./shared:/shared:ro
     depends_on:
       signal-api:
         condition: service_started

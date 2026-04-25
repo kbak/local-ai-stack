@@ -8,7 +8,7 @@ from typing import Optional
 def _normalize(s: str) -> str:
     """Lowercase + strip diacritics + non-alphanumerics → spaces collapsed.
 
-    Used so 'Barack Obama' and 'barack_obama.wav' compare equal.
+    Used so 'John Doe' and 'john_doe.wav' compare equal.
     """
     nfkd = unicodedata.normalize("NFKD", s)
     no_accents = "".join(c for c in nfkd if not unicodedata.combining(c))

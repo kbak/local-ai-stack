@@ -304,7 +304,7 @@ Skills in `signal-bot-custom-skills/` are mounted into the container at `/app/da
 
 The uoltz fork ships with several built-ins disabled by default (`web_search`, `notes`, `rss_digest`, `shell`, `skill_builder`) — the stack intentionally keeps them off: web search, news digests, and host-side actions are handled by MCP tools and watcher services instead.
 
-Available custom skills: arxiv, currency, finance, github, google_maps, hackernews, music_download, pdf, sample_download, searxng, time, tts_clone, voices_list, weather.
+Available custom skills: arxiv, currency, finance, github, google_maps, hackernews, music_download, pdf, roast, sample_download, searxng, time, tts_clone, voices_list, weather.
 
 Most are thin MCP-client shims that call mcp-proxy on port 8083. A few do their own thing:
 
@@ -313,6 +313,7 @@ Most are thin MCP-client shims that call mcp-proxy on port 8083. A few do their 
 - **sample_download** (`/sample`) — downloads a short clip from a YouTube link and saves it as a `.wav` voice sample for cloning. See setup below.
 - **voices_list** (`/voices`) — lists the voice samples currently saved under `VOICE_SAMPLES_DIR`.
 - **tts_clone** (`/tts`) — synthesises a Signal voice note from text using one of your saved voice samples. Auto-detects the language (`lingua`) or accepts an explicit ISO code as the first token. Voice hint is greedy fuzzy-matched against `VOICE_SAMPLES_DIR`. See setup below.
+- **roast** (`/roast`) — LLM-driven roast battle between two saved voices, delivered as a stitched Signal voice note. Resolves personas via the LLM (with MCP-tool research) and caches them on disk; preserves the duel.py mechanics (repetition detection, periodic pivots, stall recovery via forced tool calls). See setup below.
 - **pdf** — calls the pdf-inspector service directly on port 8086.
 
 Shared helpers used by `music_download` and `sample_download` (yt-dlp client, filename utilities, LLM client) live in `signal-bot-custom-skills/_shared/`. The skill loader skips underscore-prefixed directories, so `_shared/` is import-only.
@@ -406,6 +407,44 @@ The voice hint is greedy fuzzy-matched against the filename stems under `VOICE_S
 The first token is treated as a 2-letter ISO language code only if it's exactly two characters AND in Chatterbox's supported set (`ar, da, de, el, en, es, fi, fr, he, hi, it, ja, ko, ms, nl, no, pl, pt, ru, sv, sw, tr, zh`). Otherwise auto-detect runs. Text is capped at ~2700 chars (~3 minutes of speech).
 
 This skill needs the `signal` and `sender` kwargs that the `kbak/uoltz` fork injects into direct skills (since the bot's standard reply path only sends text). Other forks would need a small `bot.py` patch — see [the upstream commit](https://github.com/kbak/uoltz/commit/0423314) for the 2-line change.
+
+### Roast battle skill
+
+LLM-driven roast battle between two voices you've already saved. Both agents stay fully in character, take turns trading roasts, and can pull MCP tools (search, fetch, hackernews, etc.) for fresh material when they get stuck. The transcript is sent as a text message first; the stitched voice note follows.
+
+**Usage**
+```
+/roast <person1>, <person2>
+/roast <person1>, <person2> <turns>
+/roast <person1>, <person2> <turns> <topic...>
+/roast <lang> <person1>, <person2> [turns] [topic...]
+```
+Examples:
+```
+/roast hillary clinton, donald trump
+/roast hillary clinton, donald trump 8
+/roast hillary clinton, donald trump 8 better than you
+/roast pl hillary clinton, donald trump 10 lepsza niz ty
+```
+
+The first token is treated as a language code only if it's exactly two ASCII chars and in Chatterbox's supported set. Comma is required between the two names. The turns slot must be an integer (`2..30`); default `6`. Anything after the integer (or after the second name, if no integer is given) is the topic. **If you omit the topic, the LLM invents one** for the two named combatants — usually pretty good.
+
+**Mechanics preserved from the original duel.py**
+- Random opening agent, opening meta-prompt embedding the topic.
+- Repetition detection (difflib SequenceMatcher) — if a turn looks too similar to recent ones, the next agent gets a forced "drop it, fresh angle" pivot prompt.
+- Periodic pivot every 5 successful turns to prevent agents from camping a single bit.
+- Stall recovery: if a turn produces empty output, the next turn is forced to call an MCP tool (search/fetch/etc.) to inject fresh material.
+- `<think>...</think>` blocks are stripped from streamed output before being added to history (qwen3-style models).
+
+**Voice + persona resolution**
+- Voices are resolved from the user's input via the same greedy fuzzy match `/tts` uses, against `VOICE_SAMPLES_DIR`. So `/roast donald trump, joe biden` finds `donald_trump.wav` and `joe_biden.wav`.
+- Personas are LLM-generated once per name and cached at `/app/data/persona_cache/<slug>.txt` inside the bot (signal-bot-data volume). Delete the file to force a regeneration.
+
+**Model**
+Picks the largest currently-running non-coder chat model via `stack_shared.llm_model.resolve_model()` — the same helper every other watcher uses. No need to pin a model in the skill.
+
+**Latency**
+A 6-turn roast typically takes 30–60s end to end (persona-resolution rounds + 6 LLM turns + 6 audio-clone calls + ffmpeg stitch). The audio synthesis dominates after caching.
 
 ## calendar-watcher
 

@@ -12,9 +12,13 @@ from strands import tool
 _SKILL_DIR = str(Path(__file__).parent)
 if _SKILL_DIR not in sys.path:
     sys.path.insert(0, _SKILL_DIR)
+# Sibling-skill `_shared/` package
+_CUSTOM_SKILLS_ROOT = str(Path(__file__).parent.parent)
+if _CUSTOM_SKILLS_ROOT not in sys.path:
+    sys.path.insert(0, _CUSTOM_SKILLS_ROOT)
 
 import lang as lang_mod  # noqa: E402
-import match as match_mod  # noqa: E402
+from _shared import voice_match as match_mod  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
