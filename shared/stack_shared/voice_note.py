@@ -56,6 +56,48 @@ def strip_markdown(text: str) -> str:
     return text.strip()
 
 
+# ── TTS-specific normalisation ───────────────────────────────────────────────
+#
+# Applied AFTER strip_markdown but BEFORE chunking/synthesis. These rewrites
+# are speech-only — the original text (with URLs, EU-style numbers, etc.) is
+# still what gets sent as the Signal text message.
+
+# Bare URLs that survived markdown stripping (anchor links already collapsed
+# to their text by _RE_LINK). We collapse to the registrable host so Kokoro
+# says "github.com" instead of spelling out the full path digit by digit.
+_RE_BARE_URL = re.compile(
+    r"\bhttps?://(?:www\.)?([a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+)\S*",
+    re.IGNORECASE,
+)
+
+# EU-style decimal commas (e.g. "3,5 million") emitted by multilingual LLMs
+# when they ingest non-English source feeds. We only touch the *unambiguous*
+# pattern: a comma between digits, with 1-2 digits after, NOT followed by
+# another digit or comma. That deliberately leaves alone:
+#   - English thousands separators: "1,234" / "12,345,678" (3 digits, often
+#     chained — caught by the `,\d{3}` branch left alone)
+#   - Grammatical commas with whitespace: "by 2017, 5 people" (whitespace
+#     after the comma — pattern requires \d immediately after)
+#   - Weird 4+-digit suffixes like "1,2345" — not a real format anywhere,
+#     don't risk a wrong rewrite.
+_RE_EU_DECIMAL = re.compile(r"(?<=\d),(\d{1,2})(?![\d,])")
+
+
+def prepare_for_tts(text: str) -> str:
+    """Speech-only rewrites applied after markdown stripping.
+
+    Currently:
+      - Bare URLs collapsed to their host (so TTS reads "github.com" not the
+        full path).
+      - EU-style decimal commas converted to periods (LLM occasionally emits
+        "3,5 million" when summarising non-English feeds; English thousands
+        separators are preserved).
+    """
+    text = _RE_BARE_URL.sub(r"\1", text)
+    text = _RE_EU_DECIMAL.sub(r".\1", text)
+    return text
+
+
 # ── chunking ─────────────────────────────────────────────────────────────────
 
 
@@ -180,9 +222,9 @@ def send_text_and_voice_brief(
 
     audio_api_url = audio_api_url or os.environ.get("AUDIO_API_URL", "http://audio-api:8088")
 
-    stripped = strip_markdown(text)
-    chunks = chunk_for_voice(stripped)
-    log.info("Synthesizing %d voice-note chunk(s) for brief (%d chars total)", len(chunks), len(stripped))
+    speech_text = prepare_for_tts(strip_markdown(text))
+    chunks = chunk_for_voice(speech_text)
+    log.info("Synthesizing %d voice-note chunk(s) for brief (%d chars total)", len(chunks), len(speech_text))
 
     for i, chunk in enumerate(chunks, 1):
         try:
