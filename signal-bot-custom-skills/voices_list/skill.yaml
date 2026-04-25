@@ -1,0 +1,12 @@
+name: voices_list
+description: >
+  List the voice samples currently available for cloning under VOICE_SAMPLES_DIR.
+  Each entry is a filename stem you can pass as the `voice` argument to
+  audio-api's clone_voice tool.
+version: "1.0.0"
+enabled: true
+command: /voices
+command_usage: "/voices"
+
+tools:
+  - "voices:list_voices"

@@ -13,6 +13,13 @@ from strands import tool
 _SKILL_DIR = str(Path(__file__).parent)
 if _SKILL_DIR not in sys.path:
     sys.path.insert(0, _SKILL_DIR)
+# Ensure sibling-skill `_shared/` package is importable
+_CUSTOM_SKILLS_ROOT = str(Path(__file__).parent.parent)
+if _CUSTOM_SKILLS_ROOT not in sys.path:
+    sys.path.insert(0, _CUSTOM_SKILLS_ROOT)
+
+from _shared.files import artist_title_filename, unique_path  # noqa: E402
+from _shared.ytdlp import download_audio  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -36,53 +43,6 @@ def _parse_input(text: str) -> tuple[str, str]:
         return "", url_match.group(0)
 
     return "", text
-
-
-def _safe_filename(artist: str, title: str) -> str:
-    """Build a filesystem-safe 'Artist - Title' string."""
-    def clean(s: str) -> str:
-        return re.sub(r'[<>:"/\\|?*]', "", s).strip()
-    return f"{clean(artist)} - {clean(title)}"
-
-
-def _unique_path(directory: Path, base_name: str, ext: str = ".mp3") -> Path:
-    """Return a path that doesn't exist yet, appending (2), (3)... if needed."""
-    candidate = directory / f"{base_name}{ext}"
-    if not candidate.exists():
-        return candidate
-    counter = 2
-    while True:
-        candidate = directory / f"{base_name} ({counter}){ext}"
-        if not candidate.exists():
-            return candidate
-        counter += 1
-
-
-def _download_yt(query_or_url: str, dest_dir: str) -> tuple[str, str, str]:
-    """Download best-quality audio via the host yt-dlp service.
-
-    Returns (mp3_path, artist, title).
-    """
-    import httpx
-
-    service_url = os.getenv("YTDLP_SERVICE_URL", "http://host.docker.internal:8200")
-    dest = os.path.join(dest_dir, "download.mp3")
-
-    logger.info("Calling yt-dlp service at %s for: %s", service_url, query_or_url)
-    resp = httpx.post(
-        f"{service_url}/download",
-        json={"query": query_or_url},
-        timeout=120,
-    )
-    if resp.status_code != 200:
-        raise RuntimeError(f"yt-dlp service error {resp.status_code}: {resp.text[:200]}")
-
-    with open(dest, "wb") as f:
-        f.write(resp.content)
-
-    artist = resp.headers.get("X-Artist", "")
-    title = resp.headers.get("X-Title", "")
-    return dest, artist, title
 
 
 def _set_tags(path: str, artist: str, title: str, album: str, year: str, genre: str, cover_url: str):
@@ -198,8 +158,9 @@ def download_music(input: str, images: list | None = None, status_fn=None) -> st
         # --- Download from YouTube ---
         search_target = (meta.search_query if meta else url)
 
+        raw_mp3 = os.path.join(tmp, "download.mp3")
         try:
-            raw_mp3, yt_artist, yt_title = _download_yt(search_target, tmp)
+            yt_artist, yt_title = download_audio(search_target, raw_mp3, timeout=120)
         except Exception as e:
             logger.exception("Download failed")
             return f"Download failed: {e}"
@@ -232,8 +193,8 @@ def download_music(input: str, images: list | None = None, status_fn=None) -> st
         target_dir.mkdir(parents=True, exist_ok=True)
 
         # --- Final filename & copy ---
-        base_name = _safe_filename(meta.artist, meta.title)
-        final_path = _unique_path(target_dir, base_name)
+        base_name = artist_title_filename(meta.artist, meta.title)
+        final_path = unique_path(target_dir, base_name, ".mp3")
 
         import shutil
         shutil.copy2(trimmed_mp3, final_path)

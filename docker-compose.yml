@@ -149,6 +149,7 @@ services:
       - signal-bot-data:/app/data
       - signal-cli-data:/signal-cli-data:ro
       - ${MUSIC_HOST_DIR:?MUSIC_HOST_DIR must be set in .env}:/music
+      - ${VOICE_SAMPLES_DIR:?VOICE_SAMPLES_DIR must be set in .env}:/app/voice-samples
       - ${MEMORY_DIR:?MEMORY_DIR must be set in .env}:/memory:ro
     depends_on:
       signal-api:

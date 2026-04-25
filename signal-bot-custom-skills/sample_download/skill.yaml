@@ -1,0 +1,15 @@
+name: sample_download
+description: >
+  Download a short voice sample from a YouTube link and save it as a .wav under
+  VOICE_SAMPLES_DIR for later voice cloning. Accepts a start time and a length
+  (or just a length, in which case the start time is taken from the URL or 0).
+  Auto-names the file `firstname_lastname.wav` based on the video title; an
+  optional trailing hint overrides the LLM-derived name.
+version: "1.0.0"
+enabled: true
+command: /sample
+command_arg: input
+command_usage: "/sample <youtube-url> [start] <length> [name_hint]"
+
+tools:
+  - "sample:download_sample"

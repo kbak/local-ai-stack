@@ -73,7 +73,7 @@ Edit `.env` and set:
 - `CALDAV_CALENDAR_NAMES` — comma-separated calendar names to track (e.g. `Travel`). Leave empty to track all calendars.
 - `GOOGLE_MAPS_API_KEY` — Google Places API (New) key for venue ratings and addresses in meal briefings.
 - `MEMORY_DIR` — absolute host path for memory storage (`USER.md`, `MEMORY.md`, Qdrant volume). Keep outside the repo.
-- `VOICE_SAMPLES_DIR` — absolute host path containing `.wav` reference samples for Chatterbox voice cloning. Mounted read-only into audio-api at `/app/voice-samples`. **Required** — no default.
+- `VOICE_SAMPLES_DIR` — absolute host path containing `.wav` reference samples for Chatterbox voice cloning. Mounted read-only into audio-api and read-write into signal-bot (so `/sample` can write new samples) at `/app/voice-samples` in both. **Required** — no default.
 - `MUSIC_HOST_DIR` — absolute host path to your music library, mounted read-write into signal-bot at `/music`. **Required** — no default.
 - `SECONDARY_GPU` — index or UUID of the secondary GPU. Hosts audio-api and the always-resident `qwen-coder-1.5B` autocomplete model. Defaults to `0` for single-GPU hosts.
 
@@ -302,13 +302,17 @@ Skills in `signal-bot-custom-skills/` are mounted into the container at `/app/da
 
 The uoltz fork ships with several built-ins disabled by default (`web_search`, `notes`, `rss_digest`, `shell`, `skill_builder`) — the stack intentionally keeps them off: web search, news digests, and host-side actions are handled by MCP tools and watcher services instead.
 
-Available custom skills: arxiv, currency, finance, github, google_maps, hackernews, music_download, pdf, searxng, time, weather.
+Available custom skills: arxiv, currency, finance, github, google_maps, hackernews, music_download, pdf, sample_download, searxng, time, voices_list, weather.
 
 Most are thin MCP-client shims that call mcp-proxy on port 8083. A few do their own thing:
 
 - **github** — calls the GitHub REST API directly (not via mcp-proxy) using `GITHUB_TOKEN` from the environment.
 - **music_download** (`/music`) — downloads songs from Shazam or Spotify links as high-quality MP3, trims non-music content from start/end, classifies into a configured directory, and sets ID3 tags including cover art. See setup below.
+- **sample_download** (`/sample`) — downloads a short clip from a YouTube link and saves it as a `.wav` voice sample for cloning. See setup below.
+- **voices_list** (`/voices`) — lists the voice samples currently saved under `VOICE_SAMPLES_DIR`.
 - **pdf** — calls the pdf-inspector service directly on port 8086.
+
+Shared helpers used by `music_download` and `sample_download` (yt-dlp client, filename utilities, LLM client) live in `signal-bot-custom-skills/_shared/`. The skill loader skips underscore-prefixed directories, so `_shared/` is import-only.
 
 For details on the patches applied to the uoltz fork, see the [kbak/uoltz README](https://github.com/kbak/uoltz).
 
@@ -356,6 +360,26 @@ Or send a screenshot of Shazam/Spotify with `/music` as the caption.
    MUSIC_CLASSIFY_PROMPT="rock -> rock; everything else -> top40"
    YTDLP_SERVICE_URL=http://host.docker.internal:8200
    ```
+
+### Voice sample skill
+
+Downloads a short clip from a YouTube link and saves it as a `.wav` under `VOICE_SAMPLES_DIR` so audio-api can use it for voice cloning.
+
+**Usage**
+```
+/sample <youtube-url> <length>                   # length only; start = URL ?t= or 0
+/sample <youtube-url> <start> <length>           # explicit start
+/sample <youtube-url> <start> <length> <name>    # override the auto-detected name
+```
+Timestamps may be `hh:mm:ss`, `mm:ss`, or `ss`. The bot auto-names the saved file `<firstname_lastname>.wav` from the YouTube title; on collision a numeric suffix is appended (e.g. `obama (2).wav`). Aim for 5–15 seconds of clean speech for the best clone quality.
+
+```
+/voices                                          # list samples already saved
+```
+
+**Setup**
+
+Reuses the same yt-dlp service as `/music` (see above) — no extra services. `VOICE_SAMPLES_DIR` must be set in `.env`; it is mounted read-write into signal-bot at `/app/voice-samples` (and read-only into audio-api at the same path).
 
 ## calendar-watcher
 
