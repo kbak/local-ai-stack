@@ -469,24 +469,33 @@
         }
     }
 
+    async function postApi(path, body) {
+        const resp = await fetch(`${API_BASE}/${path}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ session_id: sessionId, ...body }),
+        });
+        if (!resp.ok) {
+            const text = await resp.text().catch(() => "");
+            throw new Error(`${path} ${resp.status}: ${text.slice(0, 200)}`);
+        }
+        const data = await resp.json();
+        if (data.error) throw new Error(data.error);
+        return data;
+    }
+
     async function loadModel() {
         modelWorking = true;
         modelBtn.disabled = true;
         setModelButton("working", "Loading…");
         try {
             await ensureBootstrapped();
+            // The Unload path disables backend #0 to fully tear down ComfyUI
+            // and free its CUDA context; re-enable it before SelectModel or
+            // the load fails because no backend is available.
+            await postApi("ToggleBackend", { backend_id: 0, enabled: true });
             // SelectModel blocks until the load is complete (or fails).
-            const resp = await fetch(`${API_BASE}/SelectModel`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ session_id: sessionId, model: modelName }),
-            });
-            if (!resp.ok) {
-                const body = await resp.text().catch(() => "");
-                throw new Error(`SelectModel ${resp.status}: ${body.slice(0, 200)}`);
-            }
-            const data = await resp.json();
-            if (data.error) throw new Error(data.error);
+            await postApi("SelectModel", { model: modelName });
         } catch (err) {
             console.error("Model load failed:", err);
             alert(`Model load failed: ${err.message}`);
@@ -503,21 +512,10 @@
         setModelButton("working", "Unloading…");
         try {
             await ensureBootstrapped();
-            const resp = await fetch(`${API_BASE}/FreeBackendMemory`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    session_id: sessionId,
-                    system_ram: false,   // VRAM only.
-                    backend:    "all",
-                }),
-            });
-            if (!resp.ok) {
-                const body = await resp.text().catch(() => "");
-                throw new Error(`FreeBackendMemory ${resp.status}: ${body.slice(0, 200)}`);
-            }
-            const data = await resp.json();
-            if (data.error) throw new Error(data.error);
+            // Disabling the backend kills the ComfyUI subprocess, which fully
+            // releases the model AND the residual CUDA context (~1.5 GB that
+            // FreeBackendMemory leaves behind). Load re-enables backend #0.
+            await postApi("ToggleBackend", { backend_id: 0, enabled: false });
         } catch (err) {
             console.error("Model unload failed:", err);
             alert(`Model unload failed: ${err.message}`);
@@ -630,6 +628,11 @@
                     model,
                     temperature: EXPAND_TEMPERATURE,
                     max_tokens: EXPAND_MAX_TOKENS,
+                    // Disable Qwen3.x reasoning — without this the model spends the
+                    // entire token budget in <think>...</think> and returns empty
+                    // content (finish_reason: "length"). Same pattern as
+                    // signal-bot-custom-skills/_shared/llm.py.
+                    chat_template_kwargs: { enable_thinking: false },
                     messages: [
                         { role: "system", content: EXPAND_SYSTEM },
                         { role: "user",   content: original },

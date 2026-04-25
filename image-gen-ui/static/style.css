@@ -254,16 +254,31 @@ form#composer {
     color: var(--text);
     border: 1px solid var(--border);
     border-radius: 14px;
-    /* Right padding leaves room for the inline expand button. */
-    padding: 12px 44px 12px 14px;
+    /* Right padding leaves room for the inline expand button + a scrollbar
+       gutter, so the textarea's own scrollbar can't sit under the button. */
+    padding: 12px 56px 12px 14px;
     font-size: 15px;
     font-family: inherit;
     line-height: 1.4;
     resize: none;
+    min-height: 64px;
     max-height: 200px;
     width: 100%;
     outline: none;
     transition: border-color 80ms ease;
+    /* Thin scrollbar so it tucks neatly into the right-padding gutter. */
+    scrollbar-width: thin;
+}
+
+#prompt::-webkit-scrollbar {
+    width: 8px;
+}
+#prompt::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 4px;
+}
+#prompt::-webkit-scrollbar-thumb:hover {
+    background: var(--text-muted);
 }
 
 #prompt:focus {
