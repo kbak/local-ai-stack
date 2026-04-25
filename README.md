@@ -85,7 +85,6 @@ Edit `llama-swap.yaml` to set your models and their llama-server arguments. The 
 
 - **Primary GPU (`main` group, swappable):** Qwen 3.6 27B at Q5 and Q6, Qwen 3.6 35B-A3B, Gemma 4 31B. One at a time.
 - **Secondary GPU (`cuda1` group, persistent):** `qwen-coder-1.5B` for FIM tab-complete — always loaded so tab-complete never pays a cold-start cost. Coexists on the same card with audio-api (Whisper + Kokoro + Chatterbox).
-- **`qwen3.5-4B`** is also defined in the `cuda1` group as a fallback chat model but is *not* auto-loaded — Chatterbox now occupies the secondary-GPU headroom that previously kept it warm. Request it explicitly via the OpenAI API or the llama-swap UI when the primary GPU is busy (e.g. evicted for gaming) and llama-swap will load it on demand.
 
 The chat entries use:
 - `--n-gpu-layers 999` — full GPU offload
@@ -126,7 +125,7 @@ http://localhost:8080/ui
 Two GPUs are partitioned across services via `CUDA_VISIBLE_DEVICES` (set at the container level for audio-api and per-model in llama-swap via `${env.SECONDARY_GPU}`):
 
 - **Primary GPU:** llama-swap chat/agent models (Qwen, Gemma). One at a time within the `main` group.
-- **Secondary GPU (`SECONDARY_GPU`):** audio-api (Whisper + Kokoro + Chatterbox) and the autocomplete coder model `qwen-coder-1.5B`, all resident together. The `qwen3.5-4B` fallback chat model also pins here when explicitly loaded.
+- **Secondary GPU (`SECONDARY_GPU`):** audio-api (Whisper + Kokoro + Chatterbox) and the autocomplete coder model `qwen-coder-1.5B`, all resident together.
 
 The `groups` block in `llama-swap.yaml` keeps the coder model in its own `persistent: true` group so chat-model swaps on the primary GPU never evict it — tab-complete never pays a cold-start cost.
 

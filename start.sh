@@ -57,7 +57,7 @@ done
 echo "Pre-loading qwen-3.5B on 5060 Ti..."
 until curl -sf http://localhost:8080/v1/chat/completions \
     -H "Content-Type: application/json" \
-    -d '{"model":"qwen3.5-4B","messages":[{"role":"user","content":"hi"}],"max_tokens":1}' \
+    -d '{"model":"qwen3.5-9B","messages":[{"role":"user","content":"hi"}],"max_tokens":1}' \
     >/dev/null 2>&1; do
     sleep 2
 done

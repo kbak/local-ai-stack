@@ -1,16 +1,24 @@
 listen: "0.0.0.0:8080"
 
 models:
-  qwen3.6-27B-Q5_K_XL:
-    cmd: llama-server --port ${PORT} -hf unsloth/Qwen3.6-27B-GGUF --hf-file Qwen3.6-27B-UD-Q5_K_XL.gguf --device CUDA0 --split-mode none --n-gpu-layers 999 --parallel 1 --flash-attn on --batch-size 4096 --ubatch-size 1024 --ctx-size 131072 --no-mmap
+  qwen3.6-27B-Q6:
+    cmd: llama-server --port ${PORT} -hf unsloth/Qwen3.6-27B-GGUF --hf-file Qwen3.6-27B-Q6_K.gguf --device CUDA0 --split-mode none --n-gpu-layers 999 --parallel 1 --flash-attn on --batch-size 4096 --ubatch-size 1024 --ctx-size 100000 --no-mmap --cache-reuse 256
     ttl: 0
 
-  qwen3.6-27B-Q6:
-    cmd: llama-server --port ${PORT} -hf unsloth/Qwen3.6-27B-GGUF --hf-file Qwen3.6-27B-Q6_K.gguf --device CUDA0 --split-mode none --n-gpu-layers 999 --parallel 1 --flash-attn on --batch-size 4096 --ubatch-size 1024 --ctx-size 100000 --no-mmap
+  qwen3.6-27B-Q5_K_XL:
+    cmd: llama-server --port ${PORT} -hf unsloth/Qwen3.6-27B-GGUF --hf-file Qwen3.6-27B-UD-Q5_K_XL.gguf --device CUDA0 --split-mode none --n-gpu-layers 999 --parallel 1 --flash-attn on --batch-size 4096 --ubatch-size 1024 --ctx-size 131072 --no-mmap --cache-reuse 256
+    ttl: 0
+
+  qwen3.6-27B-Q4_K_XL:
+    cmd: llama-server --port ${PORT} -hf unsloth/Qwen3.6-27B-GGUF --hf-file Qwen3.6-27B-UD-Q4_K_XL.gguf --device CUDA0 --split-mode none --n-gpu-layers 999 --parallel 1 --flash-attn on --batch-size 4096 --ubatch-size 2048 --ctx-size 65536 --no-mmap --cache-reuse 256
     ttl: 0
 
   qwen3.6-35B-A3B:
-    cmd: llama-server --port ${PORT} -hf unsloth/Qwen3.6-35B-A3B-GGUF --hf-file Qwen3.6-35B-A3B-UD-Q5_K_S.gguf --device CUDA0 --split-mode none --n-gpu-layers 999 --parallel 1 --flash-attn on --batch-size 4096 --ubatch-size 1024 --ctx-size 170000 --no-mmap
+    cmd: llama-server --port ${PORT} -hf unsloth/Qwen3.6-35B-A3B-GGUF --hf-file Qwen3.6-35B-A3B-UD-Q5_K_S.gguf --device CUDA0 --split-mode none --n-gpu-layers 999 --parallel 1 --flash-attn on --batch-size 4096 --ubatch-size 1024 --ctx-size 170000 --no-mmap --cache-reuse 256
+    ttl: 0
+
+  qwen3.5-9B:
+    cmd: llama-server --port ${PORT} -hf unsloth/Qwen3.5-9B-GGUF --hf-file Qwen3.5-9B-Q5_K_M.gguf --device CUDA0 --split-mode none --n-gpu-layers 999 --parallel 1 --flash-attn on --batch-size 2048 --ubatch-size 512 --ctx-size 4096 --no-mmap --cache-reuse 256
     ttl: 0
 
   gemma4-31B:
@@ -32,15 +40,6 @@ models:
     cmd: llama-server --port ${PORT} -hf bartowski/Qwen2.5-Coder-1.5B-Instruct-GGUF --hf-file Qwen2.5-Coder-1.5B-Instruct-Q5_K_M.gguf --device CUDA0 --split-mode none --n-gpu-layers 999 --parallel 1 --flash-attn on --batch-size 1024 --ubatch-size 256 --ctx-size 16384 --no-mmap
     ttl: 0
 
-  # Fallback chat model on the 5060 Ti. Stays loaded so signal-bot still works
-  # when the main 27B is evicted off the 5090 (e.g. for gaming).
-  # Same CUDA_VISIBLE_DEVICES trick as qwen-coder-1.5B above.
-  qwen3.5-4B:
-    env:
-      - "CUDA_VISIBLE_DEVICES=${env.SECONDARY_GPU}"
-    cmd: llama-server --port ${PORT} -hf unsloth/Qwen3.5-4B-GGUF --hf-file Qwen3.5-4B-Q5_K_M.gguf --device CUDA0 --split-mode none --n-gpu-layers 999 --parallel 1 --flash-attn on --batch-size 2048 --ubatch-size 512 --ctx-size 4096 --no-mmap
-    ttl: 0
-
 # Two independent groups:
 #   - main (CUDA0 / 5090): one chat model at a time, swappable. exclusive=false
 #     so loading a main model does NOT unload the cuda1 group.
@@ -52,9 +51,11 @@ groups:
     swap: true
     exclusive: false
     members:
-      - "qwen3.6-27B-Q5_K_XL"
       - "qwen3.6-27B-Q6"
+      - "qwen3.6-27B-Q5_K_XL"
+      - "qwen3.6-27B-Q4_K_XL"
       - "qwen3.6-35B-A3B"
+      - "qwen3.5-9B"
       - "gemma4-31B"
 
   "cuda1":
@@ -63,4 +64,3 @@ groups:
     persistent: true
     members:
       - "qwen-coder-1.5B"
-      - "qwen3.5-4B"
