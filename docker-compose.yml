@@ -248,6 +248,8 @@ services:
       - image-gen
     networks:
       - ai-net
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     mem_limit: 64m
 
   calendar-watcher:

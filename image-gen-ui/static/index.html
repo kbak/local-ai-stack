@@ -16,14 +16,30 @@
     <main id="feed" aria-live="polite"></main>
 
     <form id="composer" autocomplete="off">
-        <textarea
-            id="prompt"
-            placeholder="Describe an image..."
-            rows="1"
-            required
-            spellcheck="true"
-            autocapitalize="sentences"
-            autofocus></textarea>
+        <div id="promptWrap">
+            <textarea
+                id="prompt"
+                placeholder="Describe an image..."
+                rows="1"
+                required
+                spellcheck="true"
+                autocapitalize="sentences"
+                autofocus></textarea>
+            <button id="expandBtn" type="button" aria-label="Expand prompt with LLM"
+                    title="Expand prompt with LLM">
+                <svg class="icon-expand" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                     stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                     stroke-linejoin="round" aria-hidden="true">
+                    <path d="M12 3l1.9 4.6L18.5 9.5l-4.6 1.9L12 16l-1.9-4.6L5.5 9.5l4.6-1.9L12 3z"></path>
+                    <path d="M19 14l.8 1.8L21.5 16.5l-1.8.8L19 19l-.8-1.7-1.7-.8 1.7-.8L19 14z"></path>
+                </svg>
+                <svg class="icon-expand-stop" width="14" height="14" viewBox="0 0 24 24"
+                     fill="currentColor" aria-hidden="true">
+                    <rect x="5" y="5" width="14" height="14" rx="2"></rect>
+                </svg>
+                <span class="spinner" aria-hidden="true"></span>
+            </button>
+        </div>
         <button id="genBtn" type="submit" aria-label="Generate">
             <svg class="icon-send" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                  stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">

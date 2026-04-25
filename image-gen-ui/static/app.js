@@ -12,8 +12,21 @@
     // no CORS, no preflight, no Settings.fds gymnastics.
     const API_BASE       = `${location.origin}/api`;
     const WS_BASE        = `${location.protocol === "https:" ? "wss:" : "ws:"}//${location.host}/api`;
+    const LLM_BASE       = `${location.origin}/llm`;
     const STORAGE_KEY    = "imagegen-history-v1";
     const MAX_HISTORY    = 60;
+
+    // Prompt-expansion system prompt. Tuned for Flux.1-dev, which prefers
+    // naturalistic descriptions over Booru-style tag dumps.
+    const EXPAND_SYSTEM = [
+        "You rewrite short image ideas into detailed prompts for the Flux.1-dev image model.",
+        "Output ONLY the prompt — no preamble, no quotes, no explanation, no trailing notes.",
+        "Write 2-4 sentences. Cover: subject, setting, lighting, mood, and a photographic or artistic style cue (e.g. lens, film stock, medium).",
+        "Use naturalistic prose, not comma-separated tags.",
+        "Do not invent details that contradict the user's idea. If the user already wrote a long prompt, refine and tighten it; do not replace it wholesale.",
+    ].join(" ");
+    const EXPAND_TEMPERATURE = 0.7;
+    const EXPAND_MAX_TOKENS  = 400;
 
     // Flux.1-dev requires distinct parameters from SDXL/SD1.5:
     //  - cfgscale MUST be 1 (Flux is distilled; CFG > 1 destroys quality).
@@ -45,6 +58,7 @@
     const composer   = document.getElementById("composer");
     const promptEl   = document.getElementById("prompt");
     const genBtn     = document.getElementById("genBtn");
+    const expandBtn  = document.getElementById("expandBtn");
     const clearBtn   = document.getElementById("clearBtn");
     const lightbox   = document.getElementById("lightbox");
     const lightImg   = document.getElementById("lightboxImg");
@@ -56,6 +70,8 @@
     let activeSocket = null;
     let activeTiles  = null;
     let userAborted  = false;
+    let expanding    = false;
+    let expandAbort  = null;
 
     // ── History persistence ─────────────────────────────────────────────
     function loadHistory() {
@@ -391,6 +407,112 @@
         try { activeSocket.close(1000, "user-aborted"); } catch {}
     }
 
+    // ── Prompt expansion (llama-swap) ───────────────────────────────────
+    /** Extract a parameter-count hint from a model id like "qwen3.5-4B" -> 4.
+     *  Returns Infinity when no count is found so unparseable ids sort last
+     *  when we're picking the *smallest* model. */
+    function paramCount(id) {
+        const m = /(\d+(?:\.\d+)?)B/i.exec(id || "");
+        return m ? parseFloat(m[1]) : Infinity;
+    }
+
+    function isCoderModel(id) {
+        return /coder/i.test(id || "");
+    }
+
+    /** Pick a model for prompt expansion. We want the SMALLEST non-coder
+     *  model — large enough to write coherent prose, small enough that it
+     *  doesn't evict whatever the user has loaded for image generation.
+     *  Prefer models already loaded (`/running` -> ready). Falls back to
+     *  the full `/v1/models` list (llama-swap will load on demand). */
+    async function pickExpansionModel() {
+        try {
+            const r = await fetch(`${LLM_BASE}/running`, { method: "GET" });
+            if (r.ok) {
+                const data = await r.json();
+                const ready = (data.running || [])
+                    .filter((e) => e.state === "ready" && e.model)
+                    .map((e) => e.model)
+                    .filter((id) => !isCoderModel(id));
+                if (ready.length) {
+                    ready.sort((a, b) => paramCount(a) - paramCount(b));
+                    return ready[0];
+                }
+            }
+        } catch (_) { /* fall through */ }
+
+        const r2 = await fetch(`${LLM_BASE}/v1/models`, { method: "GET" });
+        if (!r2.ok) throw new Error(`llama-swap /v1/models ${r2.status}`);
+        const data2 = await r2.json();
+        const ids = (data2.data || [])
+            .map((m) => m.id)
+            .filter((id) => id && !isCoderModel(id));
+        if (!ids.length) throw new Error("No suitable model exposed by llama-swap.");
+        ids.sort((a, b) => paramCount(a) - paramCount(b));
+        return ids[0];
+    }
+
+    function setExpanding(b) {
+        expanding = b;
+        expandBtn.classList.toggle("busy", b);
+        expandBtn.setAttribute("aria-label", b ? "Stop expansion" : "Expand prompt with LLM");
+        expandBtn.title = b ? "Stop expansion" : "Expand prompt with LLM";
+    }
+
+    async function expandPrompt() {
+        if (busy) return;
+        if (expanding) {
+            if (expandAbort) expandAbort.abort();
+            return;
+        }
+        const original = promptEl.value.trim();
+        if (!original) return;
+
+        setExpanding(true);
+        expandAbort = new AbortController();
+        try {
+            const model = await pickExpansionModel();
+            const resp = await fetch(`${LLM_BASE}/v1/chat/completions`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                signal: expandAbort.signal,
+                body: JSON.stringify({
+                    model,
+                    temperature: EXPAND_TEMPERATURE,
+                    max_tokens: EXPAND_MAX_TOKENS,
+                    messages: [
+                        { role: "system", content: EXPAND_SYSTEM },
+                        { role: "user",   content: original },
+                    ],
+                }),
+            });
+            if (!resp.ok) {
+                const body = await resp.text().catch(() => "");
+                throw new Error(`LLM ${resp.status}: ${body.slice(0, 200)}`);
+            }
+            const data = await resp.json();
+            let expanded = data?.choices?.[0]?.message?.content || "";
+            // Strip any <think>...</think> blocks some models emit even when
+            // reasoning is disabled, plus surrounding quotes the model might add.
+            expanded = expanded.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+            expanded = expanded.replace(/^["'`]+|["'`]+$/g, "").trim();
+            if (!expanded) throw new Error("LLM returned an empty response.");
+            promptEl.value = expanded;
+            autoresize();
+            promptEl.focus();
+        } catch (err) {
+            if (err.name === "AbortError") {
+                // User stopped it — leave the textarea as-is, no error UI.
+            } else {
+                console.error("Prompt expansion failed:", err);
+                alert(`Prompt expansion failed: ${err.message}`);
+            }
+        } finally {
+            expandAbort = null;
+            setExpanding(false);
+        }
+    }
+
     // ── Composer ────────────────────────────────────────────────────────
     function autoresize() {
         promptEl.style.height = "auto";
@@ -406,6 +528,8 @@
         genBtn.classList.toggle("busy", b);
         genBtn.setAttribute("aria-label", b ? "Stop" : "Generate");
         genBtn.title = b ? "Stop generation" : "Generate";
+        // Expansion makes no sense mid-generation; gray it out.
+        expandBtn.disabled = b;
     }
 
     async function handleSubmit(prompt) {
@@ -474,6 +598,8 @@
             composer.requestSubmit();
         }
     });
+
+    expandBtn.addEventListener("click", expandPrompt);
 
     clearBtn.addEventListener("click", () => {
         if (busy) return;
