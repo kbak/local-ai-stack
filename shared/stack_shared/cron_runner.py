@@ -39,6 +39,8 @@ def run_cron(
             trigger="cron",
             id=job_id,
             replace_existing=True,
+            misfire_grace_time=3600,
+            coalesce=True,
             **cron_kwargs,
         )
         log.info(log_message)
