@@ -88,16 +88,18 @@ speech:
 endpoints:
   custom:
     - name: "llama.cpp"
-      apiKey: "none"
+      apiKey: "vllm"
       baseURL: "http://host.docker.internal:8080/v1"
       models:
-        default: ["qwen3.6-35B-A3B"]
+        default: ["qwen3.6-27B-NVFP4"]
         fetch: true
-      titleConvo: false
+      titleConvo: true
+      titleModel: "current_model"
+      titleMessageRole: "user"
       summarize: false
       forcePrompt: false
       modelDisplayLabel: "llama.cpp"
-      maxContextTokens: 262144
+      maxContextTokens: 65536
 
 mcpServers:
   searxng:
