@@ -14,6 +14,24 @@ from .base import Attachment, EmailBackend, Message, MessageHeaders, MessageRef
 log = logging.getLogger(__name__)
 
 
+def _format_from(msg) -> str:
+    """Rebuild a "Display Name" <addr> From header from imap_tools' parsed value.
+
+    imap_tools' `msg.from_` returns just the bare address; we lose the display
+    name, which the via-rule matcher needs for billing-platform receipts.
+    """
+    fv = msg.from_values
+    if fv and fv.name and fv.email:
+        # Quote the name only if it contains chars that need it.
+        name = fv.name
+        if any(c in name for c in ',";<>'):
+            name = '"' + name.replace('"', '\\"') + '"'
+        return f'{name} <{fv.email}>'
+    if fv and fv.email:
+        return f'<{fv.email}>'
+    return msg.from_ or ""
+
+
 class ImapBackend(EmailBackend):
     def __init__(self, account: Account) -> None:
         self.account = account
@@ -45,7 +63,7 @@ class ImapBackend(EmailBackend):
                 out.append(
                     MessageHeaders(
                         ref=MessageRef(backend_id=str(msg.uid), extra={"folder": "INBOX"}),
-                        from_addr=msg.from_ or "",
+                        from_addr=_format_from(msg),
                         to_addr=", ".join(msg.to or ()),
                         subject=msg.subject or "",
                         date=dt.astimezone(timezone.utc),
@@ -70,7 +88,7 @@ class ImapBackend(EmailBackend):
 
             headers = MessageHeaders(
                 ref=ref,
-                from_addr=msg.from_ or "",
+                from_addr=_format_from(msg),
                 to_addr=", ".join(msg.to or ()),
                 subject=msg.subject or "",
                 date=dt.astimezone(timezone.utc),

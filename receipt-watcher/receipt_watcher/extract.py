@@ -93,7 +93,14 @@ def _html_to_text(html: str) -> str:
 
 
 def _build_user_prompt(msg: Message, vendor: Vendor) -> str:
-    body = msg.body_text.strip() or _html_to_text(msg.body_html)
+    # Prefer HTML-stripped body when HTML is present. Many senders synthesize a
+    # degraded text/plain part that's just the subject line (Orb does this),
+    # while the HTML carries the actual amount/date/details. Fall back to the
+    # text part only when no HTML exists.
+    if msg.body_html:
+        body = _html_to_text(msg.body_html)
+    else:
+        body = msg.body_text.strip()
     if len(body) > 20000:
         body = body[:20000] + "\n[...truncated...]"
 

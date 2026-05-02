@@ -40,11 +40,24 @@ class Account:
 
 
 @dataclass
+class ViaRule:
+    """A trusted billing-platform path for receipts that don't come from the
+    vendor's own domain (e.g. Fly.io billing via Stripe). All three checks
+    must pass for the rule to match — otherwise a Stripe employee with a
+    spoofed display name would be enough to forge a vendor.
+    """
+    sender_domain: str
+    sender_local_part_prefix: str  # regex, anchored at start of local-part
+    from_name_contains: str        # substring, case-insensitive
+
+
+@dataclass
 class Vendor:
     key: str
     domains: list[str]
     category: str
     currency_hint: str | None
+    via: list[ViaRule]
 
 
 def load_accounts() -> list[Account]:
@@ -70,12 +83,22 @@ def load_vendors() -> list[Vendor]:
         data = yaml.safe_load(f) or {}
     out: list[Vendor] = []
     for key, raw in (data.get("vendors", {}) or {}).items():
+        via_rules: list[ViaRule] = []
+        for v in raw.get("via", []) or []:
+            via_rules.append(
+                ViaRule(
+                    sender_domain=v["sender_domain"].lower(),
+                    sender_local_part_prefix=v["sender_local_part_prefix"],
+                    from_name_contains=v["from_name_contains"],
+                )
+            )
         out.append(
             Vendor(
                 key=key,
                 domains=[d.lower() for d in raw.get("domains", [])],
                 category=raw.get("category", ""),
                 currency_hint=raw.get("currency_hint"),
+                via=via_rules,
             )
         )
     return out
