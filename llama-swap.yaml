@@ -1,5 +1,9 @@
 listen: "0.0.0.0:8080"
 
+# vLLM cold start (compile cache miss) on Qwen3.6-27B can take 5-10 min.
+# Default 120s would kill it.
+healthCheckTimeout: 900
+
 models:
   qwen3.6-27B-Q6:
     cmd: llama-server --port ${PORT} -hf unsloth/Qwen3.6-27B-GGUF --hf-file Qwen3.6-27B-Q6_K.gguf --device CUDA0 --split-mode none --n-gpu-layers 999 --parallel 1 --flash-attn on --batch-size 4096 --ubatch-size 1024 --ctx-size 100000 --no-mmap --cache-reuse 256
@@ -13,16 +17,10 @@ models:
     cmd: llama-server --port ${PORT} -hf unsloth/Qwen3.6-27B-GGUF --hf-file Qwen3.6-27B-UD-Q4_K_XL.gguf --device CUDA0 --split-mode none --n-gpu-layers 999 --parallel 1 --flash-attn on --batch-size 4096 --ubatch-size 2048 --ctx-size 65536 --no-mmap --cache-reuse 256
     ttl: 0
 
-  # NVFP4 quant served by vLLM. Native FP4 tensor cores on Blackwell + MTP n=3
-  # speculative decoding ~2.5x throughput over llama.cpp Q4 (~85 t/s vs ~60).
-  # vLLM lives in a uv venv inside WSL; flags are in vllm-launcher.sh, which
-  # llama-swap (on Windows) calls via wsl.exe. The chat-template, HF cache, and
-  # venv all live on WSL ext4.
   qwen3.6-27B-NVFP4:
     cmd: wsl.exe -d Ubuntu-24.04 -- bash /mnt/d/AI/Stack/vllm-launcher.sh ${PORT}
     proxy: http://127.0.0.1:${PORT}
     checkEndpoint: /v1/models
-    healthCheckTimeout: 600
     ttl: 0
 
   qwen3.6-35B-A3B:
