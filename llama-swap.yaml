@@ -17,7 +17,7 @@ models:
     cmd: llama-server --port ${PORT} -hf unsloth/Qwen3.6-27B-GGUF --hf-file Qwen3.6-27B-UD-Q4_K_XL.gguf --device CUDA0 --split-mode none --n-gpu-layers 999 --parallel 1 --flash-attn on --batch-size 4096 --ubatch-size 2048 --ctx-size 65536 --no-mmap --cache-reuse 256
     ttl: 0
 
-  qwen3.6-27B-NVFP4:
+  qwen3.6-27B-FP8:
     cmd: wsl.exe -d Ubuntu-24.04 -- bash /mnt/d/AI/Stack/vllm-launcher.sh ${PORT}
     proxy: http://127.0.0.1:${PORT}
     checkEndpoint: /v1/models
@@ -64,7 +64,7 @@ groups:
       - "qwen3.6-27B-Q6"
       - "qwen3.6-27B-Q5_K_XL"
       - "qwen3.6-27B-Q4_K_XL"
-      - "qwen3.6-27B-NVFP4"
+      - "qwen3.6-27B-FP8"
       - "qwen3.6-35B-A3B"
       - "qwen3.5-9B"
       - "gemma4-31B"
