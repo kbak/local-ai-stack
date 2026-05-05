@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import re
+
 from .llm_client import get_client
 from .llm_model import resolve_model
+
+_THINK_RE = re.compile(r"<think>.*?</think>", re.DOTALL)
 
 
 def chat(
@@ -21,6 +25,10 @@ def chat(
       - base_url / api_key -> `LLM_BASE_URL` / `LLM_API_KEY` env, then defaults
       - model -> resolve_model() picks the largest non-coder model currently
         loaded in llama-swap.
+
+    Thinking mode is disabled for all calls — Qwen3's reasoning trace consumes
+    the token budget and returns empty content when thinking is left on.
+    Any leaked <think>...</think> blocks are stripped as a safety net.
     """
     client = get_client(base_url=base_url, api_key=api_key)
     mid = model or resolve_model(base_url=base_url)
@@ -31,5 +39,7 @@ def chat(
             {"role": "user", "content": user},
         ],
         temperature=temperature,
+        extra_body={"chat_template_kwargs": {"enable_thinking": False}},
     )
-    return (response.choices[0].message.content or "").strip()
+    raw = response.choices[0].message.content or ""
+    return _THINK_RE.sub("", raw).strip()
