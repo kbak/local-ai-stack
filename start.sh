@@ -17,7 +17,7 @@ llama-swap --config "$SCRIPT_DIR/llama-swap.yaml" >/dev/null 2>&1 &
 echo "Pre-loading default model (qwen) before Docker stack..."
 until curl -sf http://localhost:8080/v1/chat/completions \
     -H "Content-Type: application/json" \
-    -d '{"model":"qwen3.6-35B-A3B","messages":[{"role":"user","content":"hi"}],"max_tokens":1}' \
+    -d '{"model":"qwen3.6-35B-A3B-FP8","messages":[{"role":"user","content":"hi"}],"max_tokens":1}' \
     >/dev/null 2>&1; do
     sleep 2
 done
@@ -46,7 +46,7 @@ until MSYS_NO_PATHCONV=1 wsl.exe -d Ubuntu-24.04 -- docker logs audio-api 2>&1 |
     sleep 3
 done
 
-echo "Pre-loading qwen-coder-1.5B on 5060 Ti..."
+echo "Pre-loading qwen-coder-1.5B..."
 until curl -sf http://localhost:8080/v1/chat/completions \
     -H "Content-Type: application/json" \
     -d '{"model":"qwen-coder-1.5B","messages":[{"role":"user","content":"hi"}],"max_tokens":1}' \

@@ -5,34 +5,20 @@ listen: "0.0.0.0:8080"
 healthCheckTimeout: 900
 
 models:
-  qwen3.6-27B-Q6:
-    cmd: llama-server --port ${PORT} -hf unsloth/Qwen3.6-27B-GGUF --hf-file Qwen3.6-27B-Q6_K.gguf --device CUDA0 --split-mode none --n-gpu-layers 999 --parallel 1 --flash-attn on --batch-size 4096 --ubatch-size 1024 --ctx-size 100000 --no-mmap --cache-reuse 256
-    ttl: 0
-
-  qwen3.6-27B-Q5_K_XL:
-    cmd: llama-server --port ${PORT} -hf unsloth/Qwen3.6-27B-GGUF --hf-file Qwen3.6-27B-UD-Q5_K_XL.gguf --device CUDA0 --split-mode none --n-gpu-layers 999 --parallel 1 --flash-attn on --batch-size 4096 --ubatch-size 1024 --ctx-size 131072 --no-mmap --cache-reuse 256
-    ttl: 0
-
-  qwen3.6-27B-Q4_K_XL:
-    cmd: llama-server --port ${PORT} -hf unsloth/Qwen3.6-27B-GGUF --hf-file Qwen3.6-27B-UD-Q4_K_XL.gguf --device CUDA0 --split-mode none --n-gpu-layers 999 --parallel 1 --flash-attn on --batch-size 4096 --ubatch-size 2048 --ctx-size 65536 --no-mmap --cache-reuse 256
-    ttl: 0
-
   qwen3.6-27B-FP8:
     cmd: wsl.exe -d Ubuntu-24.04 -- bash /mnt/d/AI/Stack/vllm-launcher.sh ${PORT}
     proxy: http://127.0.0.1:${PORT}
     checkEndpoint: /v1/models
     ttl: 0
 
-  qwen3.6-35B-A3B:
-    cmd: llama-server --port ${PORT} -hf unsloth/Qwen3.6-35B-A3B-GGUF --hf-file Qwen3.6-35B-A3B-UD-Q5_K_S.gguf --device CUDA0 --split-mode none --n-gpu-layers 999 --parallel 1 --flash-attn on --batch-size 4096 --ubatch-size 1024 --ctx-size 170000 --no-mmap --cache-reuse 256
+  qwen3.6-35B-A3B-FP8:
+    cmd: wsl.exe -d Ubuntu-24.04 -- bash /mnt/d/AI/Stack/vllm-launcher-35b-a3b.sh ${PORT}
+    proxy: http://127.0.0.1:${PORT}
+    checkEndpoint: /v1/models
     ttl: 0
 
   qwen3.5-9B:
     cmd: llama-server --port ${PORT} -hf unsloth/Qwen3.5-9B-GGUF --hf-file Qwen3.5-9B-Q5_K_M.gguf --device CUDA0 --split-mode none --n-gpu-layers 999 --parallel 1 --flash-attn on --batch-size 2048 --ubatch-size 512 --ctx-size 4096 --no-mmap --cache-reuse 256
-    ttl: 0
-
-  gemma4-31B:
-    cmd: llama-server --port ${PORT} -hf ggml-org/gemma-4-31B-it-GGUF:Q4_K_M --device CUDA0 --split-mode none --n-gpu-layers 999 --parallel 1 --flash-attn on --cache-type-k q4_0 --cache-type-v q4_0 --batch-size 4096 --ubatch-size 4096 --ctx-size 262144
     ttl: 0
 
   # FIM autocomplete model, lives on the 5060 Ti so it doesn't contend with the
@@ -61,13 +47,9 @@ groups:
     swap: true
     exclusive: false
     members:
-      - "qwen3.6-27B-Q6"
-      - "qwen3.6-27B-Q5_K_XL"
-      - "qwen3.6-27B-Q4_K_XL"
       - "qwen3.6-27B-FP8"
-      - "qwen3.6-35B-A3B"
+      - "qwen3.6-35B-A3B-FP8"
       - "qwen3.5-9B"
-      - "gemma4-31B"
 
   "cuda1":
     swap: false
