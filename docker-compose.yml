@@ -77,7 +77,7 @@ services:
     networks:
       - ai-net
     extra_hosts:
-      - "host.docker.internal:host-gateway"
+      - "host.docker.internal:172.18.0.1"
     mem_limit: 512m
 
   mongodb:
@@ -115,7 +115,7 @@ services:
     networks:
       - ai-net
     extra_hosts:
-      - "host.docker.internal:host-gateway"
+      - "host.docker.internal:172.18.0.1"
     mem_limit: 768m
     entrypoint: ["/bin/sh", "-c", "node /app/librechat-render.js && exec node /app/api/server/index.js"]
 
@@ -168,7 +168,7 @@ services:
     networks:
       - ai-net
     extra_hosts:
-      - "host.docker.internal:host-gateway"
+      - "host.docker.internal:172.18.0.1"
     mem_limit: 1500m
 
   location-tracker:
@@ -185,7 +185,7 @@ services:
     networks:
       - ai-net
     extra_hosts:
-      - "host.docker.internal:host-gateway"
+      - "host.docker.internal:172.18.0.1"
     mem_limit: 512m
 
   pdf-inspector:
@@ -224,7 +224,7 @@ services:
     volumes:
       - ${IMAGE_DIR:?IMAGE_DIR must be set in .env}:/opt/swarmui/Models
       - image-gen-data:/opt/swarmui/Data
-      - image-gen-output:/opt/swarmui/Output
+      - ${IMAGE_OUTPUT_DIR:?IMAGE_OUTPUT_DIR must be set in .env}:/opt/swarmui/Output
       - image-gen-dlbackend:/opt/swarmui/dlbackend
     networks:
       - ai-net
@@ -250,7 +250,7 @@ services:
     networks:
       - ai-net
     extra_hosts:
-      - "host.docker.internal:host-gateway"
+      - "host.docker.internal:172.18.0.1"
     mem_limit: 64m
 
   calendar-watcher:
@@ -273,7 +273,7 @@ services:
     networks:
       - ai-net
     extra_hosts:
-      - "host.docker.internal:host-gateway"
+      - "host.docker.internal:172.18.0.1"
     mem_limit: 512m
 
   receipt-watcher:
@@ -297,7 +297,7 @@ services:
     networks:
       - ai-net
     extra_hosts:
-      - "host.docker.internal:host-gateway"
+      - "host.docker.internal:172.18.0.1"
     mem_limit: 512m
 
   tg-watcher:
@@ -318,7 +318,7 @@ services:
     networks:
       - ai-net
     extra_hosts:
-      - "host.docker.internal:host-gateway"
+      - "host.docker.internal:172.18.0.1"
     mem_limit: 512m
 
   oss-watcher:
@@ -338,7 +338,7 @@ services:
     networks:
       - ai-net
     extra_hosts:
-      - "host.docker.internal:host-gateway"
+      - "host.docker.internal:172.18.0.1"
     mem_limit: 256m
 
   rss-watcher:
@@ -357,7 +357,7 @@ services:
     networks:
       - ai-net
     extra_hosts:
-      - "host.docker.internal:host-gateway"
+      - "host.docker.internal:172.18.0.1"
     mem_limit: 256m
 
   qdrant:
@@ -395,7 +395,7 @@ services:
     networks:
       - ai-net
     extra_hosts:
-      - "host.docker.internal:host-gateway"
+      - "host.docker.internal:172.18.0.1"
     mem_limit: 3000m
 
 networks:
@@ -418,5 +418,4 @@ volumes:
   tg-watcher-data:
   audio-api-hf-cache:
   image-gen-data:
-  image-gen-output:
   image-gen-dlbackend:

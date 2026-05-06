@@ -27,7 +27,7 @@ def build() -> Agent:
 
     model = OpenAIModel(
         client_args={"base_url": env_base_url(), "api_key": env_api_key()},
-        model_id=resolve_model(),
+        model_id=resolve_model(startup_timeout=600.0),
         params={
             "temperature": config.LLM_TEMPERATURE,
             "max_tokens": config.LLM_MAX_TOKENS,

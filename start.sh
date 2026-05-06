@@ -2,7 +2,6 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-WSL_SCRIPT_DIR="$(echo "$SCRIPT_DIR" | sed 's|^/\([a-z]\)/|/mnt/\1/|')"
 
 # Export .env so llama-swap can resolve ${env.SECONDARY_GPU} in its config.
 # docker-compose reads .env on its own, but llama-swap is a host process and
@@ -12,9 +11,10 @@ set -a
 set +a
 
 echo "Starting llama-swap..."
-llama-swap --config "$SCRIPT_DIR/llama-swap.yaml" >/dev/null 2>&1 &
+nohup llama-swap --config "$SCRIPT_DIR/llama-swap.yaml" >/tmp/llama-swap.log 2>&1 &
+disown
 
-echo "Pre-loading default model (qwen) before Docker stack..."
+echo "Pre-loading 35B chat model (cuda0_main, persistent)..."
 until curl -sf http://localhost:8080/v1/chat/completions \
     -H "Content-Type: application/json" \
     -d '{"model":"qwen3.6-35B-A3B-FP8","messages":[{"role":"user","content":"hi"}],"max_tokens":1}' \
@@ -24,15 +24,16 @@ done
 
 echo "Starting yt-dlp service..."
 cd "$SCRIPT_DIR/yt-dlp-service"
-python server.py >/dev/null 2>&1 &
+nohup "$HOME/yt-dlp-service-venv/bin/python" server.py >/tmp/yt-dlp-service.log 2>&1 &
+disown
 cd "$SCRIPT_DIR"
 
 echo "Starting Docker services..."
-MSYS_NO_PATHCONV=1 wsl.exe -d Ubuntu-24.04 -- docker compose -f $WSL_SCRIPT_DIR/docker-compose.yml up -d
+docker compose -f "$SCRIPT_DIR/docker-compose.yml" up -d
 
 echo "Waiting for all containers to be up..."
-until MSYS_NO_PATHCONV=1 wsl.exe -d Ubuntu-24.04 -- docker compose -f $WSL_SCRIPT_DIR/docker-compose.yml ps --format json \
-    | python -c "
+until docker compose -f "$SCRIPT_DIR/docker-compose.yml" ps --format json \
+    | python3 -c "
 import sys, json
 states = [json.loads(l)['State'] for l in sys.stdin if l.strip()]
 all_up = all(s == 'running' for s in states)
@@ -42,11 +43,11 @@ sys.exit(0 if all_up else 1)
 done
 
 echo "Waiting for audio-api to load Whisper + Kokoro + Chatterbox..."
-until MSYS_NO_PATHCONV=1 wsl.exe -d Ubuntu-24.04 -- docker logs audio-api 2>&1 | grep -q "Chatterbox warmup complete"; do
+until docker logs audio-api 2>&1 | grep -q "Chatterbox warmup complete"; do
     sleep 3
 done
 
-echo "Pre-loading qwen-coder-1.5B..."
+echo "Pre-loading qwen-coder-1.5B (cuda1, persistent)..."
 until curl -sf http://localhost:8080/v1/chat/completions \
     -H "Content-Type: application/json" \
     -d '{"model":"qwen-coder-1.5B","messages":[{"role":"user","content":"hi"}],"max_tokens":1}' \

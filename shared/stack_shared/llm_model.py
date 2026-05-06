@@ -97,6 +97,7 @@ def resolve_model(
     override: str | None = None,
     coder_pattern: str | None = None,
     use_cache: bool = True,
+    startup_timeout: float = 0.0,
 ) -> str:
     """Return the model id to send chat requests to.
 
@@ -106,6 +107,12 @@ def resolve_model(
       3. Largest ready non-coder model from llama-swap `/running`.
       4. Largest non-coder model from llama-swap `/v1/models`.
       5. `LLM_MODEL_FALLBACK` env var.
+
+    `startup_timeout` enables retry-with-backoff against llama-swap when steps
+    3 and 4 both return None (e.g. llama-swap is mid-startup, vLLM cold-starting
+    a 35B model can take many minutes). Set this only at process startup; in
+    hot paths leave it at 0 so a transient outage doesn't stall a single
+    request for minutes.
 
     Raises RuntimeError if none of the above yield a model id.
     """
@@ -128,7 +135,22 @@ def resolve_model(
             if cached and time.monotonic() < expires_at:
                 return cached
 
-    picked = _from_running(base, pattern) or _from_models_list(base, pattern)
+    deadline = time.monotonic() + startup_timeout if startup_timeout > 0 else None
+    backoff = 1.0
+    picked: str | None = None
+    while True:
+        picked = _from_running(base, pattern) or _from_models_list(base, pattern)
+        if picked:
+            break
+        if deadline is None or time.monotonic() >= deadline:
+            break
+        log.info(
+            "llama-swap not yet ready at %s, retrying in %.1fs (deadline %.0fs away)",
+            base, backoff, deadline - time.monotonic(),
+        )
+        time.sleep(backoff)
+        backoff = min(backoff * 2.0, 15.0)
+
     if not picked:
         picked = os.environ.get("LLM_MODEL_FALLBACK")
     if not picked:

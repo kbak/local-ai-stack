@@ -68,7 +68,10 @@ def load() -> None:
     # so we resolve once here. If llama-swap has no model loaded, this falls
     # back to the largest non-coder in /v1/models (llama-swap will auto-load
     # it on first chat call).
-    _resolved_model = config.LLM_MODEL or resolve_model(base_url=config.LLM_BASE_URL)
+    _resolved_model = config.LLM_MODEL or resolve_model(
+        base_url=config.LLM_BASE_URL,
+        startup_timeout=600.0,
+    )
     logger.info("Initializing Mem0 (llm=%s via %s, embed=%s, qdrant=%s:%s)...",
                 _resolved_model, config.LLM_BASE_URL,
                 config.EMBED_MODEL, config.QDRANT_HOST, config.QDRANT_PORT)
