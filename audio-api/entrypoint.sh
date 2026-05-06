@@ -7,8 +7,9 @@ set -e
 # leaking ~650 KB per TTS request.
 (
   while sleep 3600; do
-    find /tmp -maxdepth 1 -name 'tmp*' -type d -mmin +60 -exec rm -rf {} + 2>/dev/null || true
-    find /tmp -maxdepth 1 -name 'tmp*.wav' -mmin +60 -delete 2>/dev/null || true
+    mkdir -p /tmp && chmod 1777 /tmp
+    find /tmp -mindepth 1 -maxdepth 1 -name 'tmp*' -type d -mmin +60 -exec rm -rf {} + 2>/dev/null || true
+    find /tmp -mindepth 1 -maxdepth 1 -name 'tmp*.wav' -mmin +60 -delete 2>/dev/null || true
   done
 ) &
 
