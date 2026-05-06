@@ -1,3 +1,5 @@
+name: stack
+
 services:
   searxng:
     image: searxng/searxng

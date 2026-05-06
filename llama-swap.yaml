@@ -6,13 +6,13 @@ healthCheckTimeout: 900
 
 models:
   qwen3.6-27B-FP8:
-    cmd: wsl.exe -d Ubuntu-24.04 -- bash /mnt/d/AI/Stack/vllm-launcher.sh ${PORT}
+    cmd: wsl.exe -d Ubuntu-24.04 -- bash /mnt/d/ai/local-ai-stack/vllm-launcher.sh ${PORT}
     proxy: http://127.0.0.1:${PORT}
     checkEndpoint: /v1/models
     ttl: 0
 
   qwen3.6-35B-A3B-FP8:
-    cmd: wsl.exe -d Ubuntu-24.04 -- bash /mnt/d/AI/Stack/vllm-launcher-35b-a3b.sh ${PORT}
+    cmd: wsl.exe -d Ubuntu-24.04 -- bash /mnt/d/ai/local-ai-stack/vllm-launcher-35b-a3b.sh ${PORT}
     proxy: http://127.0.0.1:${PORT}
     checkEndpoint: /v1/models
     ttl: 0

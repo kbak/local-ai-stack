@@ -36,7 +36,7 @@ For each account, create an app-specific password:
 - **iCloud**: https://appleid.apple.com → Sign-In & Security → App-Specific
   Passwords. Host: `imap.mail.me.com`, port 993.
 
-Put each password in `D:/ai/Stack/receipt-watcher.env` (copy from
+Put each password in `receipt-watcher.env` (copy from
 `receipt-watcher.env.example`) under the name referenced by the account's
 `password_env`, e.g. `WORK_IMAP_PASSWORD`.
 
@@ -46,7 +46,7 @@ Put each password in `D:/ai/Stack/receipt-watcher.env` (copy from
    project (or create one called `receipt-watcher`).
 2. Create Service Account → name `receipt-watcher`, skip role grants, done.
 3. Click the new account → Keys → Add Key → Create new key → JSON. Download.
-4. Save as `D:/ai/Stack/receipt-watcher/secrets/sheets-key.json`.
+4. Save as `receipt-watcher/secrets/sheets-key.json`.
 5. Enable the Sheets API for the project:
    https://console.cloud.google.com/apis/library/sheets.googleapis.com
 6. Open your expenses Google Sheet → Share → paste the service account's email
@@ -63,7 +63,7 @@ cp vendors.yaml.example  vendors.yaml       # fill in your real vendor list
 ### 4. Run
 
 ```
-MSYS_NO_PATHCONV=1 wsl.exe -d Ubuntu-24.04 -- docker compose -f /mnt/d/ai/Stack/docker-compose.yml up -d --build receipt-watcher
+MSYS_NO_PATHCONV=1 wsl.exe -d Ubuntu-24.04 -- docker compose -f /mnt/d/ai/local-ai-stack/docker-compose.yml up -d --build receipt-watcher
 wsl.exe -d Ubuntu-24.04 -- docker logs -f receipt-watcher
 ```
 

@@ -4,8 +4,7 @@ Replaces @modelcontextprotocol/server-github (26 tools, ~16KB of tool defs)
 with a single ~600B tool that can invoke any read operation gh supports:
 repo content, issues, PRs, discussions, releases, workflow runs, gists, search.
 
-Auth: reads GITHUB_TOKEN from env (set in /mnt/d/ai/Stack/.env, inherited via
-mcp-proxy's --pass-environment).
+Auth: reads GITHUB_TOKEN from env
 
 Safety: a subcommand allowlist rejects anything that could write. Since gh's
 verbs are structured (noun verb ...), a small allowlist catches write attempts
