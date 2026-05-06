@@ -42,6 +42,7 @@ RUN uvx google-maps-mcp-server==0.2.1 --help 2>/dev/null || true && \
     uvx --from mcp-weather-server==0.6.1 mcp_weather_server --help 2>/dev/null || true && \
     uvx frankfurtermcp==0.4.4 --help 2>/dev/null || true && \
     uvx yfinance-mcp-server==1.0.4 --help 2>/dev/null || true && \
-    uvx mcp-searxng==0.1.0 --help 2>/dev/null || true
+    uvx mcp-searxng==0.1.0 --help 2>/dev/null || true && \
+    rm -rf /root/.cache/uv/builds-v0 /root/.cache/uv/sdists-v* /root/.cache/uv/git-v0 2>/dev/null || true
 
 ENTRYPOINT ["mcp-proxy"]

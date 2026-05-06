@@ -64,7 +64,9 @@ RUN python -c "from chatterbox.tts import ChatterboxTTS; ChatterboxTTS.from_pret
     echo "Chatterbox weight prefetch failed — first container start will download instead"
 
 COPY audio-api/app /app/app
+COPY audio-api/entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
 
 EXPOSE 8088
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8088"]
+CMD ["/app/entrypoint.sh"]

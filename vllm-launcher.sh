@@ -27,8 +27,8 @@ exec vllm serve Qwen/Qwen3.6-27B-FP8 \
   --port "$PORT" \
   --host 0.0.0.0 \
   --max-model-len 131072 \
-  --max-num-seqs 1 \
-  --gpu-memory-utilization 0.92 \
+  --max-num-seqs 2 \
+  --gpu-memory-utilization 0.40 \
   --reasoning-parser qwen3 \
   --enable-auto-tool-choice \
   --tool-call-parser qwen3_xml \

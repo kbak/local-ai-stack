@@ -7,7 +7,12 @@ RUN apt-get update && \
 WORKDIR /app
 
 COPY memory-mcp/requirements.txt /app/requirements.txt
-RUN pip install --no-cache-dir -r /app/requirements.txt
+# Install CPU-only torch first so sentence-transformers picks it up as
+# already-satisfied instead of pulling the cu* wheels (~4.5 GB of unused
+# CUDA libs). bge-m3 runs on CPU here — this container has no GPU access.
+RUN pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu \
+        torch torchvision && \
+    pip install --no-cache-dir -r /app/requirements.txt
 
 # Install stack_shared editable so a compose bind-mount of ./shared:/shared:ro
 # picks up source changes without rebuilding. --no-deps because memory-mcp
