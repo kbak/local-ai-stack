@@ -51,7 +51,7 @@ All tools are exposed via mcp-proxy on port 8083 (no authentication required —
 ## Requirements
 
 - Docker with Docker Compose
-- [vLLM](https://github.com/vllm-project/vllm) installed in a Python venv at `~/vllm-runtime/.venv` (the launcher scripts `vllm-launcher*.sh` activate it). FP8 weights need a Hopper/Blackwell GPU (H100, RTX 6000 Ada/Pro 6000, RTX 5090, etc.).
+- [vLLM](https://github.com/vllm-project/vllm) installed in a Python venv at `~/vllm-runtime/.venv` (the launcher scripts `serve-qwen-*.sh` activate it). FP8 weights need a Hopper/Blackwell GPU (H100, RTX 6000 Ada/Pro 6000, RTX 5090, etc.).
 - [llama-swap](https://github.com/mostlygeek/llama-swap) binary in PATH
 
 ## Setup
@@ -81,13 +81,13 @@ Edit `.env` and set:
 
 **3. Configure models in `llama-swap.yaml`**
 
-Each model entry shells out to a `vllm-launcher*.sh` script that activates `~/vllm-runtime/.venv` and runs `vllm serve`. Edit the launcher scripts to change vLLM args; edit `llama-swap.yaml` to add/remove models or change the group layout. The default config ships:
+Each model entry shells out to a `serve-qwen-*.sh` script that activates `~/vllm-runtime/.venv` and runs `vllm serve`. Edit the launcher scripts to change vLLM args; edit `llama-swap.yaml` to add/remove models or change the group layout. The default config ships:
 
 - **Primary GPU (`cuda0_main` group, persistent):** `qwen3.6-35B-A3B-FP8` (MoE, 3B active) — always loaded.
 - **Primary GPU (`cuda0_ondemand` group):** `qwen3.6-27B-FP8` dense — loads on first request, stays resident. Coexists on the same card with the 35B because both run with modest `--gpu-memory-utilization` (0.45–0.50).
 - **Secondary GPU (`cuda1` group, persistent):** `qwen-coder-1.5B` (Qwen2.5-Coder-1.5B-Instruct, FP16) for FIM tab-complete — always loaded so tab-complete never pays a cold-start cost. Coexists on the same card with audio-api (Whisper + Kokoro + Chatterbox).
 
-The chat launchers (`vllm-launcher.sh`, `vllm-launcher-35b-a3b.sh`) use:
+The chat launchers (`serve-qwen-27b.sh`, `serve-qwen-35b-a3b.sh`) use:
 - `--max-model-len 131072` (27B) / `262144` (35B) — full FP16 KV cache
 - `--max-num-seqs 2` — single-user, low concurrency
 - `--gpu-memory-utilization 0.45`–`0.50` — leaves headroom for the second model on the same GPU

@@ -6,13 +6,13 @@ healthCheckTimeout: 900
 
 models:
   qwen3.6-27B-FP8:
-    cmd: bash /mnt/d/ai/local-ai-stack/vllm-launcher.sh ${PORT}
+    cmd: bash /mnt/d/ai/local-ai-stack/serve-qwen-27b.sh ${PORT}
     proxy: http://127.0.0.2:${PORT}
     checkEndpoint: /v1/models
     ttl: 0
 
   qwen3.6-35B-A3B-FP8:
-    cmd: bash /mnt/d/ai/local-ai-stack/vllm-launcher-35b-a3b.sh ${PORT}
+    cmd: bash /mnt/d/ai/local-ai-stack/serve-qwen-35b-a3b.sh ${PORT}
     proxy: http://127.0.0.2:${PORT}
     checkEndpoint: /v1/models
     ttl: 0
@@ -27,7 +27,7 @@ models:
   qwen-coder-1.5B:
     env:
       - "CUDA_VISIBLE_DEVICES=${env.SECONDARY_GPU}"
-    cmd: bash /mnt/d/ai/local-ai-stack/vllm-launcher-coder.sh ${PORT}
+    cmd: bash /mnt/d/ai/local-ai-stack/serve-qwen-coder.sh ${PORT}
     proxy: http://127.0.0.2:${PORT}
     checkEndpoint: /v1/models
     ttl: 0
