@@ -51,6 +51,9 @@ ENV SWARMUI_TORCH_INDEX=https://download.pytorch.org/whl/cu128
 
 EXPOSE 7801
 
-# launch-linux.sh forwards args to the dotnet binary. --host 0.0.0.0 lets the
-# container expose the UI; --launch_mode none suppresses the browser open.
-CMD ["bash", "launch-linux.sh", "--host", "0.0.0.0", "--port", "7801", "--launch_mode", "none"]
+COPY image-gen/entrypoint.sh /opt/swarmui/entrypoint.sh
+COPY image-gen/Backends.fds /opt/swarmui/Data/Backends.fds
+RUN chmod +x /opt/swarmui/entrypoint.sh
+
+ENTRYPOINT ["/opt/swarmui/entrypoint.sh"]
+CMD ["--host", "0.0.0.0", "--port", "7801", "--launch_mode", "none"]
