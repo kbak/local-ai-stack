@@ -63,8 +63,8 @@ cp vendors.yaml.example  vendors.yaml       # fill in your real vendor list
 ### 4. Run
 
 ```
-MSYS_NO_PATHCONV=1 wsl.exe -d Ubuntu-24.04 -- docker compose -f /mnt/d/ai/local-ai-stack/docker-compose.yml up -d --build receipt-watcher
-wsl.exe -d Ubuntu-24.04 -- docker logs -f receipt-watcher
+docker compose up -d --build receipt-watcher
+docker logs -f receipt-watcher
 ```
 
 Start with `DRY_RUN=true` in `receipt-watcher.env`. Watch logs for a few days;
@@ -82,5 +82,5 @@ container.
 - `/data/receipts.jsonl` (in the container volume) — audit log, one line per
   processed email. Inspect with:
   ```
-  wsl.exe -d Ubuntu-24.04 -- docker exec receipt-watcher tail -f /data/receipts.jsonl
+  docker exec receipt-watcher tail -f /data/receipts.jsonl
   ```

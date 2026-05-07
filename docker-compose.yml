@@ -72,8 +72,10 @@ services:
       - ./voice-agent/static:/app/static:ro
       - ./shared:/shared:ro
     depends_on:
-      - audio-api
-      - mcp-proxy
+      audio-api:
+        condition: service_started
+      mcp-proxy:
+        condition: service_healthy
     networks:
       - ai-net
     extra_hosts:
@@ -266,10 +268,14 @@ services:
       - calendar-watcher-data:/data
       - ./shared:/shared:ro
     depends_on:
-      - location-tracker
-      - mcp-proxy
-      - signal-api
-      - searxng
+      location-tracker:
+        condition: service_started
+      mcp-proxy:
+        condition: service_healthy
+      signal-api:
+        condition: service_started
+      searxng:
+        condition: service_started
     networks:
       - ai-net
     extra_hosts:

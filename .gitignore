@@ -6,9 +6,6 @@ __pycache__/
 *.pyc
 *.pyo
 
-# No longer used — searxng runs via mcp-proxy
-searxng-mcp/
-
 signal-bot.env
 .claude/
 

@@ -6,7 +6,7 @@ Self-hosted LLM stack with privacy-focused web search and research tools. Runs o
 
 | Service | Port | Description |
 |---|---|---|
-| llama-swap | 8080 | Model manager — switches between llama-server instances on demand |
+| llama-swap | 8080 | Model manager — switches between vLLM instances on demand |
 | SearXNG | 8081 | Privacy-focused meta search engine |
 | mcp-proxy | 8083 | MCP tool server (11 tools via streamable HTTP, no auth required) |
 | location-tracker | 8084 | City-presence timeline service; exposes `get_location_at` MCP tool (bearer token required) |
@@ -51,7 +51,7 @@ All tools are exposed via mcp-proxy on port 8083 (no authentication required —
 ## Requirements
 
 - Docker with Docker Compose
-- [llama.cpp](https://github.com/ggml-org/llama.cpp) with `llama-server` in PATH
+- [vLLM](https://github.com/vllm-project/vllm) installed in a Python venv at `~/vllm-runtime/.venv` (the launcher scripts `vllm-launcher*.sh` activate it). FP8 weights need a Hopper/Blackwell GPU (H100, RTX 6000 Ada/Pro 6000, RTX 5090, etc.).
 - [llama-swap](https://github.com/mostlygeek/llama-swap) binary in PATH
 
 ## Setup
@@ -81,19 +81,20 @@ Edit `.env` and set:
 
 **3. Configure models in `llama-swap.yaml`**
 
-Edit `llama-swap.yaml` to set your models and their llama-server arguments. The default config ships:
+Each model entry shells out to a `vllm-launcher*.sh` script that activates `~/vllm-runtime/.venv` and runs `vllm serve`. Edit the launcher scripts to change vLLM args; edit `llama-swap.yaml` to add/remove models or change the group layout. The default config ships:
 
-- **Primary GPU (`main` group, swappable):** Qwen 3.6 27B at Q5 and Q6, Qwen 3.6 35B-A3B, Gemma 4 31B. One at a time.
-- **Secondary GPU (`cuda1` group, persistent):** `qwen-coder-1.5B` for FIM tab-complete — always loaded so tab-complete never pays a cold-start cost. Coexists on the same card with audio-api (Whisper + Kokoro + Chatterbox).
+- **Primary GPU (`cuda0_main` group, persistent):** `qwen3.6-35B-A3B-FP8` (MoE, 3B active) — always loaded.
+- **Primary GPU (`cuda0_ondemand` group):** `qwen3.6-27B-FP8` dense — loads on first request, stays resident. Coexists on the same card with the 35B because both run with modest `--gpu-memory-utilization` (0.45–0.50).
+- **Secondary GPU (`cuda1` group, persistent):** `qwen-coder-1.5B` (Qwen2.5-Coder-1.5B-Instruct, FP16) for FIM tab-complete — always loaded so tab-complete never pays a cold-start cost. Coexists on the same card with audio-api (Whisper + Kokoro + Chatterbox).
 
-The chat entries use:
-- `--n-gpu-layers 999` — full GPU offload
-- `--flash-attn on` — flash attention
-- `--batch-size 4096 --ubatch-size 1024` — large batches for fast prompt processing on long contexts
-- `--device CUDA0 --split-mode none` — pin to the primary GPU (change the index if your single-GPU host has only one card)
-- `--ctx-size` — 100k–262k depending on model
+The chat launchers (`vllm-launcher.sh`, `vllm-launcher-35b-a3b.sh`) use:
+- `--max-model-len 131072` (27B) / `262144` (35B) — full FP16 KV cache
+- `--max-num-seqs 2` — single-user, low concurrency
+- `--gpu-memory-utilization 0.45`–`0.50` — leaves headroom for the second model on the same GPU
+- `--reasoning-parser qwen3 --enable-auto-tool-choice --tool-call-parser qwen3_xml` — proper tool-call handling for LibreChat
+- Stock FP8 weights (`Qwen/Qwen3.6-27B-FP8`, `Qwen/Qwen3.6-35B-A3B-FP8`) — `--structured-outputs-config.backend=auto` defaults to xgrammar on FP8, which keeps tool-call JSON well-formed (community AWQ/NVFP4 quants of these models exhibit a tool-call collapse pathology, which is why we stick with stock FP8)
 
-The coder model pins itself to the secondary GPU via `CUDA_VISIBLE_DEVICES=${env.SECONDARY_GPU}` — `--device CUDA0` inside the subprocess then resolves to whichever physical card you set. See the `groups:` block at the bottom of the file for the full layout.
+The coder model pins itself to the secondary GPU via `CUDA_VISIBLE_DEVICES=${env.SECONDARY_GPU}`. The launcher resolves UUIDs to numeric indices (vLLM 0.20.1 chokes on UUIDs in `CUDA_VISIBLE_DEVICES`).
 
 **4. Start the Docker stack**
 ```
@@ -107,7 +108,7 @@ First startup takes a few minutes — mcp-proxy builds a custom image that pre-i
 llama-swap --config llama-swap.yaml
 ```
 
-llama-swap listens on port 8080 and launches llama-server on demand when a model is requested. Inside a group, requesting a different model swaps out the current one. Models in separate `persistent: true` groups stay resident alongside each other — used here to keep the autocomplete coder model on the secondary GPU loaded concurrently with whatever chat model is running on the primary GPU.
+llama-swap listens on port 8080 and launches a `vllm serve` subprocess on demand when a model is requested. Inside a group, requesting a different model swaps out the current one (`swap: true`). Models in separate `persistent: true` groups stay resident alongside each other — used here to keep the 35B-A3B chat model on the primary GPU and the autocomplete coder model on the secondary GPU loaded concurrently. Cold start of a vLLM model can take 5–10 minutes (compile cache miss); `healthCheckTimeout: 900` accommodates this.
 
 **6. Open LibreChat**
 
@@ -124,10 +125,10 @@ http://localhost:8080/ui
 
 Two GPUs are partitioned across services via `CUDA_VISIBLE_DEVICES` (set at the container level for audio-api and per-model in llama-swap via `${env.SECONDARY_GPU}`):
 
-- **Primary GPU:** llama-swap chat/agent models (Qwen, Gemma). One at a time within the `main` group.
+- **Primary GPU:** llama-swap chat/agent models. The 35B-A3B is always-loaded (`cuda0_main`, persistent); the 27B dense model is on-demand but sticky (`cuda0_ondemand`, no swap target). Both coexist via modest `--gpu-memory-utilization` settings.
 - **Secondary GPU (`SECONDARY_GPU`):** audio-api (Whisper + Kokoro + Chatterbox) and the autocomplete coder model `qwen-coder-1.5B`, all resident together.
 
-The `groups` block in `llama-swap.yaml` keeps the coder model in its own `persistent: true` group so chat-model swaps on the primary GPU never evict it — tab-complete never pays a cold-start cost.
+The `groups` block in `llama-swap.yaml` keeps the coder model in its own `persistent: true` group so loads/unloads on the primary GPU never evict it — tab-complete never pays a cold-start cost.
 
 Single-GPU hosts work fine: leave `SECONDARY_GPU=0` and everything coexists on one card (mind the VRAM budget).
 
@@ -143,7 +144,7 @@ schema: v1
 models:
   - name: Qwen 3.6 27B
     provider: openai
-    model: qwen3.6-27B-Q5_K_XL
+    model: qwen3.6-27B-FP8
     apiBase: http://127.0.0.1:8080/v1
     apiKey: dummy
     roles: [chat, edit, apply]
@@ -167,9 +168,9 @@ The model `id`s must match the llama-swap.yaml entries exactly. `qwen-coder-1.5B
 
 MCP servers can also be wired into Continue via per-server YAMLs in `.continue/mcpServers/` (committed in this repo: `github.yaml`, `searxng.yaml`, `time.yaml`).
 
-## Connecting MCP tools from llama.cpp web UI
+## Connecting MCP tools from external clients
 
-The llama.cpp built-in web UI also supports MCP directly. Add individual servers:
+mcp-proxy exposes each MCP server at its own streamable-http endpoint. Wire them into any MCP client (Continue.dev, Claude Desktop, etc.) by URL:
 
 ```
 http://<server-ip>:8083/servers/searxng/mcp

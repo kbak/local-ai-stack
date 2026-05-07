@@ -10,10 +10,6 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-WSL_SCRIPT_DIR="$(echo "$SCRIPT_DIR" | sed 's|^/\([a-z]\)/|/mnt/\1/|')"
-
-DOCKER="wsl.exe -d Ubuntu-24.04 -- docker"
-COMPOSE_FILE="$WSL_SCRIPT_DIR/docker-compose.yml"
 
 echo "Rebuilding + starting image-gen + image-gen-ui in foreground (Ctrl+C to stop)..."
 echo "UI: http://localhost:7802 (engine API: http://localhost:7801)"
@@ -22,4 +18,4 @@ echo
 # --build rebuilds only if Dockerfiles or build context changed (layer cache
 # makes no-op rebuilds ~1s). Naming services explicitly so other always-on
 # services aren't restarted.
-MSYS_NO_PATHCONV=1 $DOCKER compose -f "$COMPOSE_FILE" up --build image-gen image-gen-ui
+docker compose -f "$SCRIPT_DIR/docker-compose.yml" up --build image-gen image-gen-ui

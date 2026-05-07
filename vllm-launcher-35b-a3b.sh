@@ -1,7 +1,7 @@
 #!/bin/bash
 # Launcher for vLLM (Qwen3.6-35B-A3B-FP8), called by llama-swap.
 # llama-swap allocates a port and passes it as $1.
-# Lives on the host filesystem; copied/run from WSL via wsl.exe.
+# Activates the vLLM venv at ~/vllm-runtime/.venv and execs `vllm serve`.
 set -e
 
 PORT="${1:?port arg required}"
