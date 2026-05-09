@@ -14,6 +14,14 @@ echo "Starting llama-swap..."
 nohup llama-swap --config "$SCRIPT_DIR/llama-swap.yaml" >/tmp/llama-swap.log 2>&1 &
 disown
 
+echo "Pre-loading qwen-coder-7B (cuda0_coder, persistent)..."
+until curl -sf http://localhost:8080/v1/chat/completions \
+    -H "Content-Type: application/json" \
+    -d '{"model":"qwen-coder-7B","messages":[{"role":"user","content":"hi"}],"max_tokens":1}' \
+    >/dev/null 2>&1; do
+    sleep 2
+done
+
 echo "Pre-loading 35B chat model (cuda0_main, persistent)..."
 until curl -sf http://localhost:8080/v1/chat/completions \
     -H "Content-Type: application/json" \
@@ -45,14 +53,6 @@ done
 echo "Waiting for audio-api to load Whisper + Kokoro + Chatterbox..."
 until docker logs audio-api 2>&1 | grep -q "Chatterbox warmup complete"; do
     sleep 3
-done
-
-echo "Pre-loading qwen-coder-1.5B (cuda1, persistent)..."
-until curl -sf http://localhost:8080/v1/chat/completions \
-    -H "Content-Type: application/json" \
-    -d '{"model":"qwen-coder-1.5B","messages":[{"role":"user","content":"hi"}],"max_tokens":1}' \
-    >/dev/null 2>&1; do
-    sleep 2
 done
 
 echo "Waiting for voice-agent..."

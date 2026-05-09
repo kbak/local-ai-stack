@@ -24,10 +24,8 @@ models:
   #
   # CUDA_VISIBLE_DEVICES hides the primary GPU from this subprocess entirely;
   # with only the 5060 Ti visible vLLM uses it as cuda:0.
-  qwen-coder-1.5B:
-    env:
-      - "CUDA_VISIBLE_DEVICES=${env.SECONDARY_GPU}"
-    cmd: bash /mnt/d/ai/local-ai-stack/serve-qwen-coder.sh ${PORT}
+  qwen-coder-7B:
+    cmd: bash /mnt/d/ai/local-ai-stack/serve-qwen-coder-7b.sh ${PORT}
     proxy: http://127.0.0.2:${PORT}
     checkEndpoint: /v1/models
     ttl: 0
@@ -51,9 +49,9 @@ groups:
     members:
       - "qwen3.6-27B-FP8"
 
-  "cuda1":
+  "cuda0_coder":
     swap: false
     exclusive: false
     persistent: true
     members:
-      - "qwen-coder-1.5B"
+      - "qwen-coder-7B"
