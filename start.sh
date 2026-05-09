@@ -10,8 +10,9 @@ set -a
 . "$SCRIPT_DIR/.env"
 set +a
 
+cd "$SCRIPT_DIR"
 echo "Starting llama-swap..."
-nohup llama-swap --config "$SCRIPT_DIR/llama-swap.yaml" >/tmp/llama-swap.log 2>&1 &
+nohup llama-swap --config llama-swap.yaml >/tmp/llama-swap.log 2>&1 &
 disown
 
 echo "Pre-loading qwen-coder-7B (cuda0_coder, persistent)..."

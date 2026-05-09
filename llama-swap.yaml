@@ -6,13 +6,13 @@ healthCheckTimeout: 900
 
 models:
   qwen3.6-27B-FP8:
-    cmd: bash /mnt/d/ai/local-ai-stack/serve-qwen-27b.sh ${PORT}
+    cmd: bash ./serve-qwen-27b.sh ${PORT}
     proxy: http://127.0.0.2:${PORT}
     checkEndpoint: /v1/models
     ttl: 0
 
   qwen3.6-35B-A3B-FP8:
-    cmd: bash /mnt/d/ai/local-ai-stack/serve-qwen-35b-a3b.sh ${PORT}
+    cmd: bash ./serve-qwen-35b-a3b.sh ${PORT}
     proxy: http://127.0.0.2:${PORT}
     checkEndpoint: /v1/models
     ttl: 0
@@ -25,7 +25,7 @@ models:
   # CUDA_VISIBLE_DEVICES hides the primary GPU from this subprocess entirely;
   # with only the 5060 Ti visible vLLM uses it as cuda:0.
   qwen-coder-7B:
-    cmd: bash /mnt/d/ai/local-ai-stack/serve-qwen-coder-7b.sh ${PORT}
+    cmd: bash ./serve-qwen-coder-7b.sh ${PORT}
     proxy: http://127.0.0.2:${PORT}
     checkEndpoint: /v1/models
     ttl: 0
