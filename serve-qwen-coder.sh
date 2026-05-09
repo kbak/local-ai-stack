@@ -40,5 +40,5 @@ exec vllm serve Qwen/Qwen2.5-Coder-1.5B-Instruct \
   --host 0.0.0.0 \
   --max-model-len 8192 \
   --max-num-seqs 1 \
-  --gpu-memory-utilization 0.40 \
+  --gpu-memory-utilization 0.25 \
   --dtype float16

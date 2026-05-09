@@ -109,7 +109,7 @@ def _process(
     sheets_client: SheetsClient | None,
     acct_state: state_mod.AccountState,
 ) -> None:
-    vendor_name = vendor.key.title()
+    vendor_name = vendor.name
     subject = hdrs.subject
 
     if not receipt.is_receipt:

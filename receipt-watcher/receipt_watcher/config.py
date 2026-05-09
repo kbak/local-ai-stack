@@ -58,6 +58,11 @@ class Vendor:
     category: str
     currency_hint: str | None
     via: list[ViaRule]
+    display_name: str | None = None
+
+    @property
+    def name(self) -> str:
+        return self.display_name or self.key.title()
 
 
 def load_accounts() -> list[Account]:
@@ -99,6 +104,7 @@ def load_vendors() -> list[Vendor]:
                 category=raw.get("category", ""),
                 currency_hint=raw.get("currency_hint"),
                 via=via_rules,
+                display_name=raw.get("display_name"),
             )
         )
     return out

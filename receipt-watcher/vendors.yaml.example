@@ -4,9 +4,16 @@
 # or subdomain of a listed domain).
 #
 # Copy to vendors.yaml (gitignored) and fill in your real vendor list.
+#
+# `display_name` is optional. It's the exact string written to the Vendor
+# column in the spreadsheet AND used to look up prior payment-method rows.
+# It must match the casing/spacing of existing rows in your sheet exactly,
+# otherwise the lookup will miss and the receipt will be flagged for review.
+# Falls back to key.title() (e.g. "usmobile" → "Usmobile") if omitted.
 
 vendors:
   example-vendor:
+    display_name: "Example Vendor"
     domains:
       - example.com
     category: "Software subscription"
