@@ -17,3 +17,6 @@ receipt-watcher.env
 
 # YouTube cookies — contains session tokens, never commit
 yt-dlp-service/youtube_cookies.txt
+
+# Google service account keys and OAuth tokens — never commit
+receipt-watcher/secrets/*.json

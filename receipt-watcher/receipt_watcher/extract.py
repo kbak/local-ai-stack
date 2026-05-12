@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import json
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
+from datetime import datetime
 
 from bs4 import BeautifulSoup
 from stack_shared.llm_chat import chat
@@ -80,6 +81,37 @@ class Receipt:
     raw: dict = field(default_factory=dict)
 
 
+_VALID_CONFIDENCE = {"high", "medium", "low"}
+_VALID_PERIOD = {"pay-as-you-go", "monthly", "one-time", ""}
+
+
+def _sanitize(r: Receipt, subject: str) -> Receipt:
+    """Clamp LLM output fields to known-good values; downgrade confidence on anomalies."""
+    overrides: dict = {}
+
+    if r.confidence not in _VALID_CONFIDENCE:
+        log.warning("Unexpected confidence %r for %r — forcing low", r.confidence, subject)
+        overrides["confidence"] = "low"
+
+    if r.period not in _VALID_PERIOD:
+        log.warning("Unexpected period %r for %r — clearing", r.period, subject)
+        overrides["period"] = ""
+
+    if r.amount is not None and r.amount < 0:
+        log.warning("Negative amount %s for %r — forcing low confidence", r.amount, subject)
+        overrides["confidence"] = "low"
+
+    if r.date:
+        try:
+            datetime.strptime(r.date, "%Y-%m-%d")
+        except ValueError:
+            log.warning("Unparseable date %r for %r — clearing, forcing low", r.date, subject)
+            overrides["date"] = ""
+            overrides["confidence"] = "low"
+
+    return replace(r, **overrides) if overrides else r
+
+
 def _html_to_text(html: str) -> str:
     if not html:
         return ""
@@ -150,7 +182,7 @@ def extract(msg: Message, vendor: Vendor) -> Receipt:
     except (TypeError, ValueError):
         amount = None
 
-    return Receipt(
+    receipt = Receipt(
         is_receipt=bool(data.get("is_receipt")),
         confidence=str(data.get("confidence", "low")).lower(),
         amount=amount,
@@ -160,3 +192,4 @@ def extract(msg: Message, vendor: Vendor) -> Receipt:
         payment_method_from_email=str(data.get("payment_method") or ""),
         raw=data,
     )
+    return _sanitize(receipt, msg.headers.subject)

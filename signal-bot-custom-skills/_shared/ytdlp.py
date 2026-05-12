@@ -15,11 +15,17 @@ def download_audio(query_or_url: str, dest_path: str, timeout: int = 180) -> tup
     by yt-dlp (either may be empty).
     """
     service_url = os.getenv("YTDLP_SERVICE_URL", "http://host.docker.internal:8200")
+    token = os.getenv("YTDLP_SERVICE_TOKEN", "")
     logger.info("Calling yt-dlp service at %s for: %s", service_url, query_or_url)
+
+    headers = {}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
 
     resp = httpx.post(
         f"{service_url}/download",
         json={"query": query_or_url},
+        headers=headers,
         timeout=timeout,
     )
     if resp.status_code != 200:

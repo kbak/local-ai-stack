@@ -77,7 +77,7 @@ Edit `.env` and set:
 - `MEMORY_DIR` — absolute host path for memory storage (`USER.md`, `MEMORY.md`, Qdrant volume). Keep outside the repo.
 - `VOICE_SAMPLES_DIR` — absolute host path containing `.wav` reference samples for Chatterbox voice cloning. Mounted read-only into audio-api and read-write into signal-bot (so `/sample` can write new samples) at `/app/voice-samples` in both. **Required** — no default.
 - `MUSIC_HOST_DIR` — absolute host path to your music library, mounted read-write into signal-bot at `/music`. **Required** — no default.
-- `SECONDARY_GPU` — index or UUID of the secondary GPU. Hosts audio-api and the always-resident `qwen-coder-1.5B` autocomplete model. Defaults to `0` for single-GPU hosts.
+- `SECONDARY_GPU` — index or UUID of the secondary GPU. Hosts audio-api (Whisper + Kokoro + Chatterbox). Defaults to `0` for single-GPU hosts.
 
 **3. Configure models in `llama-swap.yaml`**
 
@@ -85,16 +85,18 @@ Each model entry shells out to a `serve-qwen-*.sh` script that activates `~/vllm
 
 - **Primary GPU (`cuda0_main` group, persistent):** `qwen3.6-35B-A3B-FP8` (MoE, 3B active) — always loaded.
 - **Primary GPU (`cuda0_ondemand` group):** `qwen3.6-27B-FP8` dense — loads on first request, stays resident. Coexists on the same card with the 35B because both run with modest `--gpu-memory-utilization` (0.45–0.50).
-- **Secondary GPU (`cuda1` group, persistent):** `qwen-coder-1.5B` (Qwen2.5-Coder-1.5B-Instruct, FP16) for FIM tab-complete — always loaded so tab-complete never pays a cold-start cost. Coexists on the same card with audio-api (Whisper + Kokoro + Chatterbox).
+- **Primary GPU (`cuda0_coder` group, persistent):** `qwen-coder-7B` (Qwen2.5-Coder-7B-Instruct, bfloat16) for FIM tab-complete — always loaded so tab-complete never pays a cold-start cost. Runs at `--gpu-memory-utilization 0.17`, leaving enough headroom to coexist with the chat models on the same GPU.
 
 The chat launchers (`serve-qwen-27b.sh`, `serve-qwen-35b-a3b.sh`) use:
 - `--max-model-len 131072` (27B) / `262144` (35B) — full FP16 KV cache
 - `--max-num-seqs 2` — single-user, low concurrency
-- `--gpu-memory-utilization 0.45`–`0.50` — leaves headroom for the second model on the same GPU
+- `--gpu-memory-utilization 0.45`–`0.50` — leaves headroom for the coder model on the same GPU
 - `--reasoning-parser qwen3 --enable-auto-tool-choice --tool-call-parser qwen3_xml` — proper tool-call handling for LibreChat
-- Stock FP8 weights (`Qwen/Qwen3.6-27B-FP8`, `Qwen/Qwen3.6-35B-A3B-FP8`) — `--structured-outputs-config.backend=auto` defaults to xgrammar on FP8, which keeps tool-call JSON well-formed (community AWQ/NVFP4 quants of these models exhibit a tool-call collapse pathology, which is why we stick with stock FP8)
+- `--override-generation-config '{"repetition_penalty":1.05,"presence_penalty":0.3}'` — prevents the synonym/word-list collapse seen under repetitive prompts
+- `--chat-template "$HOME/vllm-runtime/qwen3.6-librechat.jinja"` — custom Jinja template for LibreChat tool-call formatting
+- Stock FP8 weights (`Qwen/Qwen3.6-27B-FP8`, `Qwen/Qwen3.6-35B-A3B-FP8`) — keeps tool-call JSON well-formed (community AWQ/NVFP4 quants exhibit a tool-call collapse pathology, which is why we stick with stock FP8)
 
-The coder model pins itself to the secondary GPU via `CUDA_VISIBLE_DEVICES=${env.SECONDARY_GPU}`. The launcher resolves UUIDs to numeric indices (vLLM 0.20.1 chokes on UUIDs in `CUDA_VISIBLE_DEVICES`).
+The coder model (`qwen-coder-7B`) pins itself to the primary GPU via `CUDA_VISIBLE_DEVICES=0` in its launcher script and runs with `--gpu-memory-utilization 0.17` so it coexists with the chat models.
 
 **4. Start the Docker stack**
 ```
@@ -126,9 +128,9 @@ http://localhost:8080/ui
 Two GPUs are partitioned across services via `CUDA_VISIBLE_DEVICES` (set at the container level for audio-api and per-model in llama-swap via `${env.SECONDARY_GPU}`):
 
 - **Primary GPU:** llama-swap chat/agent models. The 35B-A3B is always-loaded (`cuda0_main`, persistent); the 27B dense model is on-demand but sticky (`cuda0_ondemand`, no swap target). Both coexist via modest `--gpu-memory-utilization` settings.
-- **Secondary GPU (`SECONDARY_GPU`):** audio-api (Whisper + Kokoro + Chatterbox) and the autocomplete coder model `qwen-coder-1.5B`, all resident together.
+- **Secondary GPU (`SECONDARY_GPU`):** audio-api (Whisper + Kokoro + Chatterbox) — resident alongside the primary GPU's workloads.
 
-The `groups` block in `llama-swap.yaml` keeps the coder model in its own `persistent: true` group so loads/unloads on the primary GPU never evict it — tab-complete never pays a cold-start cost.
+The `groups` block in `llama-swap.yaml` keeps the coder model in its own `cuda0_coder` `persistent: true` group so loads/unloads of the on-demand 27B model never evict it — tab-complete never pays a cold-start cost.
 
 Single-GPU hosts work fine: leave `SECONDARY_GPU=0` and everything coexists on one card (mind the VRAM budget).
 
@@ -149,9 +151,9 @@ models:
     apiKey: dummy
     roles: [chat, edit, apply]
 
-  - name: Qwen Coder 1.5B
+  - name: Qwen Coder 7B
     provider: openai
-    model: qwen-coder-1.5B
+    model: qwen-coder-7B
     apiBase: http://127.0.0.1:8080/v1
     apiKey: dummy
     roles: [autocomplete]
@@ -164,7 +166,7 @@ tabAutocompleteOptions:
   useCache: true
 ```
 
-The model `id`s must match the llama-swap.yaml entries exactly. `qwen-coder-1.5B` runs on the secondary GPU at ~150 t/s (≈200–400 ms tab-complete latency); chat/edit/agent use Qwen 3.6 27B on the primary GPU.
+The model `id`s must match the llama-swap.yaml entries exactly. `qwen-coder-7B` runs on the primary GPU alongside the chat models (at 0.17 GPU memory utilization); chat/edit/agent use Qwen 3.6 27B on the same GPU.
 
 MCP servers can also be wired into Continue via per-server YAMLs in `.continue/mcpServers/` (committed in this repo: `github.yaml`, `searxng.yaml`, `time.yaml`).
 
@@ -258,7 +260,7 @@ LibreChat serves on `:443` via Tailscale — voice-agent is on `:8443` to avoid 
 
 ## image-gen (on-demand image generation)
 
-Two profile-gated containers that come up together:
+Two always-on containers (started with the rest of the stack, but VRAM is only consumed once you load a model):
 
 - **`image-gen`** (port 7801) — the engine. SwarmUI fronting a hidden ComfyUI backend; pure JSON API, no human UI exposed.
 - **`image-gen-ui`** (port 7802) — a tiny nginx-served static frontend in the spirit of ChatGPT/Claude: prompt textarea, four-image grid per prompt, click for full size, history persisted in localStorage. Talks to the engine over its WebSocket API.
@@ -310,7 +312,7 @@ The first `./img.sh` does a one-time setup inside SwarmUI:
 
 After that, never visit 7801 again. Open `http://localhost:7802` and the custom UI handles the rest.
 
-Subsequent launches are fast — both ComfyUI and SwarmUI start in seconds. Output images are persisted to the `image-gen-output` Docker volume.
+Subsequent launches are fast — both ComfyUI and SwarmUI start in seconds. Output images are written directly to the host path you set as `IMAGE_OUTPUT_DIR` in `.env` (bind-mounted into the container at `/opt/swarmui/Output`).
 
 ### Editing the UI
 
@@ -665,7 +667,7 @@ Workflow: copy the template into a new folder, customize the focus areas in `CLA
 - LibreChat chat history is persisted in MongoDB (`mongodb-data` volume) — survives container restarts
 - MCP package cache is persisted — tool calls are fast after first use
 - SearXNG runs locally — no search queries leave your network
-- llama-swap unloads the previous model within a group when another is requested; a separate persistent group on the secondary GPU keeps the coder autocomplete model resident alongside whichever chat model the `main` group is running
+- llama-swap unloads the previous model within a group when another is requested; a separate `cuda0_coder` persistent group on the primary GPU keeps the `qwen-coder-7B` autocomplete model resident alongside whichever chat model the `cuda0_ondemand` group is running
 - signal-cli-data volume is shared between signal-api (read-write) and signal-bot (read-only)
 - mcp-proxy bundles `uvx` for Python-based MCP servers and the `gh` CLI for the custom read-only GitHub server (`mcp-proxy/gh-read-server.py`). No Node.js dependency anymore
 - audio-api is the single GPU consumer for STT/TTS/voice-cloning — signal-bot, LibreChat, and voice-agent all call it over HTTP

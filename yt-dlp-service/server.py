@@ -21,7 +21,9 @@ from pathlib import Path
 import shutil
 
 import yt_dlp
-from fastapi import FastAPI, HTTPException
+import hmac
+
+from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
@@ -29,6 +31,17 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(me
 logger = logging.getLogger("yt-dlp-service")
 
 app = FastAPI()
+
+# Optional bearer token. Set YTDLP_SERVICE_TOKEN in the environment to require
+# callers to authenticate. Leave unset (or empty) to allow unauthenticated access.
+_SERVICE_TOKEN = os.getenv("YTDLP_SERVICE_TOKEN", "")
+
+
+def _check_auth(authorization: str = Header(default="")):
+    if _SERVICE_TOKEN and not hmac.compare_digest(
+        authorization.encode(), f"Bearer {_SERVICE_TOKEN}".encode()
+    ):
+        raise HTTPException(status_code=401, detail="Unauthorized")
 
 COOKIES_FILE = os.getenv("YT_COOKIES", str(Path(__file__).parent / "youtube_cookies.txt"))
 
@@ -38,7 +51,7 @@ class DownloadRequest(BaseModel):
 
 
 @app.post("/download")
-async def download(req: DownloadRequest):
+async def download(req: DownloadRequest, background_tasks: BackgroundTasks, _: None = Depends(_check_auth)):
     logger.info("Download request: %s", req.query)
 
     tmp = tempfile.mkdtemp(prefix="ytdlp_")
@@ -53,7 +66,6 @@ async def download(req: DownloadRequest):
             break
     opts = {
         "format": "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best",
-        "remote_components": {"ejs:github"},
         "outtmpl": out_template,
         "postprocessors": [
             {
@@ -81,11 +93,13 @@ async def download(req: DownloadRequest):
             if "entries" in info:
                 info = info["entries"][0]
     except Exception as e:
+        shutil.rmtree(tmp, ignore_errors=True)
         logger.error("yt-dlp failed: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
 
     mp3 = next(Path(tmp).glob("download*.mp3"), None)
     if not mp3:
+        shutil.rmtree(tmp, ignore_errors=True)
         raise HTTPException(status_code=500, detail="yt-dlp did not produce an mp3 file")
 
     artist = info.get("artist") or info.get("uploader") or "" if info else ""
@@ -97,6 +111,7 @@ async def download(req: DownloadRequest):
     def _latin1_safe(s: str) -> str:
         return s.encode("latin-1", errors="replace").decode("latin-1")
 
+    background_tasks.add_task(shutil.rmtree, tmp, ignore_errors=True)
     return FileResponse(
         path=str(mp3),
         media_type="audio/mpeg",
@@ -105,7 +120,6 @@ async def download(req: DownloadRequest):
             "X-Artist": _latin1_safe(artist),
             "X-Title": _latin1_safe(title),
         },
-        background=None,
     )
 
 
