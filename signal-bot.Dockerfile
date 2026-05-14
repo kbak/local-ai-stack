@@ -24,4 +24,13 @@ RUN pip install --no-cache-dir --no-deps -e /shared/
 
 RUN cp -r /uoltz/app/. .
 
+# Make agent timeout configurable via AGENT_TIMEOUT_S env var (default 120s).
+# The upstream default of 60s is too short for the 35B model on long contexts.
+RUN sed -i 's/^AGENT_TIMEOUT = 60$/AGENT_TIMEOUT = int(os.environ.get("AGENT_TIMEOUT_S", "120"))/' /app/bot.py
+
+# Disable Qwen3 extended thinking for the bot — the jinja template defaults to
+# thinking ON, which burns 10k+ tokens per response (60-80s on 35B). LibreChat
+# sends its own enable_thinking=true; the bot always wants it off.
+RUN sed -i 's/"max_tokens": max_tok,/"max_tokens": max_tok,\n            "extra_body": {"chat_template_kwargs": {"enable_thinking": False}},/' /app/agent.py
+
 CMD ["python", "bot.py"]
