@@ -37,6 +37,12 @@ nohup "$HOME/yt-dlp-service-venv/bin/python" server.py >/tmp/yt-dlp-service.log 
 disown
 cd "$SCRIPT_DIR"
 
+echo "Waiting for dockerd socket..."
+for i in $(seq 1 60); do docker info >/dev/null 2>&1 && break; sleep 1; done
+if grep -qi microsoft /proc/version 2>/dev/null; then
+    echo "Running wsl-host-forward..."
+    sudo /usr/local/sbin/wsl-host-forward || echo "(wsl-host-forward failed; container->host routing may be degraded)"
+fi
 echo "Starting Docker services..."
 docker compose -f "$SCRIPT_DIR/docker-compose.yml" up -d
 
