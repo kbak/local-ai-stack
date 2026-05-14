@@ -26,6 +26,8 @@ def send_message(
             },
             timeout=15,
         )
+        if not resp.is_success:
+            log.error("signal-api %s: %s", resp.status_code, resp.text[:500])
         resp.raise_for_status()
         log.info("Signal message sent to %s", recipient)
     except Exception:

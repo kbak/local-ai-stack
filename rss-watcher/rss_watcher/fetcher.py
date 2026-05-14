@@ -38,6 +38,9 @@ def fetch_category(urls: list[str], lookback_hours: int) -> list[dict]:
     for url in urls:
         try:
             feed = feedparser.parse(url)
+            if feed.bozo and not feed.entries:
+                log.warning("Failed to fetch feed %s: %s", url, feed.bozo_exception)
+                continue
             for entry in feed.entries:
                 pub = _parse_date(entry)
                 if pub is None or pub < cutoff:
