@@ -14,8 +14,7 @@ Self-hosted LLM stack with privacy-focused web search and research tools. Runs o
 | voice-agent | 8087 | Browser voice-chat UI with wake-word-free VAD, streaming TTS, voice picker, and full MCP tool access via strands |
 | audio-api | 8088 | Shared GPU-backed Whisper (STT) + Kokoro (TTS) + Chatterbox (voice cloning) service with an OpenAI-compatible API (pinned to the secondary GPU) |
 | memory-mcp | 8089 | Self-hosted agentic memory (Mem0 + bge-m3 + Qdrant) exposed as REST + MCP; Tier 2 of the hybrid memory architecture |
-| image-gen | 7801 | On-demand image-generation engine (SwarmUI + Flux.1-dev). Profile-gated. Treated as an API; humans should not visit this port |
-| image-gen-ui | 7802 | ChatGPT-style frontend for image-gen — the UI you actually open. Static nginx, talks to image-gen on 7801 |
+| llama-swap playground | 8080/ui | Built-in llama-swap UI — model monitor, manual load/unload, and image generation playground (FLUX.1-dev) |
 | qdrant | 6333 | Vector store backing memory-mcp |
 | calendar-watcher | — | Polls calendar for meal and travel events; enriches with rating/menu/weather/maps; delivers briefings via Signal |
 | tg-watcher | — | Listens to a Telegram group as your user account; sends a daily LLM-generated brief via Signal |
@@ -53,6 +52,15 @@ All tools are exposed via mcp-proxy on port 8083 (no authentication required —
 - Docker with Docker Compose
 - [vLLM](https://github.com/vllm-project/vllm) installed in a Python venv at `~/vllm-runtime/.venv` (the launcher scripts `serve-qwen-*.sh` activate it). FP8 weights need a Hopper/Blackwell GPU (H100, RTX 6000 Ada/Pro 6000, RTX 5090, etc.).
 - [llama-swap](https://github.com/mostlygeek/llama-swap) binary in PATH
+- [stable-diffusion.cpp](https://github.com/leejet/stable-diffusion.cpp) `sd-server` binary in PATH (for image generation). Build with CUDA:
+  ```bash
+  git clone --recursive https://github.com/leejet/stable-diffusion.cpp ~/src/sdcpp
+  cmake -S ~/src/sdcpp -B ~/src/sdcpp/build \
+    -DSD_CUBLAS=ON -DGGML_CUDA=ON -DCMAKE_BUILD_TYPE=Release \
+    -DSD_SERVER_BUILD_FRONTEND=OFF
+  cmake --build ~/src/sdcpp/build --target sd-server -j$(nproc)
+  sudo install ~/src/sdcpp/build/bin/sd-server /usr/local/bin/
+  ```
 
 ## Setup
 
@@ -86,6 +94,8 @@ Each model entry shells out to a `serve-qwen-*.sh` script that activates `~/vllm
 - **Primary GPU (`cuda0_main` group, persistent):** `qwen3.6-35B-A3B-FP8` (MoE, 3B active) — always loaded.
 - **Primary GPU (`cuda0_ondemand` group):** `qwen3.6-27B-FP8` dense — loads on first request, stays resident. Coexists on the same card with the 35B because both run with modest `--gpu-memory-utilization` (0.45–0.50).
 - **Primary GPU (`cuda0_coder` group, persistent):** `qwen-coder-7B` (Qwen2.5-Coder-7B-Instruct, bfloat16) for FIM tab-complete — always loaded so tab-complete never pays a cold-start cost. Runs at `--gpu-memory-utilization 0.17`, leaving enough headroom to coexist with the chat models on the same GPU.
+- **Primary GPU (`cuda0_image` group, swap):** `flux-dev` — stable-diffusion.cpp serving FLUX.1-dev FP8 via `/v1/images/generations`. Loads on first image request, unloads after 10 min idle (`ttl: 600`). Use the llama-swap playground at `http://localhost:8080/ui` to generate images.
+- **Secondary GPU (`cuda1_reranker` group, persistent):** `bge-reranker-v2-m3` — cross-encoder reranker via vLLM (`--runner pooling`). Endpoint: `POST /v1/score`. ~1.1 GB, loaded alongside audio-api on the 5060 Ti.
 
 The chat launchers (`serve-qwen-27b.sh`, `serve-qwen-35b-a3b.sh`) use:
 - `--max-model-len 131072` (27B) / `262144` (35B) — full FP16 KV cache
@@ -125,14 +135,23 @@ http://localhost:8080/ui
 
 ## GPU layout
 
-Two GPUs are partitioned across services via `CUDA_VISIBLE_DEVICES` (set at the container level for audio-api and per-model in llama-swap via `${env.SECONDARY_GPU}`):
+Two GPUs are partitioned via `CUDA_VISIBLE_DEVICES` (Docker container env for audio-api; llama-swap `env:` field per model for the reranker):
 
-- **Primary GPU:** llama-swap chat/agent models. The 35B-A3B is always-loaded (`cuda0_main`, persistent); the 27B dense model is on-demand but sticky (`cuda0_ondemand`, no swap target). Both coexist via modest `--gpu-memory-utilization` settings.
-- **Secondary GPU (`SECONDARY_GPU`):** audio-api (Whisper + Kokoro + Chatterbox) — resident alongside the primary GPU's workloads.
+**Primary GPU (cuda0):**
+| Group | Model | Persistent | Notes |
+|---|---|---|---|
+| `cuda0_main` | qwen3.6-35B-A3B-FP8 | yes | Always loaded; never evicted |
+| `cuda0_ondemand` | qwen3.6-27B-FP8 | no | Loads on first request, stays (ttl: 0) |
+| `cuda0_coder` | qwen-coder-7B | yes | FIM autocomplete; 0.17 gpu_util |
+| `cuda0_image` | flux-dev | no | Image gen; unloads after 10 min idle |
 
-The `groups` block in `llama-swap.yaml` keeps the coder model in its own `cuda0_coder` `persistent: true` group so loads/unloads of the on-demand 27B model never evict it — tab-complete never pays a cold-start cost.
+**Secondary GPU (cuda1 / 5060 Ti, `SECONDARY_GPU`):**
+| Group | Model | Persistent | Notes |
+|---|---|---|---|
+| — | audio-api (Docker) | always-on | Whisper + Kokoro + Chatterbox |
+| `cuda1_reranker` | bge-reranker-v2-m3 | yes | Cross-encoder reranker; ~1.1 GB |
 
-Single-GPU hosts work fine: leave `SECONDARY_GPU=0` and everything coexists on one card (mind the VRAM budget).
+Single-GPU hosts: set `SECONDARY_GPU=0` and everything coexists on one card (mind the VRAM budget).
 
 ## VS Code / Continue.dev
 
@@ -258,65 +277,37 @@ Then open `https://<pc-name>.<tailnet>.ts.net:8443` on your phone.
 
 LibreChat serves on `:443` via Tailscale — voice-agent is on `:8443` to avoid the collision.
 
-## image-gen (on-demand image generation)
+## Image generation (FLUX.1-dev via stable-diffusion.cpp)
 
-Two always-on containers (started with the rest of the stack, but VRAM is only consumed once you load a model):
+Image generation runs as a llama-swap model — no separate Docker containers. `sd-server` (stable-diffusion.cpp) is spawned on demand by llama-swap when the `flux-dev` model is first requested, and auto-unloads after 10 minutes idle.
 
-- **`image-gen`** (port 7801) — the engine. SwarmUI fronting a hidden ComfyUI backend; pure JSON API, no human UI exposed.
-- **`image-gen-ui`** (port 7802) — a tiny nginx-served static frontend in the spirit of ChatGPT/Claude: prompt textarea, four-image grid per prompt, click for full size, history persisted in localStorage. Talks to the engine over its WebSocket API.
+**UI:** `http://localhost:8080/ui` → select `flux-dev` in the model dropdown → Images tab.
 
-**Use it on demand**, after manually unloading the main chat model:
-```
-curl -s http://localhost:8080/unload     # frees the primary GPU
-./img.sh                                  # foreground; Ctrl+C stops both
-```
-Then open **`http://localhost:7802`**. (Don't bother with 7801 — it's the engine, not for humans.)
+**API:** `POST http://localhost:8080/v1/images/generations` (OpenAI-compatible).
 
-The launcher prints VRAM status before and after, warns if a main-group LLM is still resident, and ensures both containers are stopped on exit (Ctrl+C, error, or shell close).
+### Model files
 
-### Hardware
-
-Runs on the primary GPU (`PRIMARY_GPU` in `.env`, defaults to `0`). Built against `nvidia/cuda:12.8.1-runtime-ubuntu24.04` so it works on Blackwell (RTX 5090 / 5060 Ti — older `cu126` images crash with `no kernel image is available`). At fp8 the model uses ~12 GB; at fp16 closer to ~28 GB.
-
-### One-time model setup
-
-Drop the Flux.1-dev fp8 weights and the Comfy-Org text encoders into `${IMAGE_DIR}` on the host (the path you set in `.env`). All four files are ungated — no HuggingFace token required.
+Model files live at the host path in `serve-sdcpp.sh` (`~/models/image-gen` by default). Expected layout:
 
 ```
-${IMAGE_DIR}/
-├── unet/flux1-dev-fp8.safetensors                  (~12 GB)
-├── vae/ae.safetensors                              (~335 MB)
-├── clip/clip_l.safetensors                         (~250 MB)
-└── clip/t5xxl_fp8_e4m3fn.safetensors               (~4.9 GB)
+~/models/image-gen/
+├── diffusion_models/flux1-dev-fp8.safetensors   (~12 GB)
+├── VAE/ae.safetensors                            (~335 MB)
+└── text_encoders/
+    ├── clip_l.safetensors                        (~250 MB)
+    └── t5xxl_fp8_e4m3fn.safetensors             (~4.9 GB)
 ```
 
-Quick download via `huggingface-cli`:
-```
+Download via `huggingface-cli` (all files are ungated):
+```bash
 huggingface-cli download Comfy-Org/flux1-dev flux1-dev-fp8.safetensors \
-    --local-dir ${IMAGE_DIR}/unet
+    --local-dir ~/models/image-gen/diffusion_models
 huggingface-cli download Comfy-Org/Lumina_Text_Encoders \
     t5xxl_fp8_e4m3fn.safetensors clip_l.safetensors \
-    --local-dir ${IMAGE_DIR}/clip
+    --local-dir ~/models/image-gen/text_encoders
 huggingface-cli download Comfy-Org/flux1-schnell ae.safetensors \
-    --local-dir ${IMAGE_DIR}/vae
+    --local-dir ~/models/image-gen/VAE
 ```
-
-(Adjust to match the file layout your build of SwarmUI expects — SwarmUI's first-launch wizard will offer to download Flux for you and lay the directory out automatically. The list above is what you'd get.)
-
-### First launch
-
-The first `./img.sh` does a one-time setup inside SwarmUI:
-- ComfyUI backend is fetched and a Python venv is created with cu128 PyTorch wheels (~5 minutes).
-- SwarmUI auto-detects the model files in `${IMAGE_DIR}` and registers them.
-- The first time you visit `http://localhost:7801` directly (only needed once), SwarmUI's setup wizard runs — pick `just_self`, backend `comfyui`, theme of your choice, **set Flux.1-dev fp8 as the default model**.
-
-After that, never visit 7801 again. Open `http://localhost:7802` and the custom UI handles the rest.
-
-Subsequent launches are fast — both ComfyUI and SwarmUI start in seconds. Output images are written directly to the host path you set as `IMAGE_OUTPUT_DIR` in `.env` (bind-mounted into the container at `/opt/swarmui/Output`).
-
-### Editing the UI
-
-`image-gen-ui/static/` is bind-mounted read-only into the nginx container, so HTML/CSS/JS edits apply with a hard refresh (Ctrl+Shift+R) — no rebuild needed. The backend SwarmUI URL is computed from the page origin (`<host>:7801`), so the UI works unchanged whether accessed via `localhost`, the LAN IP, or a Tailscale name.
 
 ## Signal Bot
 
@@ -667,7 +658,8 @@ Workflow: copy the template into a new folder, customize the focus areas in `CLA
 - LibreChat chat history is persisted in MongoDB (`mongodb-data` volume) — survives container restarts
 - MCP package cache is persisted — tool calls are fast after first use
 - SearXNG runs locally — no search queries leave your network
-- llama-swap unloads the previous model within a group when another is requested; a separate `cuda0_coder` persistent group on the primary GPU keeps the `qwen-coder-7B` autocomplete model resident alongside whichever chat model the `cuda0_ondemand` group is running
+- llama-swap routes image gen (`flux-dev`), reranking (`bge-reranker-v2-m3`), and all LLM traffic through a single port (8080). Each model is in its own group; `exclusive: false` lets them coexist on the same GPU when VRAM permits
+- llama-swap unloads the previous model within a group when another is requested; persistent groups (`cuda0_main`, `cuda0_coder`, `cuda1_reranker`) are never evicted by swap events
 - signal-cli-data volume is shared between signal-api (read-write) and signal-bot (read-only)
 - mcp-proxy bundles `uvx` for Python-based MCP servers and the `gh` CLI for the custom read-only GitHub server (`mcp-proxy/gh-read-server.py`). No Node.js dependency anymore
 - audio-api is the single GPU consumer for STT/TTS/voice-cloning — signal-bot, LibreChat, and voice-agent all call it over HTTP

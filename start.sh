@@ -3,9 +3,9 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Export .env so llama-swap can resolve ${env.SECONDARY_GPU} in its config.
-# docker-compose reads .env on its own, but llama-swap is a host process and
-# only sees vars we export here.
+# Export .env so llama-swap and its serve-*.sh subprocesses inherit all vars
+# (SECONDARY_GPU in particular — serve-reranker.sh reads it directly).
+# docker-compose reads .env on its own; llama-swap only sees what we export.
 set -a
 . "$SCRIPT_DIR/.env"
 set +a
@@ -19,6 +19,14 @@ echo "Pre-loading qwen-coder-7B (cuda0_coder, persistent)..."
 until curl -sf http://localhost:8080/v1/chat/completions \
     -H "Content-Type: application/json" \
     -d '{"model":"qwen-coder-7B","messages":[{"role":"user","content":"hi"}],"max_tokens":1}' \
+    >/dev/null 2>&1; do
+    sleep 2
+done
+
+echo "Pre-loading bge-reranker-v2-m3 (cuda1_reranker, persistent)..."
+until curl -sf http://localhost:8080/v1/score \
+    -H "Content-Type: application/json" \
+    -d '{"model":"bge-reranker-v2-m3","text_1":"test","text_2":["test"]}' \
     >/dev/null 2>&1; do
     sleep 2
 done

@@ -30,11 +30,33 @@ models:
     checkEndpoint: /v1/models
     ttl: 0
 
-# Three independent groups, all on exclusive: false so they coexist:
-#   - cuda0_main (RTX 6000 / 96 GB): 35B-A3B always-loaded, never evicted.
-#   - cuda0_ondemand (same GPU): 27B loads on first request and stays. Sole
-#     member of its swap group + ttl: 0 means nothing displaces it.
-#   - cuda1 (5060 Ti / 16 GB): coder model, persistent, always-loaded.
+  # FLUX.1-dev FP8 image generation via stable-diffusion.cpp (sd-server).
+  # Replaces the SwarmUI+ComfyUI Docker stack. The playground UI at /ui
+  # serves as the human-facing frontend.
+  # sd-server must be in PATH — build with -DSD_CUBLAS=on from leejet/stable-diffusion.cpp.
+  flux-dev:
+    cmd: bash ./serve-sdcpp.sh ${PORT}
+    proxy: http://127.0.0.2:${PORT}
+    checkEndpoint: /v1/models
+    ttl: 600
+
+  # Cross-encoder reranker on the 5060 Ti (~1.1 GB weights, persistent).
+  # vLLM 0.20.1 uses --runner pooling (not --task score).
+  # Endpoint: POST /v1/score with {"model":"bge-reranker-v2-m3","text_1":"query","text_2":["doc1","doc2"]}
+  bge-reranker-v2-m3:
+    cmd: bash ./serve-reranker.sh ${PORT}
+    proxy: http://127.0.0.2:${PORT}
+    checkEndpoint: /v1/models
+    ttl: 0
+
+# Groups, all exclusive: false so they coexist on shared GPUs:
+#   cuda0 (RTX 6000 / 96 GB):
+#     - cuda0_main:     35B-A3B, always-loaded, never evicted.
+#     - cuda0_ondemand: 27B, loads on first request, stays (ttl: 0).
+#     - cuda0_coder:    coder-7B, persistent, primary-GPU autocomplete.
+#     - cuda0_image:    FLUX-dev, swap=true + ttl:600 to reclaim VRAM when idle.
+#   cuda1 (5060 Ti / 16 GB):
+#     - cuda1_reranker: bge-reranker-v2-m3, persistent, tiny footprint.
 groups:
   "cuda0_main":
     swap: false
@@ -55,3 +77,20 @@ groups:
     persistent: true
     members:
       - "qwen-coder-7B"
+
+  # Image gen on the primary GPU. Not persistent — swaps out after ttl idle
+  # to free VRAM headroom for the 27B model if both are needed concurrently.
+  "cuda0_image":
+    swap: true
+    exclusive: false
+    members:
+      - "flux-dev"
+
+  # Reranker on the 5060 Ti alongside audio-api. Persistent: tiny model, no
+  # reason to pay the vLLM startup cost on each request.
+  "cuda1_reranker":
+    swap: false
+    exclusive: false
+    persistent: true
+    members:
+      - "bge-reranker-v2-m3"
