@@ -24,9 +24,9 @@ until curl -sf http://localhost:8080/v1/chat/completions \
 done
 
 echo "Pre-loading bge-reranker-v2-m3 (cuda1_reranker, persistent)..."
-until curl -sf http://localhost:8080/v1/score \
+until curl -sf http://localhost:8080/v1/embeddings \
     -H "Content-Type: application/json" \
-    -d '{"model":"bge-reranker-v2-m3","text_1":"test","text_2":["test"]}' \
+    -d '{"model":"bge-reranker-v2-m3","input":"test"}' \
     >/dev/null 2>&1; do
     sleep 2
 done
