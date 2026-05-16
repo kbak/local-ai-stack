@@ -6,12 +6,15 @@
 # https://github.com/leejet/stable-diffusion.cpp (enable CUDA: cmake -DSD_CUBLAS=on).
 set -e
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+WORKSPACE="$(dirname "$SCRIPT_DIR")"
+
 PORT="${1:?port arg required}"
 
 export CUDA_VISIBLE_DEVICES=0
 export CUDA_DEVICE_ORDER=PCI_BUS_ID
 
-SD_MODELS=/home/kacper/models/image-gen
+SD_MODELS=$WORKSPACE/models/image-gen
 
 exec sd-server \
   --diffusion-model "${SD_MODELS}/diffusion_models/flux1-dev-fp8.safetensors" \

@@ -4,13 +4,16 @@
 # Activates the vLLM venv at ~/vllm-runtime/.venv and execs `vllm serve`.
 set -e
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+WORKSPACE="$(dirname "$SCRIPT_DIR")"
+
 PORT="${1:?port arg required}"
 
-cd "$HOME/vllm-runtime"
+cd "$WORKSPACE/vllm-runtime"
 # shellcheck disable=SC1091
 source .venv/bin/activate
 
-export HF_HOME="$HOME/models/hf"
+export HF_HOME="$WORKSPACE/models/hf"
 export CUDA_VISIBLE_DEVICES=0
 export CUDA_DEVICE_ORDER=PCI_BUS_ID
 export TORCHINDUCTOR_COMPILE_THREADS=16
@@ -30,4 +33,4 @@ exec vllm serve Qwen/Qwen3.6-35B-A3B-FP8 \
   --enable-auto-tool-choice \
   --tool-call-parser qwen3_xml \
   --override-generation-config '{"repetition_penalty":1.05,"presence_penalty":0.3}' \
-  --chat-template "$HOME/vllm-runtime/qwen3.6-librechat.jinja"
+  --chat-template "$WORKSPACE/vllm-runtime/qwen3.6-librechat.jinja"

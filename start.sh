@@ -2,6 +2,7 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+WORKSPACE="$(dirname "$SCRIPT_DIR")"
 
 # Export .env so llama-swap and its serve-*.sh subprocesses inherit all vars
 # (SECONDARY_GPU in particular — serve-reranker.sh reads it directly).
@@ -24,9 +25,9 @@ until curl -sf http://localhost:8080/v1/chat/completions \
 done
 
 echo "Pre-loading bge-reranker-v2-m3 (cuda1_reranker, persistent)..."
-until curl -sf http://localhost:8080/v1/embeddings \
+until curl -sf http://localhost:8080/v1/rerank \
     -H "Content-Type: application/json" \
-    -d '{"model":"bge-reranker-v2-m3","input":"test"}' \
+    -d '{"model":"bge-reranker-v2-m3","query":"test","documents":["doc"]}' \
     >/dev/null 2>&1; do
     sleep 2
 done
@@ -41,7 +42,7 @@ done
 
 echo "Starting yt-dlp service..."
 cd "$SCRIPT_DIR/yt-dlp-service"
-nohup "$HOME/yt-dlp-service-venv/bin/python" server.py >/tmp/yt-dlp-service.log 2>&1 &
+nohup "$WORKSPACE/yt-dlp-service-venv/bin/python" server.py >/tmp/yt-dlp-service.log 2>&1 &
 disown
 cd "$SCRIPT_DIR"
 
