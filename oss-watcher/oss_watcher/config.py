@@ -1,8 +1,8 @@
 import os
 
-# Discord user token + channel to monitor
-DISCORD_TOKEN: str = os.environ["DISCORD_TOKEN"]
-DISCORD_CHANNEL_ID: str = os.environ["DISCORD_CHANNEL_ID"]
+# Discord user token + channel to monitor (both optional — omit to skip Discord)
+DISCORD_TOKEN: str | None = os.environ.get("DISCORD_TOKEN")
+DISCORD_CHANNEL_ID: str | None = os.environ.get("DISCORD_CHANNEL_ID")
 
 # GitHub personal access token + repo to monitor (owner/repo)
 GITHUB_TOKEN: str = os.environ["GITHUB_TOKEN"]

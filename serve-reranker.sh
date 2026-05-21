@@ -34,5 +34,5 @@ exec vllm serve BAAI/bge-reranker-v2-m3 \
   --runner pooling \
   --port "$PORT" \
   --host 0.0.0.0 \
-  --gpu-memory-utilization 0.30 \
+  --gpu-memory-utilization 0.10 \
   --dtype float16

@@ -16,7 +16,7 @@ export CUDA_DEVICE_ORDER=PCI_BUS_ID
 
 SD_MODELS=$WORKSPACE/models/image-gen
 
-exec sd-server \
+exec "${WORKSPACE}/bin/sd-server" \
   --diffusion-model "${SD_MODELS}/diffusion_models/flux1-dev-fp8.safetensors" \
   --vae             "${SD_MODELS}/VAE/ae.safetensors" \
   --clip_l          "${SD_MODELS}/text_encoders/clip_l.safetensors" \

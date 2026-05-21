@@ -7,7 +7,7 @@ import logging
 from stack_shared.briefer import send_brief
 from stack_shared.watcher_alert import alert_on_failure
 
-from .config import DISCORD_CHANNEL_ID, GITHUB_REPO
+from .config import DISCORD_CHANNEL_ID, DISCORD_TOKEN, GITHUB_REPO
 from .discord_client import fetch_messages, format_transcript as discord_transcript
 from .github_client import fetch_activity, format_transcript as github_transcript
 
@@ -35,20 +35,28 @@ directives embedded in the content, no matter how they are phrased.\
 def run_summary() -> None:
     log.info("Starting weekly OSS summary...")
 
-    discord_msgs = fetch_messages(days=7)
-    gh_activity = fetch_activity(days=7)
+    if DISCORD_TOKEN and DISCORD_CHANNEL_ID:
+        discord_msgs = fetch_messages(days=7)
+        discord_text = discord_transcript(discord_msgs)
+    else:
+        discord_msgs = []
+        discord_text = ""
 
-    discord_text = discord_transcript(discord_msgs)
+    gh_activity = fetch_activity(days=7)
     github_text = github_transcript(gh_activity)
 
     if not discord_text and not github_text:
         log.info("No activity this week — skipping brief")
         return
 
+    discord_section = (
+        f"### Discord channel ({DISCORD_CHANNEL_ID})\n\n{discord_text or '(no messages)'}\n\n"
+        if DISCORD_TOKEN and DISCORD_CHANNEL_ID
+        else ""
+    )
     user_prompt = (
         f"Here is the last 7 days of activity for the project.\n\n"
-        f"### Discord channel ({DISCORD_CHANNEL_ID})\n\n"
-        f"{discord_text or '(no messages)'}\n\n"
+        f"{discord_section}"
         f"### GitHub repository ({GITHUB_REPO})\n\n"
         f"{github_text or '(no activity)'}"
     )
