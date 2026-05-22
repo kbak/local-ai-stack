@@ -319,6 +319,81 @@ services:
       - "host.docker.internal:172.18.0.1"
     mem_limit: 256m
 
+  nextcloud-db:
+    image: mariadb:10.11
+    container_name: nextcloud-db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${NEXTCLOUD_DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: nextcloud
+      MYSQL_USER: nextcloud
+      MYSQL_PASSWORD: ${NEXTCLOUD_DB_PASSWORD}
+    volumes:
+      - nextcloud-db:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 30s
+    networks:
+      - ai-net
+    mem_limit: 512m
+
+  nextcloud-redis:
+    image: redis:7-alpine
+    container_name: nextcloud-redis
+    restart: unless-stopped
+    networks:
+      - ai-net
+    mem_limit: 128m
+
+  nextcloud:
+    image: nextcloud:33-apache
+    container_name: nextcloud
+    restart: unless-stopped
+    ports:
+      - "8090:80"
+    environment:
+      MYSQL_HOST: nextcloud-db
+      MYSQL_DATABASE: nextcloud
+      MYSQL_USER: nextcloud
+      MYSQL_PASSWORD: ${NEXTCLOUD_DB_PASSWORD}
+      NEXTCLOUD_ADMIN_USER: ${NEXTCLOUD_ADMIN_USER}
+      NEXTCLOUD_ADMIN_PASSWORD: ${NEXTCLOUD_ADMIN_PASSWORD}
+      REDIS_HOST: nextcloud-redis
+      NEXTCLOUD_TRUSTED_DOMAINS: localhost 127.0.0.1 ${NEXTCLOUD_TAILSCALE_HOST}
+      OVERWRITEPROTOCOL: https
+      OVERWRITEHOST: ${NEXTCLOUD_TAILSCALE_HOST}
+      OVERWRITECLIURL: https://${NEXTCLOUD_TAILSCALE_HOST}
+    volumes:
+      - nextcloud-data:/var/www/html
+      - ./nextcloud/hooks:/docker-entrypoint-hooks.d:ro
+    depends_on:
+      nextcloud-db:
+        condition: service_healthy
+      nextcloud-redis:
+        condition: service_started
+    networks:
+      - ai-net
+    mem_limit: 1024m
+
+  nextcloud-cron:
+    image: nextcloud:33-apache
+    container_name: nextcloud-cron
+    restart: unless-stopped
+    volumes:
+      - nextcloud-data:/var/www/html
+    entrypoint: /cron.sh
+    depends_on:
+      nextcloud-db:
+        condition: service_healthy
+      nextcloud-redis:
+        condition: service_started
+    networks:
+      - ai-net
+    mem_limit: 256m
+
   qdrant:
     image: qdrant/qdrant:v1.12.4
     container_name: qdrant
@@ -366,6 +441,8 @@ networks:
           gateway: 172.18.0.1
 
 volumes:
+  nextcloud-db:
+  nextcloud-data:
   mcp-proxy-uv-cache:
   mongodb-data:
   librechat-data:
