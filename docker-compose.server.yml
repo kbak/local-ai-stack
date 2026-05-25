@@ -1,5 +1,14 @@
 name: stack
 
+# Mini PC stack — lightweight always-on services.
+# LLM inference and audio models live on the AI PC (docker-compose.ai.yml);
+# this stack reaches them via stable Tailscale hostnames.
+#
+# Fallback: if the mini PC fails, run this file on the AI PC (WSL) alongside
+# docker-compose.ai.yml, then run `scripts/dns-failover.sh failover` to redirect
+# DNS. No config changes needed — the *.kacper.me hostnames resolve to the same
+# machine in both modes.
+
 services:
   searxng:
     image: searxng/searxng
@@ -10,9 +19,8 @@ services:
     volumes:
       - ./searxng-settings.yml:/etc/searxng/settings.yml
     networks:
-      - ai-net
+      - server-net
     mem_limit: 512m
-
 
   mcp-proxy:
     build: ./mcp-proxy
@@ -35,29 +43,8 @@ services:
       retries: 12
       start_period: 10s
     networks:
-      - ai-net
+      - server-net
     mem_limit: 1500m
-
-  audio-api:
-    build:
-      context: .
-      dockerfile: audio-api/Dockerfile
-    container_name: audio-api
-    restart: unless-stopped
-    ports:
-      - "8088:8088"
-    env_file:
-      - ./audio-api.env
-    environment:
-      CUDA_VISIBLE_DEVICES: ${SECONDARY_GPU:-0}
-      HF_HOME: /app/hf-cache
-      VOICE_SAMPLES_DIR: /app/voice-samples
-    volumes:
-      - ${VOICE_SAMPLES_DIR:?VOICE_SAMPLES_DIR must be set in .env}:/app/voice-samples:ro
-      - audio-api-hf-cache:/app/hf-cache
-    networks:
-      - ai-net
-    mem_limit: 8000m
 
   voice-agent:
     build:
@@ -67,19 +54,18 @@ services:
     restart: unless-stopped
     ports:
       - "8087:8087"
+    environment:
+      AUDIO_API_URL: https://audio.kacper.me
+      LLM_BASE_URL: https://llama.kacper.me/v1
     volumes:
       - ./signal-bot-custom-skills:/app/skills:ro
       - ./voice-agent/static:/app/static:ro
       - ./shared:/shared:ro
     depends_on:
-      audio-api:
-        condition: service_started
       mcp-proxy:
         condition: service_healthy
     networks:
-      - ai-net
-    extra_hosts:
-      - "host.docker.internal:172.18.0.1"
+      - server-net
     mem_limit: 512m
 
   mongodb:
@@ -89,7 +75,7 @@ services:
     volumes:
       - mongodb-data:/data/db
     networks:
-      - ai-net
+      - server-net
     mem_limit: 512m
 
   librechat:
@@ -100,6 +86,9 @@ services:
       - "3000:3080"
     env_file:
       - .env
+    environment:
+      AUDIO_API_BASE_URL: https://audio.kacper.me
+      LLM_BASE_URL: https://llama.kacper.me/v1
     volumes:
       - ./librechat.yaml:/app/librechat.yaml.template:ro
       - ./librechat-render.js:/app/librechat-render.js:ro
@@ -110,14 +99,10 @@ services:
         condition: service_started
       mcp-proxy:
         condition: service_healthy
-      audio-api:
-        condition: service_started
       memory-mcp:
         condition: service_started
     networks:
-      - ai-net
-    extra_hosts:
-      - "host.docker.internal:172.18.0.1"
+      - server-net
     mem_limit: 768m
     entrypoint: ["/bin/sh", "-c", "node /app/librechat-render.js && exec node /app/api/server/index.js"]
 
@@ -133,7 +118,7 @@ services:
       - MODE=native
       - AUTO_RECEIVE_SCHEDULE=0 */6 * * *
     networks:
-      - ai-net
+      - server-net
     mem_limit: 512m
 
   signal-bot:
@@ -145,6 +130,9 @@ services:
     env_file:
       - ./signal-bot.env
     environment:
+      LLM_BASE_URL: https://llama.kacper.me/v1
+      AUDIO_API_URL: https://audio.kacper.me
+      YTDLP_SERVICE_URL: https://yt.kacper.me
       MEMORY_MCP_URL: http://memory-mcp:8089
       MEMORY_DIR_MOUNT: /memory
       MEMORY_DEFAULT_USER_ID: ${MEMORY_DEFAULT_USER_ID:-default}
@@ -163,14 +151,10 @@ services:
         condition: service_healthy
       searxng:
         condition: service_started
-      audio-api:
-        condition: service_started
       memory-mcp:
         condition: service_started
     networks:
-      - ai-net
-    extra_hosts:
-      - "host.docker.internal:172.18.0.1"
+      - server-net
     mem_limit: 1500m
 
   location-tracker:
@@ -181,13 +165,13 @@ services:
     restart: unless-stopped
     env_file:
       - .env
+    environment:
+      LLM_BASE_URL: https://llama.kacper.me/v1
     volumes:
       - location-tracker-data:/data
       - ./shared:/shared:ro
     networks:
-      - ai-net
-    extra_hosts:
-      - "host.docker.internal:172.18.0.1"
+      - server-net
     mem_limit: 512m
 
   pdf-inspector:
@@ -201,12 +185,8 @@ services:
     environment:
       TRANSPORT: http
     networks:
-      - ai-net
+      - server-net
     mem_limit: 512m
-
-  # Image generation is now served by stable-diffusion.cpp (sd-server) via
-  # llama-swap on the host at port 8080 (model: flux-dev). Use the llama-swap
-  # playground UI at http://localhost:8080/ui for image generation.
 
   calendar-watcher:
     build:
@@ -217,6 +197,8 @@ services:
     env_file:
       - .env
       - signal-bot.env
+    environment:
+      LLM_BASE_URL: https://llama.kacper.me/v1
     volumes:
       - calendar-watcher-data:/data
       - ./shared:/shared:ro
@@ -230,9 +212,7 @@ services:
       searxng:
         condition: service_started
     networks:
-      - ai-net
-    extra_hosts:
-      - "host.docker.internal:172.18.0.1"
+      - server-net
     mem_limit: 512m
 
   receipt-watcher:
@@ -245,6 +225,8 @@ services:
       - .env
       - signal-bot.env
       - receipt-watcher.env
+    environment:
+      LLM_BASE_URL: https://llama.kacper.me/v1
     volumes:
       - receipt-watcher-data:/data
       - ./receipt-watcher/accounts.yaml:/app/accounts.yaml:ro
@@ -254,9 +236,7 @@ services:
     depends_on:
       - signal-api
     networks:
-      - ai-net
-    extra_hosts:
-      - "host.docker.internal:172.18.0.1"
+      - server-net
     mem_limit: 512m
 
   tg-watcher:
@@ -269,15 +249,15 @@ services:
       - .env
       - signal-bot.env
       - tg-watcher.env
+    environment:
+      LLM_BASE_URL: https://llama.kacper.me/v1
     volumes:
       - tg-watcher-data:/data
       - ./shared:/shared:ro
     depends_on:
       - signal-api
     networks:
-      - ai-net
-    extra_hosts:
-      - "host.docker.internal:172.18.0.1"
+      - server-net
     mem_limit: 512m
 
   oss-watcher:
@@ -290,14 +270,14 @@ services:
       - .env
       - signal-bot.env
       - oss-watcher.env
+    environment:
+      LLM_BASE_URL: https://llama.kacper.me/v1
     volumes:
       - ./shared:/shared:ro
     depends_on:
       - signal-api
     networks:
-      - ai-net
-    extra_hosts:
-      - "host.docker.internal:172.18.0.1"
+      - server-net
     mem_limit: 256m
 
   rss-watcher:
@@ -309,14 +289,15 @@ services:
     env_file:
       - signal-bot.env
       - rss-watcher.env
+    environment:
+      LLM_BASE_URL: https://llama.kacper.me/v1
+      AUDIO_API_URL: https://audio.kacper.me
     volumes:
       - ./shared:/shared:ro
     depends_on:
       - signal-api
     networks:
-      - ai-net
-    extra_hosts:
-      - "host.docker.internal:172.18.0.1"
+      - server-net
     mem_limit: 256m
 
   nextcloud-db:
@@ -337,7 +318,7 @@ services:
       retries: 20
       start_period: 30s
     networks:
-      - ai-net
+      - server-net
     mem_limit: 512m
 
   nextcloud-redis:
@@ -345,7 +326,7 @@ services:
     container_name: nextcloud-redis
     restart: unless-stopped
     networks:
-      - ai-net
+      - server-net
     mem_limit: 128m
 
   nextcloud:
@@ -375,7 +356,7 @@ services:
       nextcloud-redis:
         condition: service_started
     networks:
-      - ai-net
+      - server-net
     mem_limit: 1024m
 
   nextcloud-cron:
@@ -391,7 +372,7 @@ services:
       nextcloud-redis:
         condition: service_started
     networks:
-      - ai-net
+      - server-net
     mem_limit: 256m
 
   qdrant:
@@ -403,7 +384,7 @@ services:
     volumes:
       - ${MEMORY_DIR:?MEMORY_DIR must be set in .env}/qdrant:/qdrant/storage
     networks:
-      - ai-net
+      - server-net
     mem_limit: 1024m
 
   memory-mcp:
@@ -415,9 +396,7 @@ services:
     ports:
       - "8089:8089"
     environment:
-      MEMORY_LLM_BASE_URL: http://host.docker.internal:8080/v1
-      # MEMORY_LLM_MODEL intentionally unset - memory_backend resolves the
-      # largest non-coder model currently loaded in llama-swap at startup.
+      MEMORY_LLM_BASE_URL: https://llama.kacper.me/v1
       MEMORY_QDRANT_HOST: qdrant
       MEMORY_QDRANT_PORT: "6333"
       MEMORY_DEFAULT_USER_ID: ${MEMORY_DEFAULT_USER_ID:-default}
@@ -427,22 +406,18 @@ services:
     depends_on:
       - qdrant
     networks:
-      - ai-net
-    extra_hosts:
-      - "host.docker.internal:172.18.0.1"
+      - server-net
     mem_limit: 3000m
 
 networks:
-  ai-net:
+  server-net:
     driver: bridge
     ipam:
       config:
-        - subnet: 172.18.0.0/16
-          gateway: 172.18.0.1
+        - subnet: 172.19.0.0/16
+          gateway: 172.19.0.1
 
 volumes:
-  nextcloud-db:
-  nextcloud-data:
   mcp-proxy-uv-cache:
   mongodb-data:
   librechat-data:
@@ -452,4 +427,5 @@ volumes:
   calendar-watcher-data:
   receipt-watcher-data:
   tg-watcher-data:
-  audio-api-hf-cache:
+  nextcloud-db:
+  nextcloud-data:

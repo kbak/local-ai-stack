@@ -6,13 +6,13 @@ mcpSettings:
     - "http://location-tracker:8084"
     - "http://pdf-inspector:8085/"
     - "http://memory-mcp:8089"
-    - "http://audio-api:8088"
+    - "${AUDIO_API_BASE_URL}"
   autoApprove: true
 
 speech:
   tts:
     openai:
-      url: "http://audio-api:8088/v1/audio/speech"
+      url: "${AUDIO_API_BASE_URL}/v1/audio/speech"
       apiKey: "sk-no-key-required"
       model: "kokoro"
       voices:
@@ -72,7 +72,7 @@ speech:
         - zm_yunyang
   stt:
     openai:
-      url: "http://audio-api:8088/v1"
+      url: "${AUDIO_API_BASE_URL}/v1"
       apiKey: "sk-no-key-required"
       model: "whisper-1"
   speechTab:
@@ -89,7 +89,7 @@ endpoints:
   custom:
     - name: "llama.cpp"
       apiKey: "vllm"
-      baseURL: "http://host.docker.internal:8080/v1"
+      baseURL: "${LLM_BASE_URL}"
       models:
         default: ["qwen3.6-27B-FP8"]
         fetch: true
@@ -161,6 +161,6 @@ mcpServers:
     type: streamable-http
     serverInstructions: false
   chatterbox:
-    url: http://audio-api:8088/mcp/mcp
+    url: ${AUDIO_API_BASE_URL}/mcp/mcp
     type: streamable-http
     serverInstructions: false

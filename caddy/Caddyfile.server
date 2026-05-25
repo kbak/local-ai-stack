@@ -1,0 +1,36 @@
+# Env vars required: ACME_EMAIL, CLOUDFLARE_API_TOKEN
+# Put them in /etc/caddy/caddy.env — loaded automatically by the official Caddy service.
+# The cloudflare DNS module must be compiled in (xcaddy or official CF binary).
+{
+	email {env.ACME_EMAIL}
+	auto_https disable_redirects
+	acme_dns cloudflare {env.CLOUDFLARE_API_TOKEN}
+}
+
+voice.kacper.me {
+	reverse_proxy 127.0.0.1:8087
+}
+
+chat.kacper.me {
+	reverse_proxy 127.0.0.1:3000
+}
+
+search.kacper.me {
+	reverse_proxy 127.0.0.1:8081
+}
+
+pdf.kacper.me {
+	reverse_proxy 127.0.0.1:8086
+}
+
+mcp.kacper.me {
+	reverse_proxy 127.0.0.1:8083
+}
+
+memory.kacper.me {
+	reverse_proxy 127.0.0.1:8089
+}
+
+nextcloud.kacper.me {
+	reverse_proxy 127.0.0.1:8090
+}

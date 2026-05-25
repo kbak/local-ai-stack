@@ -57,15 +57,16 @@ async def download(req: DownloadRequest, background_tasks: BackgroundTasks, _: N
     tmp = tempfile.mkdtemp(prefix="ytdlp_")
     out_template = str(Path(tmp) / "download.%(ext)s")
 
-    # Build js_runtimes — discover node/deno from PATH
+    # Build js_runtimes — only accept native Linux binaries (skip /mnt/c/... Windows paths)
     js_runtimes = {}
     for runtime, binary in [("node", "node"), ("deno", "deno"), ("bun", "bun")]:
         path = shutil.which(binary)
-        if path:
+        if path and not path.startswith("/mnt/c/"):
             js_runtimes[runtime] = {"path": path}
             break
+
     opts = {
-        "format": "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best",
+        "format": "bestaudio/best",
         "outtmpl": out_template,
         "postprocessors": [
             {
@@ -77,6 +78,8 @@ async def download(req: DownloadRequest, background_tasks: BackgroundTasks, _: N
         "quiet": True,
         "no_warnings": True,
         "default_search": "ytsearch1",
+        # Allow yt-dlp to fetch the EJS challenge solver from GitHub (needed for YouTube sig solving)
+        "remote_components": {"ejs:github"},
     }
 
     if js_runtimes:

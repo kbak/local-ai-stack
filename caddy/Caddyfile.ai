@@ -1,0 +1,46 @@
+# Env vars required: ACME_EMAIL, CLOUDFLARE_API_TOKEN
+{
+	email {env.ACME_EMAIL}
+	auto_https disable_redirects
+	acme_dns cloudflare {env.CLOUDFLARE_API_TOKEN}
+}
+
+audio.kacper.me {
+	reverse_proxy 127.0.0.1:8088
+}
+
+llama.kacper.me {
+	reverse_proxy 127.0.0.1:8080
+}
+
+yt.kacper.me {
+	reverse_proxy 127.0.0.1:8200
+}
+
+voice.kacper.me {
+	reverse_proxy 127.0.0.1:8087
+}
+
+chat.kacper.me {
+	reverse_proxy 127.0.0.1:3000
+}
+
+search.kacper.me {
+	reverse_proxy 127.0.0.1:8081
+}
+
+pdf.kacper.me {
+	reverse_proxy 127.0.0.1:8086
+}
+
+mcp.kacper.me {
+	reverse_proxy 127.0.0.1:8083
+}
+
+memory.kacper.me {
+	reverse_proxy 127.0.0.1:8089
+}
+
+nextcloud.kacper.me {
+	reverse_proxy 127.0.0.1:8090
+}

@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# Bootstrap AI-side services on this machine.
+# - native llama-swap (port 8080) and yt-dlp-service (port 8200)
+# - docker-compose.ai.yml (audio-api)
+# Waits for models + Chatterbox warmup before exiting.
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -46,39 +50,24 @@ nohup "$WORKSPACE/yt-dlp-service-venv/bin/python" server.py >/tmp/yt-dlp-service
 disown
 cd "$SCRIPT_DIR"
 
+echo "Waiting for yt-dlp service..."
+until curl -sf http://localhost:8200/health >/dev/null 2>&1; do
+    sleep 2
+done
+
 echo "Waiting for dockerd socket..."
 for i in $(seq 1 60); do docker info >/dev/null 2>&1 && break; sleep 1; done
 if grep -qi microsoft /proc/version 2>/dev/null; then
     echo "Running wsl-host-forward..."
     sudo /usr/local/sbin/wsl-host-forward || echo "(wsl-host-forward failed; container->host routing may be degraded)"
 fi
-echo "Starting Docker services..."
-docker compose -f "$SCRIPT_DIR/docker-compose.yml" up -d
 
-echo "Waiting for all containers to be up..."
-until docker compose -f "$SCRIPT_DIR/docker-compose.yml" ps --format json \
-    | python3 -c "
-import sys, json
-states = [json.loads(l)['State'] for l in sys.stdin if l.strip()]
-all_up = all(s == 'running' for s in states)
-sys.exit(0 if all_up else 1)
-" 2>/dev/null; do
-    sleep 2
-done
+echo "Starting Docker services (ai)..."
+docker compose -f "$SCRIPT_DIR/docker-compose.ai.yml" up -d --wait
 
 echo "Waiting for audio-api to load Whisper + Kokoro + Chatterbox..."
 until docker logs audio-api 2>&1 | grep -q "Chatterbox warmup complete"; do
     sleep 3
 done
 
-echo "Waiting for voice-agent..."
-until curl -sf http://localhost:8087/health >/dev/null 2>&1; do
-    sleep 2
-done
-
-echo "Waiting for memory-mcp (bge-m3 + Mem0)..."
-until curl -sf http://localhost:8089/health >/dev/null 2>&1; do
-    sleep 2
-done
-
-echo "Stack is up."
+echo "AI stack is up."

@@ -1,0 +1,30 @@
+name: stack
+
+services:
+  audio-api:
+    build:
+      context: .
+      dockerfile: audio-api/Dockerfile
+    container_name: audio-api
+    restart: unless-stopped
+    ports:
+      - "8088:8088"
+    env_file:
+      - ./audio-api.env
+    environment:
+      CUDA_VISIBLE_DEVICES: ${SECONDARY_GPU:-0}
+      HF_HOME: /app/hf-cache
+      VOICE_SAMPLES_DIR: /app/voice-samples
+    volumes:
+      - ${VOICE_SAMPLES_DIR:?VOICE_SAMPLES_DIR must be set in .env}:/app/voice-samples:ro
+      - audio-api-hf-cache:/app/hf-cache
+    networks:
+      - ai-net
+    mem_limit: 8000m
+
+networks:
+  ai-net:
+    driver: bridge
+
+volumes:
+  audio-api-hf-cache:
