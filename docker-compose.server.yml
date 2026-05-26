@@ -55,8 +55,10 @@ services:
     ports:
       - "8087:8087"
     environment:
-      AUDIO_API_URL: https://audio.kacper.me
-      LLM_BASE_URL: https://llama.kacper.me/v1
+      AUDIO_API_URL: "${AUDIO_API_URL:-https://audio.kacper.me}"
+      LLM_BASE_URL: "${LLM_BASE_URL:-https://llama.kacper.me/v1}"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./signal-bot-custom-skills:/app/skills:ro
       - ./voice-agent/static:/app/static:ro
@@ -69,7 +71,7 @@ services:
     mem_limit: 512m
 
   mongodb:
-    image: mongo:7
+    image: mongo:8.0
     container_name: mongodb
     restart: unless-stopped
     volumes:
@@ -87,8 +89,10 @@ services:
     env_file:
       - .env
     environment:
-      AUDIO_API_BASE_URL: https://audio.kacper.me
-      LLM_BASE_URL: https://llama.kacper.me/v1
+      AUDIO_API_BASE_URL: "${AUDIO_API_URL:-https://audio.kacper.me}"
+      LLM_BASE_URL: "${LLM_BASE_URL:-https://llama.kacper.me/v1}"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./librechat.yaml:/app/librechat.yaml.template:ro
       - ./librechat-render.js:/app/librechat-render.js:ro
@@ -130,12 +134,14 @@ services:
     env_file:
       - ./signal-bot.env
     environment:
-      LLM_BASE_URL: https://llama.kacper.me/v1
-      AUDIO_API_URL: https://audio.kacper.me
-      YTDLP_SERVICE_URL: https://yt.kacper.me
+      LLM_BASE_URL: "${LLM_BASE_URL:-https://llama.kacper.me/v1}"
+      AUDIO_API_URL: "${AUDIO_API_URL:-https://audio.kacper.me}"
+      YTDLP_SERVICE_URL: "${YTDLP_SERVICE_URL:-https://yt.kacper.me}"
       MEMORY_MCP_URL: http://memory-mcp:8089
       MEMORY_DIR_MOUNT: /memory
       MEMORY_DEFAULT_USER_ID: ${MEMORY_DEFAULT_USER_ID:-default}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./signal-bot-custom-skills:/app/data/custom_skills
       - signal-bot-data:/app/data
@@ -166,7 +172,9 @@ services:
     env_file:
       - .env
     environment:
-      LLM_BASE_URL: https://llama.kacper.me/v1
+      LLM_BASE_URL: "${LLM_BASE_URL:-https://llama.kacper.me/v1}"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - location-tracker-data:/data
       - ./shared:/shared:ro
@@ -198,7 +206,9 @@ services:
       - .env
       - signal-bot.env
     environment:
-      LLM_BASE_URL: https://llama.kacper.me/v1
+      LLM_BASE_URL: "${LLM_BASE_URL:-https://llama.kacper.me/v1}"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - calendar-watcher-data:/data
       - ./shared:/shared:ro
@@ -226,7 +236,9 @@ services:
       - signal-bot.env
       - receipt-watcher.env
     environment:
-      LLM_BASE_URL: https://llama.kacper.me/v1
+      LLM_BASE_URL: "${LLM_BASE_URL:-https://llama.kacper.me/v1}"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - receipt-watcher-data:/data
       - ./receipt-watcher/accounts.yaml:/app/accounts.yaml:ro
@@ -250,7 +262,9 @@ services:
       - signal-bot.env
       - tg-watcher.env
     environment:
-      LLM_BASE_URL: https://llama.kacper.me/v1
+      LLM_BASE_URL: "${LLM_BASE_URL:-https://llama.kacper.me/v1}"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - tg-watcher-data:/data
       - ./shared:/shared:ro
@@ -271,7 +285,9 @@ services:
       - signal-bot.env
       - oss-watcher.env
     environment:
-      LLM_BASE_URL: https://llama.kacper.me/v1
+      LLM_BASE_URL: "${LLM_BASE_URL:-https://llama.kacper.me/v1}"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./shared:/shared:ro
     depends_on:
@@ -290,8 +306,10 @@ services:
       - signal-bot.env
       - rss-watcher.env
     environment:
-      LLM_BASE_URL: https://llama.kacper.me/v1
-      AUDIO_API_URL: https://audio.kacper.me
+      LLM_BASE_URL: "${LLM_BASE_URL:-https://llama.kacper.me/v1}"
+      AUDIO_API_URL: "${AUDIO_API_URL:-https://audio.kacper.me}"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./shared:/shared:ro
     depends_on:
@@ -376,7 +394,7 @@ services:
     mem_limit: 256m
 
   qdrant:
-    image: qdrant/qdrant:v1.12.4
+    image: qdrant/qdrant:v1.17.1
     container_name: qdrant
     restart: unless-stopped
     ports:
@@ -396,10 +414,12 @@ services:
     ports:
       - "8089:8089"
     environment:
-      MEMORY_LLM_BASE_URL: https://llama.kacper.me/v1
+      MEMORY_LLM_BASE_URL: "${LLM_BASE_URL:-https://llama.kacper.me/v1}"
       MEMORY_QDRANT_HOST: qdrant
       MEMORY_QDRANT_PORT: "6333"
       MEMORY_DEFAULT_USER_ID: ${MEMORY_DEFAULT_USER_ID:-default}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ${MEMORY_DIR:?MEMORY_DIR must be set in .env}:/memory
       - ./shared:/shared:ro

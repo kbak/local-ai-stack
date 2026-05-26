@@ -17,7 +17,7 @@ COPY audio-api/requirements.txt /app/requirements-base.txt
 RUN sed -i '/^chatterbox-tts/d' /app/requirements-base.txt && \
     pip install --no-cache-dir -r /app/requirements-base.txt && \
     pip uninstall -y onnxruntime && \
-    pip install --no-cache-dir --force-reinstall onnxruntime-gpu==1.19.2
+    pip install --no-cache-dir --force-reinstall onnxruntime-gpu==1.23.2
 
 # Step 2 — torch / torchaudio from the cu128 index. Required for Blackwell
 # (sm_120 — 5060 Ti / 5090). The cu128 wheels bundle their own CUDA runtime
