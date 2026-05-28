@@ -6,6 +6,7 @@ mcpSettings:
     - "http://location-tracker:8084"
     - "http://pdf-inspector:8085/"
     - "http://memory-mcp:8089"
+    - "http://reverse-image-search:8091"
     - "${AUDIO_API_BASE_URL}"
   autoApprove: true
 
@@ -147,8 +148,8 @@ mcpServers:
     type: streamable-http
     serverInstructions: false
   pdf-inspector:
-    url: http://pdf-inspector:8085/sse/
-    type: sse
+    url: http://pdf-inspector:8085/mcp/
+    type: streamable-http
     serverInstructions: false
   location-tracker:
     url: http://location-tracker:8084/mcp
@@ -162,5 +163,9 @@ mcpServers:
     serverInstructions: false
   chatterbox:
     url: ${AUDIO_API_BASE_URL}/mcp/mcp
+    type: streamable-http
+    serverInstructions: false
+  reverse-image-search:
+    url: http://reverse-image-search:8091/mcp/
     type: streamable-http
     serverInstructions: false

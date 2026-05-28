@@ -393,6 +393,22 @@ services:
       - server-net
     mem_limit: 256m
 
+  reverse-image-search:
+    build:
+      context: .
+      dockerfile: reverse-image-search/Dockerfile
+    container_name: reverse-image-search
+    restart: unless-stopped
+    ports:
+      - "8091:8091"
+    environment:
+      SAUCENAO_API_KEY: ${SAUCENAO_API_KEY:-}
+      LLM_BASE_URL: "${LLM_BASE_URL:-https://llama.kacper.me/v1}"
+      SEARXNG_URL: "http://searxng:8080"
+    networks:
+      - server-net
+    mem_limit: 256m
+
   qdrant:
     image: qdrant/qdrant:v1.17.1
     container_name: qdrant

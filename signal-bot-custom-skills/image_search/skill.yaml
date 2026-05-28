@@ -1,0 +1,15 @@
+name: image_search
+description: >
+  Analyze images to identify people, objects, memes, and find their web origin.
+  Use automatically when the user sends an image attachment or shares an image URL.
+  analyze_image is best for memes and photoshopped content (uses VLM + web search).
+  reverse_image_search is best for original unmodified photos (uses Yandex + SauceNAO).
+version: "1.0.0"
+enabled: true
+command: /identify
+command_arg: source
+command_usage: "/identify <image url or attachment path>"
+
+tools:
+  - "image_search:analyze_image"
+  - "image_search:reverse_image_search"
