@@ -26,9 +26,4 @@ until curl -sf http://localhost:8087/health >/dev/null 2>&1; do
     sleep 2
 done
 
-echo "Waiting for memory-mcp..."
-until curl -sf http://localhost:8089/health >/dev/null 2>&1; do
-    sleep 2
-done
-
 echo "Server stack is up."

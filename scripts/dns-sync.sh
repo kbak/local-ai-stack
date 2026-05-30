@@ -13,7 +13,8 @@ MY_IP="$(tailscale ip -4 2>/dev/null)"
 
 DOMAIN="kacper.me"
 CF_API="https://api.cloudflare.com/client/v4"
-SERVER_HOSTS=(voice chat search pdf mcp memory nextcloud)
+# memory.kacper.me lives on the AI box now (memory-mcp moved to docker-compose.ai.yml).
+SERVER_HOSTS=(voice chat search pdf mcp nextcloud)
 
 cf() { curl -sSf -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" "$@"; }
 
