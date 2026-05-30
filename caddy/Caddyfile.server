@@ -30,3 +30,7 @@ mcp.kacper.me {
 nextcloud.kacper.me {
 	reverse_proxy 127.0.0.1:8090
 }
+
+yt.kacper.me {
+	reverse_proxy 127.0.0.1:8200
+}
