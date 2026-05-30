@@ -4,7 +4,7 @@ Two surfaces:
   * /health and /v1/*   — plain REST (for start.sh readiness checks and debugging)
   * /mcp                — MCP streamable-http endpoint for LibreChat, signal-bot, opencode
 
-Both speak to the same Mem0 backend (bge-m3 local, qwen via llama-swap, Qdrant store).
+Both speak to the same Mem0 backend (bge-m3 local, Qwen via llama-swap on the host, Qdrant store).
 
 Note: do NOT enable `from __future__ import annotations` here. FastMCP's tool
 decorator runs `issubclass(param.annotation, Context)` on each parameter, which
@@ -64,6 +64,8 @@ def search_memory(query: str, user_id: str = "", limit: int = 5) -> dict:
     Returns the top matches ranked by semantic similarity.
     """
     uid = user_id or config.DEFAULT_USER_ID
+    if not memory_backend.is_ready():
+        return {"query": query, "user_id": uid, "results": [], "error": "backend not ready"}
     results = memory_backend.search(query=query, user_id=uid, limit=limit)
     return {"query": query, "user_id": uid, "results": results}
 
@@ -72,6 +74,8 @@ def search_memory(query: str, user_id: str = "", limit: int = 5) -> dict:
 def list_memories(user_id: str = "", limit: int = 100) -> dict:
     """List all stored memories for a user. Useful for auditing or pruning."""
     uid = user_id or config.DEFAULT_USER_ID
+    if not memory_backend.is_ready():
+        return {"user_id": uid, "count": 0, "results": [], "error": "backend not ready"}
     results = memory_backend.list_all(user_id=uid, limit=limit)
     return {"user_id": uid, "count": len(results), "results": results}
 
@@ -94,6 +98,8 @@ def delete_memory(memory_id: str, confirm_token: str = "") -> dict:
     Never call step 2 without a user confirmation in between.
     """
     if not confirm_token:
+        if not memory_backend.is_ready():
+            return {"error": "backend not ready"}
         record = memory_backend.get_by_id(memory_id)
         if record is None:
             return {"error": f"memory_id not found: {memory_id}"}

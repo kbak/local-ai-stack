@@ -103,8 +103,6 @@ services:
         condition: service_started
       mcp-proxy:
         condition: service_healthy
-      memory-mcp:
-        condition: service_started
     networks:
       - server-net
     mem_limit: 768m
@@ -137,7 +135,7 @@ services:
       LLM_BASE_URL: "${LLM_BASE_URL:-https://llama.kacper.me/v1}"
       AUDIO_API_URL: "${AUDIO_API_URL:-https://audio.kacper.me}"
       YTDLP_SERVICE_URL: "${YTDLP_SERVICE_URL:-https://yt.kacper.me}"
-      MEMORY_MCP_URL: http://memory-mcp:8089
+      MEMORY_MCP_URL: https://memory.kacper.me
       MEMORY_DIR_MOUNT: /memory
       MEMORY_DEFAULT_USER_ID: ${MEMORY_DEFAULT_USER_ID:-default}
     extra_hosts:
@@ -156,8 +154,6 @@ services:
       mcp-proxy:
         condition: service_healthy
       searxng:
-        condition: service_started
-      memory-mcp:
         condition: service_started
     networks:
       - server-net
@@ -409,41 +405,6 @@ services:
       - server-net
     mem_limit: 256m
 
-  qdrant:
-    image: qdrant/qdrant:v1.17.1
-    container_name: qdrant
-    restart: unless-stopped
-    ports:
-      - "6333:6333"
-    volumes:
-      - ${MEMORY_DIR:?MEMORY_DIR must be set in .env}/qdrant:/qdrant/storage
-    networks:
-      - server-net
-    mem_limit: 1024m
-
-  memory-mcp:
-    build:
-      context: .
-      dockerfile: memory-mcp/Dockerfile
-    container_name: memory-mcp
-    restart: unless-stopped
-    ports:
-      - "8089:8089"
-    environment:
-      MEMORY_LLM_BASE_URL: "${LLM_BASE_URL:-https://llama.kacper.me/v1}"
-      MEMORY_QDRANT_HOST: qdrant
-      MEMORY_QDRANT_PORT: "6333"
-      MEMORY_DEFAULT_USER_ID: ${MEMORY_DEFAULT_USER_ID:-default}
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    volumes:
-      - ${MEMORY_DIR:?MEMORY_DIR must be set in .env}:/memory
-      - ./shared:/shared:ro
-    depends_on:
-      - qdrant
-    networks:
-      - server-net
-    mem_limit: 3000m
 
 networks:
   server-net:
@@ -465,3 +426,4 @@ volumes:
   tg-watcher-data:
   nextcloud-db:
   nextcloud-data:
+

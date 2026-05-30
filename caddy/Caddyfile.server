@@ -27,10 +27,6 @@ mcp.kacper.me {
 	reverse_proxy 127.0.0.1:8083
 }
 
-memory.kacper.me {
-	reverse_proxy 127.0.0.1:8089
-}
-
 nextcloud.kacper.me {
 	reverse_proxy 127.0.0.1:8090
 }
