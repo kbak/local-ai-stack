@@ -2,10 +2,11 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_DIR="$(dirname "$SCRIPT_DIR")"
 
 # Load env vars (MEMORY_DIR, NEXTCLOUD_DB_PASSWORD, NEXTCLOUD_ADMIN_PASSWORD)
 set -a
-source "$SCRIPT_DIR/.env"
+source "$REPO_DIR/.env"
 set +a
 
 docker inspect nextcloud &>/dev/null || { echo "Nextcloud container not running on $(hostname -s), skipping."; exit 0; }

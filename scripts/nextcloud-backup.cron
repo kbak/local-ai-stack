@@ -1,0 +1,7 @@
+# Nextcloud nightly backup — runs as root via cron daemon (no login needed).
+# Install:  sudo cp scripts/nextcloud-backup.cron /etc/cron.d/nextcloud-backup
+#           sudo chown root:root /etc/cron.d/nextcloud-backup
+#           sudo chmod 644 /etc/cron.d/nextcloud-backup
+SHELL=/bin/bash
+PATH=/usr/bin:/bin
+0 3 * * * root /bin/bash /home/kacper/local-ai-stack/scripts/backup-nextcloud.sh >> /var/log/nextcloud-backup.log 2>&1
