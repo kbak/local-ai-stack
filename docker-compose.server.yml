@@ -122,8 +122,11 @@ services:
     volumes:
       - signal-cli-data:/home/.local/share/signal-cli
     environment:
-      - MODE=native
-      - AUTO_RECEIVE_SCHEDULE=0 */6 * * *
+      # json-rpc: signal-cli stays resident (no per-call JVM cold-start). Requires
+      # the bot to receive over the WebSocket (/v1/receive WS), which the
+      # json-rpc-websocket-receive branch of uoltz does. AUTO_RECEIVE_SCHEDULE is
+      # incompatible with json-rpc, so it's omitted.
+      - MODE=json-rpc
     networks:
       - server-net
     mem_limit: 512m
