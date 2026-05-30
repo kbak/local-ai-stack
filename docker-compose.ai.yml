@@ -27,7 +27,7 @@ services:
       MEMORY_QDRANT_PORT: "6333"
       MEMORY_DEFAULT_USER_ID: ${MEMORY_DEFAULT_USER_ID:-default}
     extra_hosts:
-      - "host.docker.internal:host-gateway"
+      - "host.docker.internal:172.18.0.1"
     volumes:
       - ./shared:/shared:ro
     depends_on:
