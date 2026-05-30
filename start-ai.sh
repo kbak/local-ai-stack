@@ -44,16 +44,8 @@ until curl -sf http://localhost:8080/v1/chat/completions \
     sleep 2
 done
 
-echo "Starting yt-dlp service..."
-cd "$SCRIPT_DIR/yt-dlp-service"
-nohup "$WORKSPACE/yt-dlp-service-venv/bin/python" server.py >/tmp/yt-dlp-service.log 2>&1 &
-disown
-cd "$SCRIPT_DIR"
-
-echo "Waiting for yt-dlp service..."
-until curl -sf http://localhost:8200/health >/dev/null 2>&1; do
-    sleep 2
-done
+# yt-dlp-service now runs on the Linux server box as a systemd service
+# (scripts/setup-ytdlp.sh), co-located with signal-bot — no longer launched here.
 
 echo "Waiting for dockerd socket..."
 for i in $(seq 1 60); do docker info >/dev/null 2>&1 && break; sleep 1; done
