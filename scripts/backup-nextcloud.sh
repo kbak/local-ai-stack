@@ -8,9 +8,11 @@ set -a
 source "$SCRIPT_DIR/.env"
 set +a
 
+docker inspect nextcloud &>/dev/null || { echo "Nextcloud container not running on $(hostname -s), skipping."; exit 0; }
+
 NC_VOLUME="/var/lib/docker/volumes/stack_nextcloud-data/_data"
 STAGING_DIR="$(mktemp -d)"
-OUTPUT_ZIP="$MEMORY_DIR/nextcloud-backup.7z"
+OUTPUT_ZIP="$MEMORY_DIR/nextcloud-backup-$(hostname -s).7z"
 TIMESTAMP=$(date +"%Y-%m-%d %H:%M:%S")
 
 log() { echo "[$TIMESTAMP] $*"; }
