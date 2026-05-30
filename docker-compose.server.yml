@@ -70,8 +70,13 @@ services:
       - server-net
     mem_limit: 512m
 
+  # mongo 8.0+ hard-aborts on Linux kernel >=6.19 (this host is 7.0) via a
+  # version-string guard (SERVER-121912) — no env var bypasses it. The guard
+  # only exists in 8.0+, and MongoDB states only "8.0 or newer" is affected, so
+  # 7.0 runs clean. LibreChat supports 7.x; the 8.0 dump restores fine into it.
+  # WSL (kernel 6.6) is unaffected and can stay on 8.0.
   mongodb:
-    image: mongo:8.0
+    image: mongo:7.0
     container_name: mongodb
     restart: unless-stopped
     volumes:
