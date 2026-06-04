@@ -28,9 +28,18 @@ RUN cp -r /uoltz/app/. .
 # The upstream default of 60s is too short for the 35B model on long contexts.
 RUN sed -i 's/^AGENT_TIMEOUT = 60$/AGENT_TIMEOUT = int(os.environ.get("AGENT_TIMEOUT_S", "120"))/' /app/bot.py
 
-# Disable Qwen3 extended thinking for the bot — the jinja template defaults to
-# thinking ON, which burns 10k+ tokens per response (60-80s on 35B). LibreChat
-# sends its own enable_thinking=true; the bot always wants it off.
-RUN sed -i 's/"max_tokens": max_tok,/"max_tokens": max_tok,\n            "extra_body": {"chat_template_kwargs": {"enable_thinking": False}},/' /app/agent.py
+# Light thinking for the bot. Qwen3 thinking is re-enabled (enable_thinking=True)
+# but kept SHORT via a brief-reasoning directive in the system prompt (next sed),
+# so the bot stops hallucinating / contradicting itself WITHOUT the 10k-token,
+# 60-80s blowups of full default thinking. Measured against the live 35B-A3B
+# endpoint: trivial chat ~1-2s / ~200 tok, a reasoning question ~3s / ~570 tok,
+# tool calls unaffected (~80 tok). vLLM's qwen3 reasoning-parser strips the
+# <think> block into a separate `reasoning` field, so the trace never leaks into
+# the Signal reply.
+RUN sed -i 's/"max_tokens": max_tok,/"max_tokens": max_tok,\n            "extra_body": {"chat_template_kwargs": {"enable_thinking": True}},/' /app/agent.py
+
+# Remove the /no_think soft-switch (it would override enable_thinking=True) and
+# replace it with a tight thinking budget so reasoning stays brief and fast.
+RUN sed -i 's|^/no_think$|Think briefly before replying: a sentence or two to check facts and avoid contradicting yourself, then answer. Skip thinking for greetings and trivial messages. Keep reasoning short to stay fast.|' /app/agent.py
 
 CMD ["python", "bot.py"]

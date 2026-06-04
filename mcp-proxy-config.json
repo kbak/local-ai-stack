@@ -1,8 +1,8 @@
 {
   "mcpServers": {
     "searxng": {
-      "command": "uvx",
-      "args": ["mcp-searxng==0.1.0"],
+      "command": "npx",
+      "args": ["-y", "mcp-searxng@1.1.0"],
       "env": {
         "SEARXNG_URL": "http://searxng:8080"
       }
