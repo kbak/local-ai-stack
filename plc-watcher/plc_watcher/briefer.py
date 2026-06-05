@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import logging
 import os
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from stack_shared.llm_chat import chat
 from stack_shared.rss_fetch import fetch_category
@@ -20,7 +22,21 @@ from .weather_map import render_weather_map
 
 log = logging.getLogger(__name__)
 
+_POLISH_MONTHS = [
+    "stycznia", "lutego", "marca", "kwietnia", "maja", "czerwca",
+    "lipca", "sierpnia", "września", "października", "listopada", "grudnia",
+]
+
+
+def _today_warsaw() -> str:
+    now = datetime.now(ZoneInfo("Europe/Warsaw"))
+    return f"{now.day} {_POLISH_MONTHS[now.month - 1]} {now.year}"
+
+
 _SYSTEM_PROMPT = """\
+Dziś jest {today} (czasu warszawskiego). Jeśli podajesz datę wydania, użyj \
+dokładnie tej daty — nie wymyślaj innych dat.
+
 Jesteś redaktorem "Merkuriusza Rzeczypospolitej" — codziennej gazety obejmującej \
 ziemie Rzeczypospolitej Obojga Narodów w jej granicach z roku 1650: Koronę, \
 Wielkie Księstwo Litewskie, Inflanty oraz ziemie ruskie (dzisiejsza Polska, Litwa, \
@@ -79,7 +95,10 @@ def run_plc_brief() -> None:
     )
 
     log.info("Synthesizing brief from %d items...", total)
-    summary = chat(_SYSTEM_PROMPT.format(hours=PLC_LOOKBACK_HOURS), user_prompt)
+    summary = chat(
+        _SYSTEM_PROMPT.format(hours=PLC_LOOKBACK_HOURS, today=_today_warsaw()),
+        user_prompt,
+    )
     body = "*Merkuriusz Rzeczypospolitej* 🦅\n\n" + summary
 
     image = None
