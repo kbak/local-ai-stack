@@ -2,50 +2,73 @@
   "mcpServers": {
     "searxng": {
       "command": "npx",
-      "args": ["-y", "mcp-searxng@1.1.0"],
+      "args": [
+        "-y",
+        "mcp-searxng@1.1.0"
+      ],
       "env": {
         "SEARXNG_URL": "http://searxng:8080"
       }
     },
     "fetch": {
       "command": "uvx",
-      "args": ["mcp-server-fetch==2025.4.7"]
+      "args": [
+        "mcp-server-fetch==2025.4.7"
+      ]
     },
     "arxiv": {
       "command": "uvx",
-      "args": ["arxiv-mcp-server==0.4.11"]
+      "args": [
+        "arxiv-mcp-server==0.4.11"
+      ]
     },
     "youtube": {
       "command": "uvx",
-      "args": ["mcp-youtube-transcript==0.3.5"]
+      "args": [
+        "mcp-youtube-transcript==0.3.5"
+      ]
     },
     "time": {
       "command": "uvx",
-      "args": ["mcp-server-time==2026.1.26"]
-    },
-    "hackernews": {
-      "command": "uvx",
-      "args": ["mcp-hn==0.1.0"]
+      "args": [
+        "mcp-server-time==2026.1.26"
+      ]
     },
     "weather": {
       "command": "uvx",
-      "args": ["--from", "mcp-weather-server==0.6.1", "mcp_weather_server"]
+      "args": [
+        "--from",
+        "mcp-weather-server==0.6.1",
+        "mcp_weather_server"
+      ]
     },
     "currency": {
       "command": "uvx",
-      "args": ["frankfurtermcp==0.4.4"]
+      "args": [
+        "frankfurtermcp==0.4.4"
+      ]
     },
     "finance": {
       "command": "uvx",
-      "args": ["yfinance-mcp-server==1.0.4"]
+      "args": [
+        "yfinance-mcp-server==1.0.4"
+      ]
     },
     "github": {
       "command": "python",
-      "args": ["/opt/gh-read-server.py"]
+      "args": [
+        "/opt/gh-read-server.py"
+      ]
     },
     "google-maps": {
       "command": "uv",
-      "args": ["run", "--with", "google-maps-mcp-server==0.2.1", "python", "/opt/gmaps-searchtext-shim.py"]
+      "args": [
+        "run",
+        "--with",
+        "google-maps-mcp-server==0.2.1",
+        "python",
+        "/opt/gmaps-searchtext-shim.py"
+      ]
     }
   }
 }

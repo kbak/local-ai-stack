@@ -123,10 +123,6 @@ mcpServers:
     url: http://mcp-proxy:8083/servers/youtube/mcp
     type: streamable-http
     serverInstructions: false
-  hackernews:
-    url: http://mcp-proxy:8083/servers/hackernews/mcp
-    type: streamable-http
-    serverInstructions: false
   weather:
     url: http://mcp-proxy:8083/servers/weather/mcp
     type: streamable-http

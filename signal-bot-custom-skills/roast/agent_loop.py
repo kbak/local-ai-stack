@@ -44,7 +44,6 @@ _MCP_SERVERS = (
     "fetch",
     "arxiv",
     "youtube",
-    "hackernews",
     "weather",
     "github",
 )

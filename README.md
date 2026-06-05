@@ -8,7 +8,7 @@ Self-hosted LLM stack with privacy-focused web search and research tools. Runs o
 |---|---|---|
 | llama-swap | 8080 | Model manager — switches between vLLM instances on demand |
 | SearXNG | 8081 | Privacy-focused meta search engine |
-| mcp-proxy | 8083 | MCP tool server (11 tools via streamable HTTP, no auth required) |
+| mcp-proxy | 8083 | MCP tool server (10 tools via streamable HTTP, no auth required) |
 | location-tracker | 8084 | City-presence timeline service; exposes `get_location_at` MCP tool (bearer token required) |
 | pdf-inspector | 8086 | PDF text extraction via pdf-inspector (Rust); handles Unicode, multi-column, tables |
 | voice-agent | 8087 | Browser voice-chat UI with wake-word-free VAD, streaming TTS, voice picker, and full MCP tool access via strands |
@@ -36,7 +36,6 @@ All tools are exposed via mcp-proxy on port 8083 (no authentication required —
 - **arxiv** — academic paper search
 - **youtube** — YouTube transcript extraction
 - **time** — current time and timezone conversion
-- **hackernews** — Hacker News top stories
 - **pdf-inspector** — PDF text extraction (Rust, handles Unicode/multi-column/tables); available directly at port 8086, not via mcp-proxy
 - **weather** — current weather and forecast
 - **currency** — exchange rates
@@ -359,7 +358,7 @@ Skills in `signal-bot-custom-skills/` are mounted into the container at `/app/da
 
 The uoltz fork ships with several built-ins disabled by default (`web_search`, `notes`, `rss_digest`, `shell`, `skill_builder`) — the stack intentionally keeps them off: web search, news digests, and host-side actions are handled by MCP tools and watcher services instead.
 
-Available custom skills: arxiv, currency, finance, github, google_maps, hackernews, music_download, pdf, roast, sample_download, searxng, time, tts_clone, voices_list, weather.
+Available custom skills: arxiv, currency, finance, github, google_maps, music_download, pdf, roast, sample_download, searxng, time, tts_clone, voices_list, weather.
 
 Most are thin MCP-client shims that call mcp-proxy on port 8083. A few do their own thing:
 
@@ -465,7 +464,7 @@ This skill needs the `signal` and `sender` kwargs that the `kbak/uoltz` fork inj
 
 ### Roast battle skill
 
-LLM-driven roast battle between two voices you've already saved. Both agents stay fully in character, take turns trading roasts, and can pull MCP tools (search, fetch, hackernews, etc.) for fresh material when they get stuck. The transcript is sent as a text message first; the stitched voice note follows.
+LLM-driven roast battle between two voices you've already saved. Both agents stay fully in character, take turns trading roasts, and can pull MCP tools (search, fetch, etc.) for fresh material when they get stuck. The transcript is sent as a text message first; the stitched voice note follows.
 
 **Usage**
 ```
