@@ -36,7 +36,8 @@ mcp = FastMCP("memory-mcp")
 
 
 @mcp.tool()
-def add_memory(content: str, user_id: str = "", metadata_json: str = "") -> dict:
+def add_memory(content: str, user_id: str = "", metadata_json: str = "",
+               verbatim: bool = False) -> dict:
     """Save information to long-term memory.
 
     Call this when the user states a durable preference, a stable fact about
@@ -47,11 +48,14 @@ def add_memory(content: str, user_id: str = "", metadata_json: str = "") -> dict
     in the background. Safe to call mid-conversation without slowing the reply.
 
     `metadata_json`: optional JSON-encoded string of metadata to attach.
+    `verbatim`: store `content` exactly as given, skipping LLM fact extraction.
+    Use when the user dictated the precise thing to remember.
     """
     import json as _json
     uid = user_id or config.DEFAULT_USER_ID
     metadata = _json.loads(metadata_json) if metadata_json else None
-    memory_backend.enqueue_add(content, user_id=uid, metadata=metadata)
+    memory_backend.enqueue_add(content, user_id=uid, metadata=metadata,
+                               infer=not verbatim)
     return {"queued": True, "user_id": uid, "pending": memory_backend.pending_writes()}
 
 
@@ -157,11 +161,13 @@ class AddRequest(BaseModel):
     content: str
     user_id: str = Field(default=config.DEFAULT_USER_ID)
     metadata: dict | None = None
+    verbatim: bool = False  # True → store content as-is, no LLM fact extraction
 
 
 @app.post("/v1/memory")
 def rest_add(req: AddRequest):
-    memory_backend.enqueue_add(req.content, user_id=req.user_id, metadata=req.metadata)
+    memory_backend.enqueue_add(req.content, user_id=req.user_id, metadata=req.metadata,
+                               infer=not req.verbatim)
     return {"queued": True, "user_id": req.user_id, "pending": memory_backend.pending_writes()}
 
 

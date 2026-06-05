@@ -9,7 +9,7 @@ WORKDIR /app
 # Bump UOLTZ_REV (any new value) to force a fresh git clone of kbak/uoltz.
 # Otherwise Docker caches the clone layer indefinitely and pushes to the
 # fork won't be picked up by `docker compose build`.
-ARG UOLTZ_REV=2026-05-30-0450
+ARG UOLTZ_REV=2026-06-05-0813e2d
 RUN echo "uoltz rev: ${UOLTZ_REV}" && git clone https://github.com/kbak/uoltz.git /uoltz
 RUN pip install --no-cache-dir -r /uoltz/app/requirements.txt && \
     pip install --no-cache-dir mutagen && \

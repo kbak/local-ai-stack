@@ -117,17 +117,24 @@ def _redact(job: dict) -> dict:
     return out
 
 
-def _do_add(*, messages: list[dict] | str, user_id: str, metadata: dict | None) -> None:
+def _do_add(*, messages: list[dict] | str, user_id: str, metadata: dict | None,
+            infer: bool = True) -> None:
     assert _memory is not None
-    result = _memory.add(messages, user_id=user_id, metadata=metadata or {})
-    logger.info("Stored memory for user=%s: %s", user_id, result)
+    result = _memory.add(messages, user_id=user_id, metadata=metadata or {}, infer=infer)
+    logger.info("Stored memory for user=%s (infer=%s): %s", user_id, infer, result)
 
 
 # ── Public API ──────────────────────────────────────────────────────────
 
-def enqueue_add(messages: list[dict] | str, user_id: str, metadata: dict | None = None) -> None:
-    """Queue a memory write. Returns immediately; Mem0's extractor runs in the background."""
-    _write_queue.put({"messages": messages, "user_id": user_id, "metadata": metadata})
+def enqueue_add(messages: list[dict] | str, user_id: str, metadata: dict | None = None,
+                infer: bool = True) -> None:
+    """Queue a memory write. Returns immediately; Mem0's extractor runs in the background.
+
+    infer=False stores the content verbatim (no LLM fact extraction) — use when
+    the caller already has the exact fact to keep.
+    """
+    _write_queue.put({"messages": messages, "user_id": user_id, "metadata": metadata,
+                      "infer": infer})
 
 
 def search(query: str, user_id: str, limit: int = 5) -> list[dict[str, Any]]:
