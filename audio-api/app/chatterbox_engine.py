@@ -171,6 +171,42 @@ def resolve_voice(voice: Optional[str]) -> Optional[str]:
     return str(candidate)
 
 
+# T3 caps generation at ~40 s of audio, so long texts must be synthesized in
+# sentence-grouped pieces and concatenated. ~350 chars stays safely under the cap.
+_MAX_GEN_CHARS = 350
+_SENTENCE_RE = None  # compiled lazily
+
+
+def _split_for_generation(text: str, max_chars: int = _MAX_GEN_CHARS) -> list[str]:
+    """Split text into sentence groups of at most max_chars each."""
+    import re
+    global _SENTENCE_RE
+    if _SENTENCE_RE is None:
+        _SENTENCE_RE = re.compile(r"(?<=[.!?…])\s+")
+    pieces: list[str] = []
+    current = ""
+    for sentence in _SENTENCE_RE.split(text):
+        if not sentence:
+            continue
+        # hard-split a single over-long sentence
+        while len(sentence) > max_chars:
+            cut = sentence.rfind(" ", 0, max_chars)
+            cut = cut if cut > 0 else max_chars
+            if current:
+                pieces.append(current)
+                current = ""
+            pieces.append(sentence[:cut])
+            sentence = sentence[cut:].lstrip()
+        if len(current) + len(sentence) + 1 > max_chars and current:
+            pieces.append(current)
+            current = sentence
+        else:
+            current = f"{current} {sentence}".strip()
+    if current:
+        pieces.append(current)
+    return pieces
+
+
 def synthesize(
     text: str,
     voice: Optional[str] = None,
@@ -206,12 +242,33 @@ def synthesize(
     if ref:
         kwargs["audio_prompt_path"] = ref
 
-    if lang == "en":
-        wav = _en_model.generate(text, **kwargs)
-        sr = _en_model.sr
+    import torch
+
+    model = _en_model if lang == "en" else _mtl_model
+    sr = model.sr
+    if lang != "en":
+        kwargs["language_id"] = lang
+
+    pieces = _split_for_generation(text)
+    waves = []
+    gap = None
+    for piece in pieces:
+        waves.append(model.generate(piece, **kwargs))
+        if gap is None and len(pieces) > 1:
+            # 200 ms inter-piece silence, matching the wave's shape/device
+            gap = torch.zeros(
+                *waves[0].shape[:-1], int(sr * 0.2),
+                dtype=waves[0].dtype, device=waves[0].device,
+            )
+    if len(waves) == 1:
+        wav = waves[0]
     else:
-        wav = _mtl_model.generate(text, language_id=lang, **kwargs)
-        sr = _mtl_model.sr
+        joined: list = []
+        for i, w in enumerate(waves):
+            if i:
+                joined.append(gap)
+            joined.append(w)
+        wav = torch.cat(joined, dim=-1)
 
     arr = wav.detach().cpu().numpy()
     if arr.ndim == 2:

@@ -6,11 +6,11 @@ import logging
 import os
 
 from stack_shared.llm_chat import chat
+from stack_shared.rss_fetch import fetch_category
 from stack_shared.signal_client import send_message
 from stack_shared.voice_note import send_text_and_voice_brief
 
 from .config import RSS_FEEDS, RSS_LOOKBACK_HOURS
-from .fetcher import fetch_category
 
 log = logging.getLogger(__name__)
 

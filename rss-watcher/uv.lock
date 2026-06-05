@@ -777,7 +777,9 @@ name = "stack-shared"
 version = "0.1.0"
 source = { editable = "../shared" }
 dependencies = [
+    { name = "apscheduler" },
     { name = "caldav" },
+    { name = "feedparser" },
     { name = "httpx" },
     { name = "icalendar" },
     { name = "openai" },
@@ -788,7 +790,9 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "apscheduler", specifier = ">=3.10.0" },
     { name = "caldav", specifier = ">=1.3.1" },
+    { name = "feedparser", specifier = ">=6.0.0" },
     { name = "httpx", specifier = ">=0.27.0" },
     { name = "icalendar", specifier = ">=5.0.0" },
     { name = "openai", specifier = ">=1.30.0" },

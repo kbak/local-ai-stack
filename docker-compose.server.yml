@@ -322,6 +322,28 @@ services:
       - server-net
     mem_limit: 256m
 
+  plc-watcher:
+    build:
+      context: .
+      dockerfile: plc-watcher/Dockerfile
+    container_name: plc-watcher
+    restart: unless-stopped
+    env_file:
+      - signal-bot.env
+      - plc-watcher.env
+    environment:
+      LLM_BASE_URL: "${LLM_BASE_URL:-https://llama.kacper.me/v1}"
+      AUDIO_API_URL: "${AUDIO_API_URL:-https://audio.kacper.me}"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./shared:/shared:ro
+    depends_on:
+      - signal-api
+    networks:
+      - server-net
+    mem_limit: 512m
+
   nextcloud-db:
     image: mariadb:10.11
     container_name: nextcloud-db

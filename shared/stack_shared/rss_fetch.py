@@ -1,4 +1,4 @@
-"""Fetch RSS feeds and return recent items grouped by category."""
+"""Fetch RSS feeds and return recent items, newest first (shared by rss-watcher and plc-watcher)."""
 
 from __future__ import annotations
 

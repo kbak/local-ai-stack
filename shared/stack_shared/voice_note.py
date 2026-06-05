@@ -159,12 +159,33 @@ def synthesize_opus(
     audio_api_url: str,
     voice: str | None = None,
     speed: float | None = None,
+    language: str | None = None,
 ) -> bytes:
     """POST text to audio-api and return ogg/opus bytes.
 
     Voice/speed default to audio-api's server-side DEFAULT_VOICE/DEFAULT_SPEED
     when not supplied — do not duplicate them here.
+
+    `language` routes synthesis: None/"en" → Kokoro (/v1/audio/speech);
+    anything else (e.g. "pl") → Chatterbox multilingual (/v1/audio/clone),
+    where `voice` names a sample under audio-api's voice-samples dir.
     """
+    if language is not None and language != "en":
+        payload = {
+            "text": text,
+            "language": language,
+            "response_format": "opus",
+        }
+        if voice is not None:
+            payload["voice"] = voice
+        resp = httpx.post(
+            f"{audio_api_url}/v1/audio/clone",
+            json=payload,
+            timeout=_HTTP_TIMEOUT,
+        )
+        resp.raise_for_status()
+        return resp.content
+
     payload: dict = {
         "model": "kokoro",
         "input": text,
@@ -216,9 +237,17 @@ def send_text_and_voice_brief(
     recipient: str,
     voice: str | None = None,
     audio_api_url: str | None = None,
+    language: str | None = None,
+    image_png: bytes | None = None,
 ) -> None:
     """Send the text brief, then synthesize and send voice-note chunks after it."""
-    send_message(text, signal_api_url=signal_api_url, signal_number=signal_number, recipient=recipient)
+    send_message(
+        text,
+        signal_api_url=signal_api_url,
+        signal_number=signal_number,
+        recipient=recipient,
+        image_png=image_png,
+    )
 
     audio_api_url = audio_api_url or os.environ.get("AUDIO_API_URL", "http://audio-api:8088")
 
@@ -228,7 +257,7 @@ def send_text_and_voice_brief(
 
     for i, chunk in enumerate(chunks, 1):
         try:
-            ogg = synthesize_opus(chunk, audio_api_url=audio_api_url, voice=voice)
+            ogg = synthesize_opus(chunk, audio_api_url=audio_api_url, voice=voice, language=language)
         except Exception:
             log.exception("TTS failed for chunk %d/%d — skipping", i, len(chunks))
             continue
