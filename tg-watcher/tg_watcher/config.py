@@ -19,3 +19,6 @@ SUMMARY_CRON_MINUTE: int = int(os.environ.get("SUMMARY_CRON_MINUTE", "0"))
 # How many hours back to include in the daily brief
 SUMMARY_LOOKBACK_HOURS: int = int(os.environ.get("SUMMARY_LOOKBACK_HOURS", "24"))
 
+# Hard cap on the Telegram fetch so a hung connection can't starve the scheduler
+FETCH_TIMEOUT_S: int = int(os.environ.get("TG_FETCH_TIMEOUT_S", "180"))
+

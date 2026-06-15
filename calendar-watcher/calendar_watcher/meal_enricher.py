@@ -106,7 +106,14 @@ def _find_menu_url(restaurant: str, city: str) -> str | None:
 # ── Google Places API (New) ───────────────────────────────────────────────────
 
 def _places_lookup(venue: str, city: str) -> tuple[float | None, str | None]:
-    """Return (rating, formatted_address) from Places API (New), or (None, None)."""
+    """Return (rating, formatted_address) from Places API (New), or (None, None).
+
+    For restaurant chains the top text-search hit is often the wrong-city (even
+    wrong-country) location, so when we know the city we only accept a result
+    whose formatted address actually contains it — otherwise we'd "correct" a
+    correct event into the wrong place. When the city is unknown we fall back to
+    the top hit.
+    """
     if not GOOGLE_MAPS_API_KEY:
         return None, None
     try:
@@ -124,6 +131,18 @@ def _places_lookup(venue: str, city: str) -> tuple[float | None, str | None]:
         places = resp.json().get("places", [])
         if not places:
             return None, None
+
+        city_token = (city or "").strip().lower()
+        if city_token and city_token != "unknown city":
+            for place in places:
+                addr = (place.get("formattedAddress") or "").lower()
+                if city_token in addr:
+                    return place.get("rating"), place.get("formattedAddress")
+            # No hit in the requested city — don't guess a wrong-city address.
+            log.info("Places: no '%s' result for '%s' in %d hits, skipping address",
+                     city, venue, len(places))
+            return None, None
+
         place = places[0]
         return place.get("rating"), place.get("formattedAddress")
     except Exception as e:

@@ -114,7 +114,14 @@ services:
     entrypoint: ["/bin/sh", "-c", "node /app/librechat-render.js && exec node /app/api/server/index.js"]
 
   signal-api:
-    image: bbernhard/signal-cli-rest-api
+    # Local overlay (docker/signal-cli-0145/) = bbernhard latest-dev + signal-cli 0.14.5.
+    # 2026-06-11: Signal stopped sending `serverGuid` in some sealed-sender envelopes;
+    # signal-cli <=0.14.4.1 throws `getServerGuid(...) must not be null` and DROPS every
+    # incoming message (sends unaffected — that's why tg-watcher kept posting).
+    # Fixed upstream in signal-cli 0.14.5 (AsamK/signal-cli#2059). bbernhard had no
+    # 0.14.5 image yet, so we bake it. Revert to plain bbernhard tag once their image
+    # ships signal-cli >=0.14.5, then `docker rmi signal-cli-rest-api:0.14.5-local`.
+    image: signal-cli-rest-api:0.14.5-local
     container_name: signal-api
     restart: unless-stopped
     ports:

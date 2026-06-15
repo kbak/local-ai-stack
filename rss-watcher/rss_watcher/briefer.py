@@ -10,7 +10,7 @@ from stack_shared.rss_fetch import fetch_category
 from stack_shared.signal_client import send_message
 from stack_shared.voice_note import send_text_and_voice_brief
 
-from .config import RSS_FEEDS, RSS_LOOKBACK_HOURS
+from .config import RSS_FEEDS, RSS_LOOKBACK_HOURS, RSS_RECIPIENT
 
 log = logging.getLogger(__name__)
 
@@ -64,7 +64,7 @@ def run_news_brief() -> None:
     body = "*RSS News Brief*\n\n" + "\n\n---\n\n".join(parts)
     signal_api_url = os.environ.get("SIGNAL_API_URL", "http://signal-api:8080")
     signal_number = os.environ["SIGNAL_NUMBER"]
-    recipient = os.environ["BRIEFING_RECIPIENT"]
+    recipient = RSS_RECIPIENT
 
     if os.environ.get("SIGNAL_VOICE_BRIEF") == "1":
         send_text_and_voice_brief(
