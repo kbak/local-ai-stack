@@ -139,7 +139,8 @@ def enqueue_add(messages: list[dict] | str, user_id: str, metadata: dict | None 
 
 def search(query: str, user_id: str, limit: int = 5) -> list[dict[str, Any]]:
     assert _memory is not None
-    result = _memory.search(query=query, user_id=user_id, limit=limit)
+    # mem0 2.x: entity ids moved into filters, limit -> top_k.
+    result = _memory.search(query=query, filters={"user_id": user_id}, top_k=limit)
     # Mem0 returns {"results": [...]} in recent versions; normalize.
     if isinstance(result, dict) and "results" in result:
         return result["results"]
@@ -148,7 +149,7 @@ def search(query: str, user_id: str, limit: int = 5) -> list[dict[str, Any]]:
 
 def list_all(user_id: str, limit: int = 100) -> list[dict[str, Any]]:
     assert _memory is not None
-    result = _memory.get_all(user_id=user_id, limit=limit)
+    result = _memory.get_all(filters={"user_id": user_id}, top_k=limit)
     if isinstance(result, dict) and "results" in result:
         return result["results"]
     return result  # type: ignore[return-value]
