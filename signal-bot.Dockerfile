@@ -42,4 +42,9 @@ RUN sed -i 's/"max_tokens": max_tok,/"max_tokens": max_tok,\n            "extra_
 # replace it with a tight thinking budget so reasoning stays brief and fast.
 RUN sed -i 's|^/no_think$|Think briefly before replying: a sentence or two to check facts and avoid contradicting yourself, then answer. Skip thinking for greetings and trivial messages. Keep reasoning short to stay fast.|' /app/agent.py
 
+# Attachments without a filename arrive as {"filename": null}, so .get("filename", "")
+# returns None (the default only applies to a MISSING key) and .lower() throws,
+# crashing the main loop on every photo. Coerce None -> "" before .lower().
+RUN sed -i 's|a.get("filename", "").lower()|(a.get("filename") or "").lower()|' /app/bot.py
+
 CMD ["python", "bot.py"]
