@@ -153,6 +153,7 @@ services:
       MEMORY_MCP_URL: https://memory.kacper.me
       MEMORY_DIR_MOUNT: /memory
       MEMORY_DEFAULT_USER_ID: ${MEMORY_DEFAULT_USER_ID:-default}
+      OFFLINE_EXCUSES_FILE: /app/config/offline-excuses.txt
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
@@ -163,6 +164,7 @@ services:
       - ${VOICE_SAMPLES_DIR:?VOICE_SAMPLES_DIR must be set in .env}:/app/voice-samples
       - ${MEMORY_DIR:?MEMORY_DIR must be set in .env}:/memory:ro
       - ./shared:/shared:ro
+      - ./signal-bot-offline-excuses.txt:/app/config/offline-excuses.txt:ro
     depends_on:
       signal-api:
         condition: service_started
@@ -463,4 +465,3 @@ volumes:
   tg-watcher-data:
   nextcloud-db:
   nextcloud-data:
-

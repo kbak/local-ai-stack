@@ -352,6 +352,12 @@ The bot responds in groups in two ways:
 
 The bot polls for new messages every 1 second with a 1-second receive timeout, giving ~0.5s average wait before the LLM starts processing. This is close to LibreChat's HTTP-based latency.
 
+When the LLM host is unreachable or a model request times out, the bot sends a
+random friendly reply from `signal-bot-offline-excuses.txt` instead of exposing
+the API exception. The file is bind-mounted read-only and read for every failure,
+so edits take effect on the next offline reply without rebuilding or restarting.
+Use one reply per line; blank lines and lines beginning with `#` are ignored.
+
 ### Custom skills
 
 Skills in `signal-bot-custom-skills/` are mounted into the container at `/app/data/custom_skills` and auto-discovered at startup alongside uoltz's built-ins. Each skill is a directory with a `skill.yaml` and a Python file.
