@@ -21,7 +21,7 @@ RUN git clone --depth 1 https://github.com/sparfenyuk/mcp-proxy.git /mcp-proxy-s
     rm -rf /mcp-proxy-src
 
 # Install the MCP SDK for the bundled stdio servers (gh-read, gmaps shim).
-RUN pip install --no-cache-dir "mcp>=1.2.0"
+RUN pip install --no-cache-dir "mcp>=1.2.0,<2"
 
 # Runtime shim that patches google-maps-mcp-server's PlacesTool to use
 # searchText instead of its broken searchNearby+keyword-filter combo.
