@@ -21,24 +21,32 @@
     "arxiv": {
       "command": "uvx",
       "args": [
+        "--with",
+        "mcp==1.28.0",
         "arxiv-mcp-server==0.4.11"
       ]
     },
     "youtube": {
       "command": "uvx",
       "args": [
+        "--with",
+        "mcp==1.28.0",
         "mcp-youtube-transcript==0.3.5"
       ]
     },
     "time": {
       "command": "uvx",
       "args": [
+        "--with",
+        "mcp==1.28.0",
         "mcp-server-time==2026.1.26"
       ]
     },
     "weather": {
       "command": "uvx",
       "args": [
+        "--with",
+        "mcp==1.28.0",
         "--from",
         "mcp-weather-server==0.6.1",
         "mcp_weather_server"
@@ -47,12 +55,16 @@
     "currency": {
       "command": "uvx",
       "args": [
+        "--with",
+        "mcp==1.28.0",
         "frankfurtermcp==0.4.4"
       ]
     },
     "finance": {
       "command": "uvx",
       "args": [
+        "--with",
+        "mcp==1.28.0",
         "yfinance-mcp-server==1.0.4"
       ]
     },
@@ -68,6 +80,8 @@
         "run",
         "--with",
         "google-maps-mcp-server==0.2.1",
+        "--with",
+        "mcp==1.28.0",
         "python",
         "/opt/gmaps-searchtext-shim.py"
       ]
