@@ -10,7 +10,9 @@ ENV PATH="/root/.cargo/bin:$PATH"
 
 RUN pip install --no-cache-dir maturin
 
-RUN git clone --depth 1 https://github.com/firecrawl/pdf-inspector.git /pdf-inspector-src && \
+ARG PDF_INSPECTOR_REV=f4b8c9e8546703e3817d9c47498d822cb2db81e3
+RUN git clone https://github.com/firecrawl/pdf-inspector.git /pdf-inspector-src && \
+    git -C /pdf-inspector-src checkout "${PDF_INSPECTOR_REV}" && \
     cd /pdf-inspector-src && \
     maturin build --release --out /wheels
 

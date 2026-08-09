@@ -86,7 +86,7 @@ services:
     mem_limit: 512m
 
   librechat:
-    image: ghcr.io/danny-avila/librechat:latest
+    image: ghcr.io/danny-avila/librechat:v0.8.6-rc1
     container_name: librechat
     restart: unless-stopped
     ports:
@@ -114,14 +114,15 @@ services:
     entrypoint: ["/bin/sh", "-c", "node /app/librechat-render.js && exec node /app/api/server/index.js"]
 
   signal-api:
-    # Local overlay (docker/signal-cli-0145/) = bbernhard latest-dev + signal-cli 0.14.5.
+    # Local overlay = bbernhard latest-dev + a reviewed signal-cli release.
     # 2026-06-11: Signal stopped sending `serverGuid` in some sealed-sender envelopes;
     # signal-cli <=0.14.4.1 throws `getServerGuid(...) must not be null` and DROPS every
     # incoming message (sends unaffected — that's why tg-watcher kept posting).
-    # Fixed upstream in signal-cli 0.14.5 (AsamK/signal-cli#2059). bbernhard had no
-    # 0.14.5 image yet, so we bake it. Revert to plain bbernhard tag once their image
-    # ships signal-cli >=0.14.5, then `docker rmi signal-cli-rest-api:0.14.5-local`.
-    image: signal-cli-rest-api:0.14.5-local
+    # Fixed upstream in signal-cli 0.14.5 (AsamK/signal-cli#2059). The overlay now
+    # pins 0.14.6 explicitly so rebuilding cannot silently downgrade the receiver.
+    build:
+      context: ./docker/signal-cli-0145
+    image: signal-cli-rest-api:0.14.6-local
     container_name: signal-api
     restart: unless-stopped
     ports:
@@ -383,7 +384,7 @@ services:
     mem_limit: 128m
 
   nextcloud:
-    image: nextcloud:33-apache
+    image: nextcloud:33.0.7-apache
     container_name: nextcloud
     restart: unless-stopped
     ports:
@@ -413,7 +414,7 @@ services:
     mem_limit: 1024m
 
   nextcloud-cron:
-    image: nextcloud:33-apache
+    image: nextcloud:33.0.7-apache
     container_name: nextcloud-cron
     restart: unless-stopped
     volumes:

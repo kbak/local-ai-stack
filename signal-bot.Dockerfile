@@ -12,9 +12,9 @@ WORKDIR /app
 ARG UOLTZ_REV=2026-08-09-97bbed9
 RUN echo "uoltz rev: ${UOLTZ_REV}" && git clone https://github.com/kbak/uoltz.git /uoltz
 RUN pip install --no-cache-dir -r /uoltz/app/requirements.txt && \
-    pip install --no-cache-dir mutagen && \
-    pip install --no-cache-dir -U yt-dlp && \
-    pip install --no-cache-dir lingua-language-detector
+    pip install --no-cache-dir mutagen==1.48.1 && \
+    pip install --no-cache-dir yt-dlp==2026.7.4 && \
+    pip install --no-cache-dir lingua-language-detector==2.2.0
 
 # stack_shared (resolve_model, etc.). Installed editable at /shared so the
 # compose bind-mount of ./shared:/shared:ro picks up source changes without

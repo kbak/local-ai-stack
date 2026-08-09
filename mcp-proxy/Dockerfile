@@ -15,8 +15,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Install uv (provides uvx)
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
 
-# Build and install mcp-proxy from upstream main
-RUN git clone --depth 1 https://github.com/sparfenyuk/mcp-proxy.git /mcp-proxy-src && \
+# Build and install a reviewed mcp-proxy revision instead of a moving main branch.
+ARG MCP_PROXY_REV=153a96a61fde2bf5a23961c64a3dd96b5e385108
+RUN git clone https://github.com/sparfenyuk/mcp-proxy.git /mcp-proxy-src && \
+    git -C /mcp-proxy-src checkout "${MCP_PROXY_REV}" && \
     pip install --no-cache-dir /mcp-proxy-src && \
     rm -rf /mcp-proxy-src
 

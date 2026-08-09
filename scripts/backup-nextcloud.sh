@@ -11,7 +11,6 @@ set +a
 
 docker inspect nextcloud &>/dev/null || { echo "Nextcloud container not running on $(hostname -s), skipping."; exit 0; }
 
-NC_VOLUME="/var/lib/docker/volumes/stack_nextcloud-data/_data"
 STAGING_DIR="$(mktemp -d)"
 OUTPUT_ZIP="$MEMORY_DIR/nextcloud-backup-$(hostname -s).7z"
 TIMESTAMP=$(date +"%Y-%m-%d %H:%M:%S")
@@ -36,10 +35,12 @@ docker exec nextcloud-db mysqldump \
     nextcloud > "$STAGING_DIR/nextcloud-db.sql"
 
 log "Copying data directory..."
-rsync -a "$NC_VOLUME/data/" "$STAGING_DIR/data/"
+mkdir -p "$STAGING_DIR/data"
+docker cp nextcloud:/var/www/html/data/. "$STAGING_DIR/data/"
 
 log "Copying config directory..."
-rsync -a "$NC_VOLUME/config/" "$STAGING_DIR/config/"
+mkdir -p "$STAGING_DIR/config"
+docker cp nextcloud:/var/www/html/config/. "$STAGING_DIR/config/"
 
 log "Creating encrypted zip..."
 rm -f "$OUTPUT_ZIP"
