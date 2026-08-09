@@ -33,7 +33,7 @@ COPY gh-read-server.py /opt/gh-read-server.py
 
 # Pre-install all MCP packages at pinned versions so first connection doesn't time out
 RUN uvx google-maps-mcp-server==0.2.1 --help 2>/dev/null || true && \
-    uvx mcp-server-fetch==2025.4.7 --help 2>/dev/null || true && \
+    uvx --with mcp==1.28.0 mcp-server-fetch==2025.4.7 --help 2>/dev/null || true && \
     uvx arxiv-mcp-server==0.4.11 --help 2>/dev/null || true && \
     uvx mcp-youtube-transcript==0.3.5 --help 2>/dev/null || true && \
     uvx mcp-server-time==2026.1.26 --help 2>/dev/null || true && \

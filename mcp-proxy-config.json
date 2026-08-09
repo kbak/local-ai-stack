@@ -13,6 +13,8 @@
     "fetch": {
       "command": "uvx",
       "args": [
+        "--with",
+        "mcp==1.28.0",
         "mcp-server-fetch==2025.4.7"
       ]
     },
