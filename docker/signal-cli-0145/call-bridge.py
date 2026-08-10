@@ -60,6 +60,21 @@ def is_owner(event: dict) -> bool:
     return bool(OWNER) and normalize_number(event.get("number")) == normalize_number(OWNER)
 
 
+def notification_event(message: dict) -> dict:
+    """Extract a call event from signal-cli's subscription notification.
+
+    signal-cli uses the standard subscription envelope
+    ``params: {subscription, result: <JsonCallEvent>}``. Accept the older test
+    harness shape too so upgrades fail safely rather than silently ignoring a
+    ringing call.
+    """
+    params = message.get("params") or {}
+    event = params.get("result") or params.get("callEvent")
+    if event is None and "state" in params:
+        event = params
+    return event if isinstance(event, dict) else {}
+
+
 class Rpc:
     def __init__(self) -> None:
         self.sock = socket.create_connection((RPC_HOST, RPC_PORT), timeout=10)
@@ -180,7 +195,11 @@ def run() -> None:
             while True:
                 message = rpc.read()
                 if message.get("method") == "callEvent":
-                    bridge.on_event(message.get("params", {}).get("callEvent", {}))
+                    event = notification_event(message)
+                    if event:
+                        bridge.on_event(event)
+                    else:
+                        log.error("malformed call notification: %s", message)
         except Exception:
             log.exception("call bridge disconnected; retrying")
             if bridge:
