@@ -11,6 +11,15 @@ models:
     checkEndpoint: /v1/models
     ttl: 0
 
+  # Muse Glimmer uses its dedicated pre-release vLLM container so the working
+  # local vLLM environment used by Qwen remains unchanged.
+  muse-glimmer-30B-FP8:
+    cmd: bash ./serve-muse-glimmer.sh ${PORT}
+    cmdStop: docker stop --timeout 30 llama-swap-muse-glimmer-${PORT}
+    proxy: http://127.0.0.2:${PORT}
+    checkEndpoint: /v1/models
+    ttl: 0
+
   qwen3.6-35B-A3B-FP8:
     cmd: bash ./serve-qwen-35b-a3b.sh ${PORT}
     proxy: http://127.0.0.2:${PORT}
@@ -51,25 +60,20 @@ models:
 
 # Groups, all exclusive: false so they coexist on shared GPUs:
 #   cuda0 (RTX 6000 / 96 GB):
-#     - cuda0_main:     35B-A3B, always-loaded, never evicted.
-#     - cuda0_ondemand: 27B, loads on first request, stays (ttl: 0).
+#     - cuda0_main:     35B-A3B, 27B, or Muse Glimmer; one is always loaded.
 #     - cuda0_coder:    coder-7B, persistent, primary-GPU autocomplete.
 #     - cuda0_image:    FLUX-dev, swap=true + ttl:600 to reclaim VRAM when idle.
 #   cuda1 (5060 Ti / 16 GB):
 #     - cuda1_reranker: bge-reranker-v2-m3, persistent, tiny footprint.
 groups:
   "cuda0_main":
-    swap: false
+    swap: true
     exclusive: false
     persistent: true
     members:
       - "qwen3.6-35B-A3B-FP8"
-
-  "cuda0_ondemand":
-    swap: true
-    exclusive: false
-    members:
       - "qwen3.6-27B-FP8"
+      - "muse-glimmer-30B-FP8"
 
   "cuda0_coder":
     swap: false

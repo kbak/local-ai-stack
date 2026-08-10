@@ -17,9 +17,16 @@ export HF_HOME="$WORKSPACE/models/hf"
 export CUDA_DEVICE_ORDER=PCI_BUS_ID
 export TORCHINDUCTOR_COMPILE_THREADS=16
 
-# Pin to the secondary GPU. llama-swap env: fields are not shell-expanded,
-# so we read SECONDARY_GPU directly — it's inherited from llama-swap's env.
-export CUDA_VISIBLE_DEVICES="${SECONDARY_GPU:?SECONDARY_GPU must be exported in the llama-swap environment}"
+# Pin to the secondary GPU. Prefer an inherited value, but fall back to the
+# project .env so restarting llama-swap from a non-interactive shell does not
+# silently drop the GPU selection.
+if [[ -z "${SECONDARY_GPU:-}" && -f "$SCRIPT_DIR/.env" ]]; then
+    SECONDARY_GPU=$(sed -n 's/^SECONDARY_GPU=//p' "$SCRIPT_DIR/.env" | tail -n 1)
+    SECONDARY_GPU="${SECONDARY_GPU%$'\r'}"
+    SECONDARY_GPU="${SECONDARY_GPU#\"}"
+    SECONDARY_GPU="${SECONDARY_GPU%\"}"
+fi
+export CUDA_VISIBLE_DEVICES="${SECONDARY_GPU:?SECONDARY_GPU must be set in the environment or project .env}"
 
 # vLLM rejects GPU UUID strings; resolve to numeric index.
 if [[ "${CUDA_VISIBLE_DEVICES:-}" == GPU-* ]]; then

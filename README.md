@@ -90,11 +90,10 @@ Edit `.env` and set:
 
 Each model entry shells out to a `serve-qwen-*.sh` script that activates `~/vllm-runtime/.venv` and runs `vllm serve`. Edit the launcher scripts to change vLLM args; edit `llama-swap.yaml` to add/remove models or change the group layout. The default config ships:
 
-- **Primary GPU (`cuda0_main` group, persistent):** `qwen3.6-35B-A3B-FP8` (MoE, 3B active) — always loaded.
-- **Primary GPU (`cuda0_ondemand` group):** `qwen3.6-27B-FP8` dense — loads on first request, stays resident. Coexists on the same card with the 35B because both run with modest `--gpu-memory-utilization` (0.45–0.50).
+- **Primary GPU (`cuda0_main` group, persistent and swappable):** `qwen3.6-35B-A3B-FP8`, `qwen3.6-27B-FP8`, or `muse-glimmer-30B-FP8` — exactly one main chat model stays loaded, and requesting another swaps it in. Glimmer runs in the dedicated `vllm/vllm-openai:muse-glimmer` container, leaving the local Qwen vLLM environment unchanged.
 - **Primary GPU (`cuda0_coder` group, persistent):** `qwen-coder-7B` (Qwen2.5-Coder-7B-Instruct, bfloat16) for FIM tab-complete — always loaded so tab-complete never pays a cold-start cost. Runs at `--gpu-memory-utilization 0.17`, leaving enough headroom to coexist with the chat models on the same GPU.
 - **Primary GPU (`cuda0_image` group, swap):** `flux-dev` — stable-diffusion.cpp serving FLUX.1-dev FP8 via `/v1/images/generations`. Loads on first image request, unloads after 10 min idle (`ttl: 600`). Use the llama-swap playground at `http://localhost:8080/ui` to generate images.
-- **Secondary GPU (`cuda1_reranker` group, persistent):** `bge-reranker-v2-m3` — cross-encoder reranker via vLLM (`--runner pooling`). Endpoint: `POST /v1/score`. ~1.1 GB, loaded alongside audio-api on the 5060 Ti.
+- **Secondary GPU (`cuda1_reranker` group, persistent):** `bge-reranker-v2-m3` — cross-encoder reranker via vLLM (`--runner pooling`). Endpoint through llama-swap: `POST /upstream/bge-reranker-v2-m3/v1/score`. ~1.1 GB, loaded alongside audio-api on the 5060 Ti.
 
 The chat launchers (`serve-qwen-27b.sh`, `serve-qwen-35b-a3b.sh`) use:
 - `--max-model-len 131072` (27B) / `262144` (35B) — full FP16 KV cache
@@ -106,6 +105,16 @@ The chat launchers (`serve-qwen-27b.sh`, `serve-qwen-35b-a3b.sh`) use:
 - Stock FP8 weights (`Qwen/Qwen3.6-27B-FP8`, `Qwen/Qwen3.6-35B-A3B-FP8`) — keeps tool-call JSON well-formed (community AWQ/NVFP4 quants exhibit a tool-call collapse pathology, which is why we stick with stock FP8)
 
 The coder model (`qwen-coder-7B`) pins itself to the primary GPU via `CUDA_VISIBLE_DEVICES=0` in its launcher script and runs with `--gpu-memory-utilization 0.17` so it coexists with the chat models.
+
+Muse Glimmer requires Docker access from the user running llama-swap. Its first
+request pulls the dedicated vLLM image and the approximately 34 GB
+`RedHatAI/Muse-Glimmer-30B-FP8-block` checkpoint into the shared Hugging Face
+cache. Existing Qwen launchers continue to use the local vLLM virtualenv.
+Its dedicated compile cache is persisted under `models/vllm-muse-cache` so
+container replacement does not force a full graph recompile on every swap.
+The initial WSL deployment disables image and video inputs because the dedicated
+vLLM image currently fails its startup-time Muse Glimmer video dummy-input
+profile; text, reasoning, and tool calling remain enabled.
 
 **4. Start the Docker stack**
 ```
@@ -119,7 +128,7 @@ First startup takes a few minutes — mcp-proxy builds a custom image that pre-i
 llama-swap --config llama-swap.yaml
 ```
 
-llama-swap listens on port 8080 and launches a `vllm serve` subprocess on demand when a model is requested. Inside a group, requesting a different model swaps out the current one (`swap: true`). Models in separate `persistent: true` groups stay resident alongside each other — used here to keep the 35B-A3B chat model on the primary GPU and the autocomplete coder model on the secondary GPU loaded concurrently. Cold start of a vLLM model can take 5–10 minutes (compile cache miss); `healthCheckTimeout: 900` accommodates this.
+llama-swap listens on port 8080 and launches a `vllm serve` subprocess on demand when a model is requested. Inside the main chat group, requesting a different model swaps out the current one (`swap: true`); the group is persistent, so its selected model stays loaded. Independent persistent groups keep the autocomplete coder and reranker resident. Cold start of a vLLM model can take 5–10 minutes (compile cache miss); `healthCheckTimeout: 900` accommodates this.
 
 **6. Open LibreChat**
 
