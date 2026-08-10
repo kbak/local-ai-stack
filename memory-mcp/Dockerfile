@@ -1,4 +1,4 @@
-FROM python:3.11-slim
+FROM python:3.11.15-slim-bookworm@sha256:d29f48a31a8b408ed19272ca1e7b10ebae13b240a27e862d3d4217c528e2e0c3
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends build-essential git && \
@@ -11,7 +11,7 @@ COPY memory-mcp/requirements.txt /app/requirements.txt
 # already-satisfied instead of pulling the cu* wheels (~4.5 GB of unused
 # CUDA libs). bge-m3 runs on CPU here — this container has no GPU access.
 RUN pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu \
-        torch torchvision && \
+        torch==2.11.0 torchvision==0.26.0 && \
     pip install --no-cache-dir -r /app/requirements.txt
 
 # Install stack_shared editable so a compose bind-mount of ./shared:/shared:ro

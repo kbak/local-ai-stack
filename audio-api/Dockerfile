@@ -1,4 +1,4 @@
-FROM nvidia/cuda:12.6.3-cudnn-runtime-ubuntu22.04
+FROM nvidia/cuda:12.6.3-cudnn-runtime-ubuntu22.04@sha256:5f0d2d827f6436b3cb7468fd8acbdc8c1d41261614e579ae49afe6141da51133
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends ffmpeg python3 python3-pip git && \
@@ -25,25 +25,25 @@ RUN sed -i '/^chatterbox-tts/d' /app/requirements-base.txt && \
 # torch uses its bundled libs.
 RUN pip install --no-cache-dir \
     --index-url https://download.pytorch.org/whl/cu128 \
-    "torch>=2.7" "torchaudio>=2.7"
+    "torch==2.11.0" "torchaudio==2.11.0"
 
 # Step 3 — chatterbox-tts. Install with --no-deps so its hard pin on torch==2.6.0
 # does not downgrade the cu128 wheels we just installed, then install its actual
 # runtime deps explicitly (excluding torch/torchaudio which are already there).
-RUN pip install --no-cache-dir --no-deps chatterbox-tts && \
+RUN pip install --no-cache-dir --no-deps chatterbox-tts==0.1.7 && \
     pip install --no-cache-dir \
-        "numpy" \
+        "numpy==2.2.6" \
         "librosa==0.11.0" \
-        "s3tokenizer" \
+        "s3tokenizer==0.3.0" \
         "transformers==5.2.0" \
         "diffusers==0.29.0" \
-        "resemble-perth>=1.0.0" \
+        "resemble-perth==1.0.1" \
         "conformer==0.3.2" \
         "safetensors==0.5.3" \
-        "spacy-pkuseg" \
+        "spacy-pkuseg==1.0.1" \
         "pykakasi==2.3.0" \
-        "pyloudnorm" \
-        "omegaconf"
+        "pyloudnorm==0.2.0" \
+        "omegaconf==2.3.0"
 
 # Pre-download Whisper, Kokoro, and Chatterbox weights so first start is instant.
 RUN python -c "from faster_whisper import WhisperModel; WhisperModel('small', device='cpu', compute_type='int8')"
