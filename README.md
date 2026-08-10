@@ -325,6 +325,31 @@ docker exec -it signal-api signal-cli-rest-api link -n "006-bot"
 
 The account data is stored in the `signal-cli-data` volume and persists across restarts.
 
+### Signal voice-call proof of concept
+
+The `signal-api` image also builds the experimental `signal-call-tunnel` at a
+pinned commit and runs an isolated PulseAudio server plus a small call bridge.
+The bridge subscribes directly to signal-cli's JSON-RPC call events.
+
+For safety, it accepts exactly one caller: the normalized Signal number in
+`BRIEFING_RECIPIENT`. All other incoming calls and concurrent calls are
+rejected. The current transport proof records the incoming side to an ephemeral
+WAV under `/tmp/signal-call-captures`, plays the Lenovo-local greeting, and
+hangs up. It does not send call audio to the LLM or audio-api yet.
+
+Useful diagnostics:
+
+```bash
+docker exec signal-api supervisorctl status
+docker exec signal-api sed -n '1,200p' /var/log/signal-call-bridge.log
+docker exec signal-api sed -n '1,200p' /var/log/signal-cli-json-rpc-1/out.log
+docker exec signal-api pactl list short sinks
+```
+
+Calling support is experimental upstream. Keep the tunnel commit, RingRTC
+submodule, and signal-cli version pinned and validate an actual call whenever
+any of them changes.
+
 **2. Configure signal-bot.env**
 ```
 cp signal-bot.env.example signal-bot.env

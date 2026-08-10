@@ -1,0 +1,9 @@
+.fail
+
+# An isolated, system-mode PulseAudio server for RingRTC's per-call virtual
+# devices. The container has no physical sound card and exposes no host audio.
+load-module module-native-protocol-unix socket=/run/pulse/native auth-anonymous=1
+load-module module-always-sink
+
+.nofail
+load-module module-suspend-on-idle

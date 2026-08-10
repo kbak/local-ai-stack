@@ -129,12 +129,16 @@ services:
       - "9922:8080"
     volumes:
       - signal-cli-data:/home/.local/share/signal-cli
+      # Reuse BRIEFING_RECIPIENT without injecting the bot's unrelated secrets
+      # into signal-cli, RingRTC, and PulseAudio subprocesses.
+      - ./signal-bot.env:/run/config/signal-bot.env:ro
     environment:
       # json-rpc: signal-cli stays resident (no per-call JVM cold-start). Requires
       # the bot to receive over the WebSocket (/v1/receive WS), which the
       # json-rpc-websocket-receive branch of uoltz does. AUTO_RECEIVE_SCHEDULE is
       # incompatible with json-rpc, so it's omitted.
       - MODE=json-rpc
+      - PULSE_SERVER=unix:/run/pulse/native
     networks:
       - server-net
     mem_limit: 512m
