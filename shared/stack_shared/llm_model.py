@@ -1,10 +1,10 @@
 """Resolve which model to send chat requests to.
 
 Policy: pick the largest model currently loaded in llama-swap that isn't a
-coder/autocomplete model. Coder models are pinned on the 5060 Ti for VS Code
-tab-complete and are not meant for chat/agent work. If nothing suitable is
-loaded, fall back to an env var or to the first non-coder model advertised by
-/v1/models - llama-swap will load it on demand when the chat request lands.
+coder/autocomplete model. Coder models are not meant for chat/agent work. If
+nothing suitable is loaded, wait (when a startup timeout is supplied) or fail;
+merely advertised models must never be selected because sending a request to
+one would make llama-swap change the active model.
 
 All stack services should call `resolve_model()` instead of reading
 `LLM_MODEL` directly. That way adding/renaming/removing a model in
@@ -77,22 +77,6 @@ def _from_running(base: str, pattern: re.Pattern[str]) -> str | None:
     return max(candidates, key=_param_count)
 
 
-def _from_models_list(base: str, pattern: re.Pattern[str]) -> str | None:
-    """Nothing loaded - pick largest non-coder from /v1/models. llama-swap
-    will load it on demand when the chat request lands."""
-    try:
-        resp = httpx.get(f"{base}/v1/models", timeout=2.0)
-        resp.raise_for_status()
-        ids = [m.get("id") for m in resp.json().get("data", []) if m.get("id")]
-    except Exception as e:
-        log.debug("llama-swap /v1/models unreachable: %s", e)
-        return None
-    candidates = _filter_coder(ids, pattern)
-    if not candidates:
-        return None
-    return max(candidates, key=_param_count)
-
-
 def resolve_model(
     *,
     base_url: str | None = None,
@@ -107,14 +91,12 @@ def resolve_model(
       1. Explicit `override` argument.
       2. `LLM_MODEL` env var, if set.
       3. Largest ready non-coder model from llama-swap `/running`.
-      4. Largest non-coder model from llama-swap `/v1/models`.
-      5. `LLM_MODEL_FALLBACK` env var.
+      4. `LLM_MODEL_FALLBACK` env var, if explicitly configured.
 
-    `startup_timeout` enables retry-with-backoff against llama-swap when steps
-    3 and 4 both return None (e.g. llama-swap is mid-startup, vLLM cold-starting
-    a 35B model can take many minutes). Set this only at process startup; in
-    hot paths leave it at 0 so a transient outage doesn't stall a single
-    request for minutes.
+    `startup_timeout` enables retry-with-backoff when no suitable model is
+    currently ready (for example while llama-swap is changing models). The
+    resolver never selects a model solely because `/v1/models` advertises it,
+    so automatic callers cannot initiate a swap.
 
     Raises RuntimeError if none of the above yield a model id.
     """
@@ -141,7 +123,7 @@ def resolve_model(
     backoff = 1.0
     picked: str | None = None
     while True:
-        picked = _from_running(base, pattern) or _from_models_list(base, pattern)
+        picked = _from_running(base, pattern)
         if picked:
             break
         if deadline is None or time.monotonic() >= deadline:
@@ -157,8 +139,9 @@ def resolve_model(
         picked = os.environ.get("LLM_MODEL_FALLBACK")
     if not picked:
         raise RuntimeError(
-            "Could not resolve an LLM model: llama-swap unreachable and no "
-            "LLM_MODEL / LLM_MODEL_FALLBACK env var set."
+            "Could not resolve an LLM model: no ready non-coder model is "
+            "currently loaded and no explicit LLM_MODEL / "
+            "LLM_MODEL_FALLBACK is set."
         )
 
     if use_cache:

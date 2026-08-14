@@ -17,6 +17,10 @@ export HF_HOME="$WORKSPACE/models/hf"
 export CUDA_VISIBLE_DEVICES=0
 export CUDA_DEVICE_ORDER=PCI_BUS_ID
 export TORCHINDUCTOR_COMPILE_THREADS=16
+# vLLM 0.27's auto-selected DeepGEMM path cannot transform this checkpoint's
+# FP8 MoE scale-factor layout on the RTX Pro 6000. Use the compatible fallback
+# MoE backend instead of bypassing DeepGEMM's layout assertion.
+export VLLM_MOE_USE_DEEP_GEMM=0
 
 # Stock Qwen3.6-35B-A3B-FP8 (MoE, 3B active) on the primary GPU. Single-user,
 # max-num-seqs=1, full 256K context, full FP16 KV. Same xgrammar-via-FP8 path

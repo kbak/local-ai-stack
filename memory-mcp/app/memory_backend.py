@@ -64,10 +64,9 @@ def load() -> None:
     global _memory, _resolved_model
     if _memory is not None:
         return
-    # Mem0 bakes the LLM model into its internal client at construction time,
-    # so we resolve once here. If llama-swap has no model loaded, this falls
-    # back to the largest non-coder in /v1/models (llama-swap will auto-load
-    # it on first chat call).
+    # Mem0 needs an initial model id, but inferred writes refresh the provider's
+    # model immediately before each LLM call so it follows the largest model
+    # already loaded in llama-swap without initiating a swap.
     _resolved_model = config.LLM_MODEL or resolve_model(
         base_url=config.LLM_BASE_URL,
         startup_timeout=600.0,
@@ -119,7 +118,19 @@ def _redact(job: dict) -> dict:
 
 def _do_add(*, messages: list[dict] | str, user_id: str, metadata: dict | None,
             infer: bool = True) -> None:
+    global _resolved_model
     assert _memory is not None
+    if infer and not config.LLM_MODEL:
+        current_model = resolve_model(
+            base_url=config.LLM_BASE_URL,
+            use_cache=False,
+            startup_timeout=900.0,
+        )
+        if current_model != _resolved_model:
+            logger.info("Following loaded LLM change: %s -> %s",
+                        _resolved_model, current_model)
+            _memory.llm.config.model = current_model
+            _resolved_model = current_model
     result = _memory.add(messages, user_id=user_id, metadata=metadata or {}, infer=infer)
     logger.info("Stored memory for user=%s (infer=%s): %s", user_id, infer, result)
 

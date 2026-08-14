@@ -107,6 +107,13 @@ The coder model (`qwen-coder-7B`) pins itself to the primary GPU via `CUDA_VISIB
 Its launcher disables vLLM's V2 model runner because that runner requires CUDA
 Unified Virtual Addressing, which is unavailable through the current WSL GPU
 path; the standard V1 runner remains fully supported for autocomplete.
+The Qwen3.6 35B-A3B launcher also disables the vLLM 0.27 DeepGEMM MoE path,
+whose FP8 scale-factor transformation does not support this checkpoint's
+layout, and lets vLLM select its compatible fallback MoE kernel.
+Stack services resolve only models reported ready by llama-swap's `/running`
+endpoint; they never select an unloaded model from `/v1/models`. `memory-mcp`
+refreshes its Mem0 LLM target before each inferred write, following the largest
+currently loaded non-coder model without causing a model swap.
 
 Muse Glimmer requires Docker access from the user running llama-swap. Its first
 request pulls the dedicated vLLM image and the approximately 34 GB
