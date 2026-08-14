@@ -49,7 +49,7 @@ All tools are exposed via mcp-proxy on port 8083 (no authentication required —
 ## Requirements
 
 - Docker with Docker Compose
-- [vLLM](https://github.com/vllm-project/vllm) installed in a Python venv at `~/vllm-runtime/.venv` (the launcher scripts `serve-qwen-*.sh` activate it). FP8 weights need a Hopper/Blackwell GPU (H100, RTX 6000 Ada/Pro 6000, RTX 5090, etc.).
+- [vLLM](https://github.com/vllm-project/vllm) 0.27.1 or newer installed in a Python venv at `~/vllm-runtime/.venv`, with Transformers 5.8.0 or newer (the launcher scripts `serve-qwen-*.sh` activate it). FP8 weights need a Hopper/Blackwell GPU (H100, RTX 6000 Ada/Pro 6000, RTX 5090, etc.).
 - [llama-swap](https://github.com/mostlygeek/llama-swap) binary in PATH
 - [stable-diffusion.cpp](https://github.com/leejet/stable-diffusion.cpp) `sd-server` binary in PATH (for image generation). Build with CUDA:
   ```bash
@@ -90,7 +90,7 @@ Edit `.env` and set:
 
 Each model entry shells out to a `serve-qwen-*.sh` script that activates `~/vllm-runtime/.venv` and runs `vllm serve`. Edit the launcher scripts to change vLLM args; edit `llama-swap.yaml` to add/remove models or change the group layout. The default config ships:
 
-- **Primary GPU (`cuda0_main` group, persistent and swappable):** `qwen3.6-35B-A3B-FP8`, `qwen3.6-27B-FP8`, or `muse-glimmer-30B-FP8` — exactly one main chat model stays loaded, and requesting another swaps it in. Glimmer runs in the dedicated `vllm/vllm-openai:muse-glimmer` container, leaving the local Qwen vLLM environment unchanged.
+- **Primary GPU (`cuda0_main` group, persistent and swappable):** `qwen3.6-35B-A3B-FP8`, `qwen3.8-27B-FP8`, or `muse-glimmer-30B-FP8` — exactly one main chat model stays loaded, and requesting another swaps it in. Glimmer runs in the dedicated `vllm/vllm-openai:muse-glimmer` container, leaving the local Qwen vLLM environment unchanged.
 - **Primary GPU (`cuda0_coder` group, persistent):** `qwen-coder-7B` (Qwen2.5-Coder-7B-Instruct, bfloat16) for FIM tab-complete — always loaded so tab-complete never pays a cold-start cost. Runs at `--gpu-memory-utilization 0.17`, leaving enough headroom to coexist with the chat models on the same GPU.
 - **Primary GPU (`cuda0_image` group, swap):** `flux-dev` — stable-diffusion.cpp serving FLUX.1-dev FP8 via `/v1/images/generations`. Loads on first image request, unloads after 10 min idle (`ttl: 600`). Use the llama-swap playground at `http://localhost:8080/ui` to generate images.
 - **Secondary GPU (`cuda1_reranker` group, persistent):** `bge-reranker-v2-m3` — cross-encoder reranker via vLLM (`--runner pooling`). Endpoint through llama-swap: `POST /upstream/bge-reranker-v2-m3/v1/score`. ~1.1 GB, loaded alongside audio-api on the 5060 Ti.
@@ -99,10 +99,9 @@ The chat launchers (`serve-qwen-27b.sh`, `serve-qwen-35b-a3b.sh`) use:
 - `--max-model-len 131072` (27B) / `262144` (35B) — full FP16 KV cache
 - `--max-num-seqs 2` — single-user, low concurrency
 - `--gpu-memory-utilization 0.45`–`0.50` — leaves headroom for the coder model on the same GPU
-- `--reasoning-parser qwen3 --enable-auto-tool-choice --tool-call-parser qwen3_xml` — proper tool-call handling for LibreChat
-- `--override-generation-config '{"repetition_penalty":1.05,"presence_penalty":0.3}'` — prevents the synonym/word-list collapse seen under repetitive prompts
-- `--chat-template "$HOME/vllm-runtime/qwen3.6-librechat.jinja"` — custom Jinja template for LibreChat tool-call formatting
-- Stock FP8 weights (`Qwen/Qwen3.6-27B-FP8`, `Qwen/Qwen3.6-35B-A3B-FP8`) — keeps tool-call JSON well-formed (community AWQ/NVFP4 quants exhibit a tool-call collapse pathology, which is why we stick with stock FP8)
+- `--reasoning-parser qwen3` plus automatic tool choice — the 27B uses vLLM's `qwen3_coder` tool parser and the 35B retains `qwen3_xml`
+- The Qwen3.8 27B launcher uses the checkpoint's bundled chat template, preserving its `reasoning_effort` and `preserve_thinking` controls; the Qwen3.6 35B retains the custom LibreChat template
+- Stock FP8 weights (`Qwen/Qwen3.8-27B-FP8`, `Qwen/Qwen3.6-35B-A3B-FP8`) — keeps tool-call JSON well-formed
 
 The coder model (`qwen-coder-7B`) pins itself to the primary GPU via `CUDA_VISIBLE_DEVICES=0` in its launcher script and runs with `--gpu-memory-utilization 0.17` so it coexists with the chat models.
 
@@ -149,7 +148,7 @@ Two GPUs are partitioned via `CUDA_VISIBLE_DEVICES` (Docker container env for au
 | Group | Model | Persistent | Notes |
 |---|---|---|---|
 | `cuda0_main` | qwen3.6-35B-A3B-FP8 | yes | Always loaded; never evicted |
-| `cuda0_ondemand` | qwen3.6-27B-FP8 | no | Loads on first request, stays (ttl: 0) |
+| `cuda0_main` | qwen3.8-27B-FP8 | yes | Swaps with the other main chat models |
 | `cuda0_coder` | qwen-coder-7B | yes | FIM autocomplete; 0.17 gpu_util |
 | `cuda0_image` | flux-dev | no | Image gen; unloads after 10 min idle |
 
@@ -171,9 +170,9 @@ version: 1.0.0
 schema: v1
 
 models:
-  - name: Qwen 3.6 27B
+  - name: Qwen 3.8 27B
     provider: openai
-    model: qwen3.6-27B-FP8
+    model: qwen3.8-27B-FP8
     apiBase: http://127.0.0.1:8080/v1
     apiKey: dummy
     roles: [chat, edit, apply]
@@ -193,7 +192,7 @@ tabAutocompleteOptions:
   useCache: true
 ```
 
-The model `id`s must match the llama-swap.yaml entries exactly. `qwen-coder-7B` runs on the primary GPU alongside the chat models (at 0.17 GPU memory utilization); chat/edit/agent use Qwen 3.6 27B on the same GPU.
+The model `id`s must match the llama-swap.yaml entries exactly. `qwen-coder-7B` runs on the primary GPU alongside the chat models (at 0.17 GPU memory utilization); chat/edit/agent use Qwen 3.8 27B on the same GPU.
 
 MCP servers can also be wired into Continue via per-server YAMLs in `.continue/mcpServers/` (committed in this repo: `github.yaml`, `searxng.yaml`, `time.yaml`).
 

@@ -24,8 +24,8 @@ export CUDA_DEVICE_ORDER=PCI_BUS_ID
 export TORCHINDUCTOR_COMPILE_THREADS=16
 
 # llama-swap injects CUDA_VISIBLE_DEVICES=$SECONDARY_GPU as a UUID for slot-
-# stable GPU pinning. vLLM 0.20.1 calls int(CUDA_VISIBLE_DEVICES) and chokes
-# on UUIDs, so resolve to a numeric index here.
+# stable GPU pinning. Resolve UUIDs to a numeric index for compatibility
+# across vLLM releases and CUDA device discovery paths.
 if [[ "${CUDA_VISIBLE_DEVICES:-}" == GPU-* ]]; then
     IDX=$(nvidia-smi --query-gpu=index,uuid --format=csv,noheader \
           | awk -F', ' -v uuid="$CUDA_VISIBLE_DEVICES" '$2==uuid {print $1; exit}')

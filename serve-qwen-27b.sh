@@ -18,15 +18,13 @@ export CUDA_VISIBLE_DEVICES=0
 export CUDA_DEVICE_ORDER=PCI_BUS_ID
 export TORCHINDUCTOR_COMPILE_THREADS=16
 
-# Stock Qwen3.6-27B-FP8 on the primary GPU. Single-user, max-num-seqs=1,
-# 128K context, full FP16 KV. Resolves the LibreChat agent spiral
-# pathology documented in project_vllm_qwen36_spiral.md: FP8 stock weights
-# + the default `--structured-outputs-config.backend=auto` (which picks
-# xgrammar on FP8) constrain tool-call JSON at decode time and prevent the
-# synonym/word-list collapse seen on community AWQ/NVFP4 quants.
-exec vllm serve Qwen/Qwen3.6-27B-FP8 \
+# Stock Qwen3.8-27B-FP8 on the primary GPU. The model natively supports 262K,
+# but this single-user profile caps it at 128K to preserve VRAM headroom for
+# the persistent coder model. Use the checkpoint's bundled chat template so
+# reasoning_effort and preserve_thinking remain available to API clients.
+exec vllm serve Qwen/Qwen3.8-27B-FP8 \
   --trust-remote-code \
-  --served-model-name qwen3.6-27B-FP8 \
+  --served-model-name qwen3.8-27B-FP8 \
   --port "$PORT" \
   --host 0.0.0.0 \
   --max-model-len 131072 \
@@ -34,6 +32,4 @@ exec vllm serve Qwen/Qwen3.6-27B-FP8 \
   --gpu-memory-utilization 0.45 \
   --reasoning-parser qwen3 \
   --enable-auto-tool-choice \
-  --tool-call-parser qwen3_xml \
-  --override-generation-config '{"repetition_penalty":1.05,"presence_penalty":0.3}' \
-  --chat-template "$WORKSPACE/vllm-runtime/qwen3.6-librechat.jinja"
+  --tool-call-parser qwen3_coder

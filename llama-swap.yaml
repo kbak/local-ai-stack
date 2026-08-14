@@ -1,11 +1,11 @@
 listen: "0.0.0.0:8080"
 
-# vLLM cold start (compile cache miss) on Qwen3.6-27B can take 5-10 min.
+# vLLM cold start (compile cache miss) on Qwen3.8-27B can take 5-10 min.
 # Default 120s would kill it.
 healthCheckTimeout: 900
 
 models:
-  qwen3.6-27B-FP8:
+  qwen3.8-27B-FP8:
     cmd: bash ./serve-qwen-27b.sh ${PORT}
     proxy: http://127.0.0.2:${PORT}
     checkEndpoint: /v1/models
@@ -50,7 +50,7 @@ models:
     ttl: 600
 
   # Cross-encoder reranker on the 5060 Ti (~1.1 GB weights, persistent).
-  # vLLM 0.20.1 uses --runner pooling (not --task score).
+  # vLLM uses --runner pooling for cross-encoder scoring.
   # Endpoint: POST /v1/score with {"model":"bge-reranker-v2-m3","text_1":"query","text_2":["doc1","doc2"]}
   bge-reranker-v2-m3:
     cmd: bash ./serve-reranker.sh ${PORT}
@@ -72,7 +72,7 @@ groups:
     persistent: true
     members:
       - "qwen3.6-35B-A3B-FP8"
-      - "qwen3.6-27B-FP8"
+      - "qwen3.8-27B-FP8"
       - "muse-glimmer-30B-FP8"
 
   "cuda0_coder":
