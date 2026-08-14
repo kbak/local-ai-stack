@@ -104,6 +104,9 @@ The chat launchers (`serve-qwen-27b.sh`, `serve-qwen-35b-a3b.sh`) use:
 - Stock FP8 weights (`Qwen/Qwen3.8-27B-FP8`, `Qwen/Qwen3.6-35B-A3B-FP8`) — keeps tool-call JSON well-formed
 
 The coder model (`qwen-coder-7B`) pins itself to the primary GPU via `CUDA_VISIBLE_DEVICES=0` in its launcher script and runs with `--gpu-memory-utilization 0.17` so it coexists with the chat models.
+Its launcher disables vLLM's V2 model runner because that runner requires CUDA
+Unified Virtual Addressing, which is unavailable through the current WSL GPU
+path; the standard V1 runner remains fully supported for autocomplete.
 
 Muse Glimmer requires Docker access from the user running llama-swap. Its first
 request pulls the dedicated vLLM image and the approximately 34 GB
