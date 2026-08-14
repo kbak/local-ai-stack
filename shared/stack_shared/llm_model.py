@@ -24,7 +24,9 @@ import httpx
 
 log = logging.getLogger(__name__)
 
-_DEFAULT_CODER_PATTERN = re.compile(r"coder", re.IGNORECASE)
+_DEFAULT_CODER_PATTERN = re.compile(
+    r"coder|reranker|embed|bge-|flux|stable-diffusion", re.IGNORECASE
+)
 _PARAM_COUNT_PATTERN = re.compile(r"(\d+(?:\.\d+)?)B", re.IGNORECASE)
 
 _CACHE_TTL_SECONDS = 60.0

@@ -47,4 +47,11 @@ RUN sed -i 's|^/no_think$|Think briefly before replying: a sentence or two to ch
 # crashing the main loop on every photo. Coerce None -> "" before .lower().
 RUN sed -i 's|a.get("filename", "").lower()|(a.get("filename") or "").lower()|' /app/bot.py
 
+# The upstream runtime model selector considers every ready llama-swap model.
+# During a main-model swap the persistent autocomplete model can briefly be the
+# only ready entry, causing the tool-using Signal agent to switch to qwen-coder
+# (which intentionally has no automatic tool-call parser) and fail with HTTP
+# 400. Rerankers, embedders, and image models are likewise not chat models.
+RUN sed -i 's|ids = \[entry.get("model") for entry in running if entry.get("model")\]|ids = [entry.get("model") for entry in running if entry.get("model") and not any(token in entry.get("model").lower() for token in ("coder", "reranker", "embed", "bge-", "flux", "stable-diffusion"))]|' /app/agent.py
+
 CMD ["python", "bot.py"]
