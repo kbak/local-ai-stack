@@ -304,6 +304,10 @@ services:
       - oss-watcher.env
     environment:
       LLM_BASE_URL: "${LLM_BASE_URL:-https://llama.kacper.me/v1}"
+      # Do not inherit signal-bot.env's pinned model. The watcher should use
+      # whichever non-coder chat model is already resident in llama-swap so a
+      # weekly summary cannot evict the interactive model.
+      LLM_MODEL: ""
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
