@@ -114,6 +114,34 @@ function patchAgentPdfAttachments() {
 
 patchAgentPdfAttachments();
 
+// LibreChat's "Upload as Text" normally expands an entire PDF into the first
+// prompt. Large papers can consume the whole context window before the model
+// runs. Preserve Agent PDF uploads as local files instead so both attachment
+// choices use the page-ranged pdf-inspector MCP bridge above.
+function patchPdfUploadAsText() {
+  const path = '/app/api/server/services/Files/process.js';
+  const source = fs.readFileSync(path, 'utf8');
+  const marker = 'PDF_INSPECTOR_CONTEXT_UPLOAD';
+  if (source.includes(marker)) {
+    console.log('[render] PDF Upload-as-Text redirect already installed.');
+    return;
+  }
+
+  const needle = '} else if (tool_resource === EToolResources.context) {';
+  const replacement = `} else if (
+    tool_resource === EToolResources.context &&
+    // PDF_INSPECTOR_CONTEXT_UPLOAD: retain PDFs for page-ranged MCP reading.
+    file.mimetype !== 'application/pdf'
+  ) {`;
+  if (!source.includes(needle)) {
+    throw new Error('LibreChat context-upload hook changed; PDF redirect was not applied');
+  }
+  fs.writeFileSync(path, source.replace(needle, replacement));
+  console.log('[render] PDF Upload-as-Text redirect installed.');
+}
+
+patchPdfUploadAsText();
+
 async function patchAgentInstructions() {
   if (!instructions) {
     console.log('[render] instructions empty — skipping agent patch.');
