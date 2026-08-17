@@ -24,6 +24,19 @@ RUN pip install --no-cache-dir --no-deps -e /shared/
 
 RUN cp -r /uoltz/app/. .
 
+# Built-in sub-agent skills (YouTube and webpage summarizers) call
+# config.make_model(), which normally passes LLM_MODEL straight through. The
+# stack intentionally leaves that variable empty so the resident llama-swap
+# chat model is selected dynamically; resolve it here just like the main agent
+# does instead of sending an invalid empty `model` key.
+RUN sed -i '/from strands.models.openai import OpenAIModel/a\    from stack_shared.llm_model import resolve_model' /app/config.py && \
+    sed -i 's/model_id=llm.model_id,/model_id=resolve_model(base_url=llm.base_url),/' /app/config.py
+
+# Strands 1.30 always emits `tools: []` for tool-less sub-agents. vLLM rejects
+# that OpenAI-incompatible payload; omit the field when no tools are present.
+RUN sed -i '/^        if stream:$/i\        if not request["tools"]:\n            request.pop("tools")\n' \
+    /usr/local/lib/python3.12/site-packages/strands/models/openai.py
+
 # Make agent timeout configurable via AGENT_TIMEOUT_S env var (default 120s).
 # The upstream default of 60s is too short for the 35B model on long contexts.
 RUN sed -i 's/^AGENT_TIMEOUT = 60$/AGENT_TIMEOUT = int(os.environ.get("AGENT_TIMEOUT_S", "120"))/' /app/bot.py
