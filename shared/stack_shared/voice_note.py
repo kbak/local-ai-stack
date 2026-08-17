@@ -14,6 +14,7 @@ import base64
 import logging
 import os
 import re
+import time
 
 import httpx
 
@@ -22,6 +23,7 @@ from .signal_client import send_message
 log = logging.getLogger(__name__)
 
 MAX_CHARS = 3500  # ~3-4 min of audio at Kokoro's default speed
+CLONE_MAX_CHARS = 700  # ~2 Chatterbox passes; comfortably below the 300s timeout
 _HTTP_TIMEOUT = httpx.Timeout(connect=10.0, read=300.0, write=60.0, pool=10.0)
 
 
@@ -116,10 +118,21 @@ def _split_section_if_needed(section: str, max_chars: int) -> list[str]:
             # Paragraph itself too long — split at sentence ends.
             sentences = re.split(r"(?<=[.!?])\s+", para)
             for s in sentences:
+                # A single sentence can itself exceed the limit. Hard-split it
+                # at word boundaries so every outbound TTS request is bounded.
+                while len(s) > max_chars:
+                    cut = s.rfind(" ", 0, max_chars + 1)
+                    cut = cut if cut > 0 else max_chars
+                    if buf:
+                        out.append(buf.strip())
+                        buf = ""
+                    out.append(s[:cut].strip())
+                    s = s[cut:].lstrip()
                 if len(buf) + len(s) + 1 > max_chars and buf:
                     out.append(buf.strip())
                     buf = ""
-                buf = (buf + " " + s).strip() if buf else s
+                if s:
+                    buf = (buf + " " + s).strip() if buf else s
             continue
         if len(buf) + len(para) + 2 > max_chars and buf:
             out.append(buf.strip())
@@ -252,14 +265,30 @@ def send_text_and_voice_brief(
     audio_api_url = audio_api_url or os.environ.get("AUDIO_API_URL", "http://audio-api:8088")
 
     speech_text = prepare_for_tts(strip_markdown(text))
-    chunks = chunk_for_voice(speech_text)
-    log.info("Synthesizing %d voice-note chunk(s) for brief (%d chars total)", len(chunks), len(speech_text))
+    # Chatterbox clone synthesis is roughly real-time and internally performs
+    # one sequential generation per ~350 characters. A Kokoro-sized 3500-char
+    # request therefore exceeds the five-minute HTTP timeout. Bound cloned,
+    # multilingual requests to about two internal generations apiece.
+    max_chars = CLONE_MAX_CHARS if language is not None and language != "en" else MAX_CHARS
+    chunks = chunk_for_voice(speech_text, max_chars=max_chars)
+    log.info(
+        "Synthesizing %d voice-note chunk(s) for brief (%d chars total, max %d chars/request)",
+        len(chunks),
+        len(speech_text),
+        max_chars,
+    )
 
     for i, chunk in enumerate(chunks, 1):
+        started = time.monotonic()
         try:
             ogg = synthesize_opus(chunk, audio_api_url=audio_api_url, voice=voice, language=language)
         except Exception:
-            log.exception("TTS failed for chunk %d/%d — skipping", i, len(chunks))
+            log.exception(
+                "TTS failed for chunk %d/%d after %.1fs — skipping",
+                i,
+                len(chunks),
+                time.monotonic() - started,
+            )
             continue
         try:
             send_voice_note(
@@ -268,6 +297,13 @@ def send_text_and_voice_brief(
                 signal_number=signal_number,
                 recipient=recipient,
             )
-            log.info("Voice note %d/%d sent (%d chars, %d bytes)", i, len(chunks), len(chunk), len(ogg))
+            log.info(
+                "Voice note %d/%d sent (%d chars, %d bytes, synthesized in %.1fs)",
+                i,
+                len(chunks),
+                len(chunk),
+                len(ogg),
+                time.monotonic() - started,
+            )
         except Exception:
             log.exception("Failed to send voice note %d/%d", i, len(chunks))
