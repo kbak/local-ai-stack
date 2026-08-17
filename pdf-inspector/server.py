@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
+import subprocess
 import tempfile
 from pathlib import Path
 from urllib.parse import urlparse
@@ -15,6 +16,12 @@ from fastmcp import FastMCP
 log = logging.getLogger(__name__)
 
 mcp = FastMCP("pdf-inspector")
+
+_LOCAL_ROOTS = tuple(
+    Path(root).resolve()
+    for root in os.environ.get("PDF_LOCAL_ROOTS", "/uploads").split(":")
+    if root
+)
 
 
 def _is_url(source: str) -> bool:
@@ -37,6 +44,36 @@ def _fetch_pdf(url: str) -> Path:
     return Path(tmp.name)
 
 
+def _resolve_local_pdf(source: str) -> Path:
+    """Resolve a PDF path while confining access to configured upload roots."""
+    path = Path(source).resolve(strict=True)
+    if path.suffix.lower() != ".pdf":
+        raise ValueError("Local source must be a PDF file")
+    if not any(path.is_relative_to(root) for root in _LOCAL_ROOTS):
+        raise ValueError("Local PDF path is outside the allowed upload roots")
+    return path
+
+
+def _extract_with_poppler(
+    pdf_path: str,
+    start_page: int,
+    end_page: int | None,
+) -> str:
+    """Fallback for text PDFs whose layout the Rust extractor cannot decode."""
+    cmd = ["pdftotext", "-layout", "-f", str(start_page)]
+    if end_page is not None:
+        cmd.extend(["-l", str(end_page)])
+    cmd.extend([pdf_path, "-"])
+    completed = subprocess.run(
+        cmd,
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    return completed.stdout.strip()
+
+
 @mcp.tool()
 def read_pdf(
     source: str,
@@ -55,7 +92,7 @@ def read_pdf(
             tmp_path = _fetch_pdf(source)
             pdf_path = str(tmp_path)
         else:
-            pdf_path = source
+            pdf_path = str(_resolve_local_pdf(source))
 
         # Build pages list if a range is requested
         pages: list[int] | None = None
@@ -68,20 +105,29 @@ def read_pdf(
 
         result = pdf_inspector.process_pdf(pdf_path, pages=pages)
 
+        used_fallback = False
         if result.markdown:
             text = result.markdown
         else:
-            # Scanned/image PDF — flag it clearly
-            text = (
-                f"[pdf-inspector: {result.pdf_type} PDF, "
-                f"{result.page_count} pages — OCR required for text extraction]"
-            )
+            fallback_text = _extract_with_poppler(pdf_path, start_page, end_page)
+            if fallback_text:
+                text = fallback_text
+                used_fallback = True
+                log.info("Rust extraction was empty; used Poppler fallback for %s", source)
+            else:
+                # Scanned/image PDF — flag it clearly
+                text = (
+                    f"[pdf-inspector: {result.pdf_type} PDF, "
+                    f"{result.page_count} pages — OCR required for text extraction]"
+                )
 
-        meta = []
+        meta = [f"pages={result.page_count}"]
         if result.pdf_type:
             meta.append(f"type={result.pdf_type}")
-        if result.pages_needing_ocr:
+        if result.pages_needing_ocr and not used_fallback:
             meta.append(f"pages_needing_ocr={result.pages_needing_ocr}")
+        if used_fallback:
+            meta.append("extractor=poppler_fallback")
         if result.has_encoding_issues:
             meta.append("has_encoding_issues=true")
 

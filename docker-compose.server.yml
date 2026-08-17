@@ -102,6 +102,7 @@ services:
       - ./librechat.yaml:/app/librechat.yaml.template:ro
       - ./librechat-render.js:/app/librechat-render.js:ro
       - librechat-data:/app/client/public/images
+      - librechat-uploads:/app/uploads
       - ${MEMORY_DIR:?MEMORY_DIR must be set in .env}:/memory:ro
     depends_on:
       mongodb:
@@ -212,6 +213,9 @@ services:
       - "8086:8085"
     environment:
       TRANSPORT: http
+      PDF_LOCAL_ROOTS: /uploads
+    volumes:
+      - librechat-uploads:/uploads:ro
     networks:
       - server-net
     mem_limit: 512m
@@ -470,6 +474,7 @@ volumes:
   mcp-proxy-uv-cache:
   mongodb-data:
   librechat-data:
+  librechat-uploads:
   signal-cli-data:
   signal-bot-data:
   location-tracker-data:

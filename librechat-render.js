@@ -51,6 +51,69 @@ fs.writeFileSync('/app/librechat.yaml', rendered);
 
 console.log('[render] librechat.yaml written. TIER1_MEMORY length:', process.env.TIER1_MEMORY.length);
 
+// Custom OpenAI-compatible models (including vLLM) cannot consume LibreChat's
+// native `{type: "file"}` PDF blocks. For Agents, turn local PDF attachments
+// into references for our pdf-inspector MCP server and keep the raw document
+// out of the provider payload. The attachment remains on the message/UI.
+function patchAgentPdfAttachments() {
+  const path = '/app/api/server/controllers/agents/client.js';
+  const source = fs.readFileSync(path, 'utf8');
+  const marker = 'PDF_INSPECTOR_UPLOAD_BRIDGE';
+  if (source.includes(marker)) {
+    console.log('[render] PDF attachment bridge already installed.');
+    return;
+  }
+
+  const needle = `  checkVisionRequest() {}
+
+  getSaveOptions() {`;
+  const replacement = `  checkVisionRequest() {}
+
+  // PDF_INSPECTOR_UPLOAD_BRIDGE: vLLM has no native file content part. Keep
+  // local PDFs as message attachments, expose safe paths to the MCP tool, and
+  // remove the binary documents from every provider request (including resend).
+  getPdfInspectorAttachments(attachments) {
+    return (attachments ?? []).filter(
+        (file) =>
+          file?.source === 'local' &&
+          file?.type === 'application/pdf' &&
+          typeof file?.filepath === 'string' &&
+          file.filepath.startsWith('/uploads/') &&
+          !file.filepath.includes('..'),
+    );
+  }
+
+  async addFileContextToMessage(message, attachments) {
+    await super.addFileContextToMessage(message, attachments);
+    const refs = this.getPdfInspectorAttachments(attachments)
+      .map(
+        (file) =>
+          '[Attached PDF "' + file.filename + '". Read it with the pdf-inspector MCP read_pdf tool using source="' + file.filepath + '" before answering. Start with pages 1-10 and continue in page ranges as needed.]',
+      )
+      .join('\\n');
+    if (refs) {
+      message.fileContext = [message.fileContext, refs].filter(Boolean).join('\\n\\n');
+    }
+  }
+
+  async processAttachments(message, attachments) {
+    const mcpPdfs = this.getPdfInspectorAttachments(attachments);
+    const providerAttachments = (attachments ?? []).filter((file) => !mcpPdfs.includes(file));
+    const files = await super.processAttachments(message, providerAttachments);
+    return [...files, ...mcpPdfs];
+  }
+
+  getSaveOptions() {`;
+
+  if (!source.includes(needle)) {
+    throw new Error('LibreChat Agents attachment hook changed; PDF bridge was not applied');
+  }
+  fs.writeFileSync(path, source.replace(needle, replacement));
+  console.log('[render] PDF attachment bridge installed.');
+}
+
+patchAgentPdfAttachments();
+
 async function patchAgentInstructions() {
   if (!instructions) {
     console.log('[render] instructions empty — skipping agent patch.');
