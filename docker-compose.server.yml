@@ -153,6 +153,8 @@ services:
       - ./signal-bot.env
     environment:
       LLM_BASE_URL: "${LLM_BASE_URL:-https://llama.kacper.me/v1}"
+      # Always let stack_shared select the currently loaded chat model.
+      LLM_MODEL: ""
       AUDIO_API_URL: "${AUDIO_API_URL:-https://audio.kacper.me}"
       YTDLP_SERVICE_URL: "${YTDLP_SERVICE_URL:-https://yt.kacper.me}"
       MEMORY_MCP_URL: https://memory.kacper.me
@@ -225,6 +227,7 @@ services:
       - signal-bot.env
     environment:
       LLM_BASE_URL: "${LLM_BASE_URL:-https://llama.kacper.me/v1}"
+      LLM_MODEL: ""
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
@@ -255,6 +258,7 @@ services:
       - receipt-watcher.env
     environment:
       LLM_BASE_URL: "${LLM_BASE_URL:-https://llama.kacper.me/v1}"
+      LLM_MODEL: ""
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
@@ -281,6 +285,7 @@ services:
       - tg-watcher.env
     environment:
       LLM_BASE_URL: "${LLM_BASE_URL:-https://llama.kacper.me/v1}"
+      LLM_MODEL: ""
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
@@ -304,9 +309,6 @@ services:
       - oss-watcher.env
     environment:
       LLM_BASE_URL: "${LLM_BASE_URL:-https://llama.kacper.me/v1}"
-      # Do not inherit signal-bot.env's pinned model. The watcher should use
-      # whichever non-coder chat model is already resident in llama-swap so a
-      # weekly summary cannot evict the interactive model.
       LLM_MODEL: ""
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -329,6 +331,7 @@ services:
       - rss-watcher.env
     environment:
       LLM_BASE_URL: "${LLM_BASE_URL:-https://llama.kacper.me/v1}"
+      LLM_MODEL: ""
       AUDIO_API_URL: "${AUDIO_API_URL:-https://audio.kacper.me}"
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -351,6 +354,7 @@ services:
       - plc-watcher.env
     environment:
       LLM_BASE_URL: "${LLM_BASE_URL:-https://llama.kacper.me/v1}"
+      LLM_MODEL: ""
       AUDIO_API_URL: "${AUDIO_API_URL:-https://audio.kacper.me}"
     extra_hosts:
       - "host.docker.internal:host-gateway"
