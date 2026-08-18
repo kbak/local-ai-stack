@@ -21,6 +21,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from mcp.server.fastmcp import FastMCP
+from mcp.server.transport_security import TransportSecuritySettings
 
 from . import config, memory_backend
 
@@ -32,7 +33,14 @@ logger = logging.getLogger("memory-mcp")
 # FastMCP exposes these as MCP tools over streamable-http. The same functions
 # are also exposed via REST below so you can curl them during development.
 
-mcp = FastMCP("memory-mcp")
+mcp = FastMCP(
+    "memory-mcp",
+    transport_security=TransportSecuritySettings(
+        enable_dns_rebinding_protection=True,
+        allowed_hosts=["memory.kacper.me"],
+        allowed_origins=["https://memory.kacper.me"],
+    ),
+)
 
 
 @mcp.tool()
