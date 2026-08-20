@@ -9,7 +9,7 @@ WORKDIR /app
 # Bump UOLTZ_REV (any new value) to force a fresh git clone of kbak/uoltz.
 # Otherwise Docker caches the clone layer indefinitely and pushes to the
 # fork won't be picked up by `docker compose build`.
-ARG UOLTZ_REV=2026-08-09-97bbed9
+ARG UOLTZ_REV=2026-08-20-45d402c
 RUN echo "uoltz rev: ${UOLTZ_REV}" && git clone https://github.com/kbak/uoltz.git /uoltz
 RUN pip install --no-cache-dir -r /uoltz/app/requirements.txt && \
     pip install --no-cache-dir mutagen==1.48.1 && \
@@ -36,10 +36,6 @@ RUN sed -i '/from strands.models.openai import OpenAIModel/a\    from stack_shar
 # that OpenAI-incompatible payload; omit the field when no tools are present.
 RUN sed -i '/^        if stream:$/i\        if not request["tools"]:\n            request.pop("tools")\n' \
     /usr/local/lib/python3.12/site-packages/strands/models/openai.py
-
-# Make agent timeout configurable via AGENT_TIMEOUT_S env var (default 120s).
-# The upstream default of 60s is too short for the 35B model on long contexts.
-RUN sed -i 's/^AGENT_TIMEOUT = 60$/AGENT_TIMEOUT = int(os.environ.get("AGENT_TIMEOUT_S", "120"))/' /app/bot.py
 
 # Light thinking for the bot. Qwen3 thinking is re-enabled (enable_thinking=True)
 # but kept SHORT via a brief-reasoning directive in the system prompt (next sed),
