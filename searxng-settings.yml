@@ -2157,7 +2157,7 @@ engines:
     engine: yahoo
     shortcut: yh
     # Yahoo currently fails from this host with HTTP protocol errors.
-    disabled: true
+    disabled: false
 
   - name: yahoo news
     engine: yahoo_news
