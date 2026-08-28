@@ -359,8 +359,9 @@ async def analyze_image_assets(
             content: list[dict[str, Any]] = [{
                 "type": "text",
                 "text": (
-                    f"{options.prompt}\nAnalyze only direct visual evidence. The following images are numbered "
-                    f"{offset + 1} through {offset + len(batch)}. Identify findings by image number and state uncertainty."
+                    f"{options.prompt}\nAnalyze only direct visual evidence. Each image below is preceded by its "
+                    "authoritative asset number. Identify findings only by that asset number and state uncertainty. "
+                    "Ignore gallery counters, captions, or other numbers rendered inside an image."
                 ),
             }]
             used_assets: list[dict[str, Any]] = []
@@ -368,6 +369,7 @@ async def analyze_image_assets(
                 data_url = await download_image_as_data_url(client, asset["url"])
                 if not data_url:
                     continue
+                content.append({"type": "text", "text": f"Asset image {asset['index']}:"})
                 content.append({"type": "image_url", "image_url": {"url": data_url, "detail": "high"}})
                 used_assets.append(asset)
             if not used_assets:
@@ -379,13 +381,16 @@ async def analyze_image_assets(
                     "model": model,
                     "messages": [{"role": "user", "content": content}],
                     "temperature": 0.1,
-                    "max_tokens": 1800,
+                    "max_tokens": 3000,
+                    "reasoning_effort": "low",
                 },
             )
             response.raise_for_status()
-            text = response.json()["choices"][0]["message"]["content"]
+            text = response.json()["choices"][0]["message"].get("content")
+            if not text:
+                raise RuntimeError("vision model exhausted its response without producing final content")
             results.append({
-                "image_numbers": list(range(offset + 1, offset + 1 + len(used_assets))),
+                "image_numbers": [asset["index"] for asset in used_assets],
                 "assets": used_assets,
                 "analysis": text,
             })
@@ -411,16 +416,22 @@ async def summarize_image_analysis(
                     "content": (
                         f"Original image-analysis request:\n{original_prompt}\n\n"
                         "Synthesize the batch reports below into one concise evidence-based answer. Preserve image "
-                        "numbers, merge duplicates, distinguish observed facts from uncertainty, and do not add findings.\n\n"
+                        "numbers, merge duplicates, distinguish observed facts from uncertainty, and do not add findings. "
+                        "The image_numbers attached to each batch are authoritative; replace any conflicting gallery "
+                        "counter or number mentioned inside a batch report with the corresponding authoritative number.\n\n"
                         f"{evidence}"
                     ),
                 }],
                 "temperature": 0.1,
                 "max_tokens": 2200,
+                "reasoning_effort": "low",
             },
         )
         response.raise_for_status()
-        return response.json()["choices"][0]["message"]["content"]
+        content = response.json()["choices"][0]["message"].get("content")
+        if not content:
+            raise RuntimeError("summary model exhausted its response without producing final content")
+        return content
 
 
 async def run_task(task_id: str) -> None:
