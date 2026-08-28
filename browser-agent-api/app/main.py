@@ -116,6 +116,7 @@ class TaskView(BaseModel):
     image_assets: list[dict[str, Any]] = Field(default_factory=list)
     image_analysis: list[dict[str, Any]] = Field(default_factory=list)
     image_analysis_summary: str | None = None
+    partial: bool = False
 
 
 @dataclass
@@ -308,6 +309,48 @@ async def extract_image_assets(cdp_url: str, limit: int) -> list[dict[str, Any]]
         return assets
 
 
+async def extract_page_snapshot(cdp_url: str, max_chars: int = 50_000) -> dict[str, Any] | None:
+    """Capture useful current-page state when the navigation agent cannot finish."""
+    async with async_playwright() as playwright:
+        connected = await playwright.chromium.connect_over_cdp(cdp_url, timeout=30_000)
+        for context in connected.contexts:
+            pages = context.pages
+            if not pages:
+                continue
+            page = pages[-1]
+            try:
+                text = await page.locator("body").inner_text(timeout=10_000)
+                return {
+                    "url": page.url,
+                    "title": await page.title(),
+                    "text": text[:max_chars],
+                }
+            except Exception:
+                log.exception("failed to capture partial page snapshot from %s", page.url)
+        return None
+
+
+async def add_image_analysis(
+    view: TaskView,
+    request: TaskRequest,
+    browser_resource: BrowserResource,
+    model: str,
+) -> None:
+    if not request.image_analysis or not browser_resource.cdp_url:
+        return
+    discovered_assets = await extract_image_assets(
+        browser_resource.cdp_url,
+        max(request.image_analysis.max_images * 10, 100),
+    )
+    view.image_assets = select_image_assets(discovered_assets, request.image_analysis.max_images)
+    view.image_analysis = await analyze_image_assets(view.image_assets, request.image_analysis, model)
+    view.image_analysis_summary = await summarize_image_analysis(
+        view.image_analysis,
+        request.image_analysis.prompt,
+        model,
+    )
+
+
 def select_image_assets(assets: list[dict[str, Any]], limit: int) -> list[dict[str, Any]]:
     def score(asset: dict[str, Any]) -> int:
         url = asset["url"].lower()
@@ -459,9 +502,12 @@ async def run_task(task_id: str) -> None:
                 enable_signal_handler=False,
                 source="browser-agent-api",
             )
+            navigation_timeout = TASK_TIMEOUT_SECONDS
+            if request.image_analysis:
+                navigation_timeout = max(60, TASK_TIMEOUT_SECONDS - 240)
             history = await asyncio.wait_for(
                 agent.run(max_steps=request.max_steps),
-                timeout=TASK_TIMEOUT_SECONDS,
+                timeout=navigation_timeout,
             )
             view.final_text = history.final_result()
             view.result = parse_result(view.final_text, request.output_schema is not None, unwrap_result)
@@ -469,23 +515,27 @@ async def run_task(task_id: str) -> None:
             view.duration_seconds = history.total_duration_seconds()
             view.urls = history.urls()
             view.errors = [str(error) for error in history.errors() if error]
-            if request.image_analysis and browser_resource.cdp_url:
-                discovered_assets = await extract_image_assets(
-                    browser_resource.cdp_url,
-                    max(request.image_analysis.max_images * 10, 100),
-                )
-                view.image_assets = select_image_assets(discovered_assets, request.image_analysis.max_images)
-                view.image_analysis = await analyze_image_assets(
-                    view.image_assets,
-                    request.image_analysis,
-                    model,
-                )
-                view.image_analysis_summary = await summarize_image_analysis(
-                    view.image_analysis,
-                    request.image_analysis.prompt,
-                    model,
-                )
+            await add_image_analysis(view, request, browser_resource, model)
             view.status = "completed" if view.final_text is not None else "failed"
+        except TimeoutError as exc:
+            log.warning("browser navigation timed out for task %s; salvaging current page", task_id)
+            view.errors.append(f"{type(exc).__name__}: browser navigation exceeded its time budget")
+            view.partial = True
+            if browser_resource is not None and browser_resource.cdp_url:
+                try:
+                    snapshot = await extract_page_snapshot(browser_resource.cdp_url)
+                    if snapshot:
+                        view.result = snapshot
+                        view.final_text = (
+                            "Browser navigation timed out; returning a partial snapshot of the current page.\n\n"
+                            f"Title: {snapshot['title']}\nURL: {snapshot['url']}\n\n{snapshot['text']}"
+                        )
+                        view.urls = [snapshot["url"]]
+                    await add_image_analysis(view, request, browser_resource, view.model or await resolve_model())
+                except Exception as salvage_exc:
+                    log.exception("failed to salvage browser task %s", task_id)
+                    view.errors.append(f"salvage {type(salvage_exc).__name__}: {salvage_exc}")
+            view.status = "completed" if view.final_text or view.image_analysis_summary else "failed"
         except Exception as exc:
             log.exception("browser task %s failed", task_id)
             view.errors.append(f"{type(exc).__name__}: {exc}")

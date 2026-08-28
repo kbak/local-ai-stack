@@ -96,6 +96,7 @@ All tools are exposed via mcp-proxy on port 8083 (no authentication required —
 - **google-maps** — place search, ratings, hours, geocoding, directions (requires `GOOGLE_MAPS_API_KEY`)
 - **browser** — generic headless browsing and optional Qwen image inspection. `browser_use` waits for a result; `submit_browser_task` plus `get_browser_task` support asynchronous jobs.
   LibreChat gives this server an 11-minute MCP request timeout because gallery navigation and batched vision analysis can run for several minutes.
+  If navigation exhausts its budget, the backend salvages the current page text and discovered image assets and marks the response `partial: true` instead of discarding the work.
 - **location-tracker** — `get_location_at(datetime)` — returns city, confidence, and source for any datetime; backed by CalDAV + local LLM + SearXNG. See [`location-tracker/README.md`](location-tracker/README.md).
 
 ### Brave-backed web search

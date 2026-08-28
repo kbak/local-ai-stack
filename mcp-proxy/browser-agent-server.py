@@ -80,6 +80,7 @@ def _compact_result(result: dict[str, Any]) -> dict[str, Any]:
             "image_analysis_summary",
             "errors",
             "duration_seconds",
+            "partial",
         )
         if result.get(key) not in (None, [], "")
     }
