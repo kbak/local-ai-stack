@@ -32,6 +32,7 @@ COPY gmaps-searchtext-shim.py /opt/gmaps-searchtext-shim.py
 # Thin read-only GitHub MCP server (replaces @modelcontextprotocol/server-github).
 # One tool (gh_read) instead of 26 — uses the gh CLI with GITHUB_TOKEN from env.
 COPY gh-read-server.py /opt/gh-read-server.py
+COPY browser-agent-server.py /opt/browser-agent-server.py
 
 # Pre-install all MCP packages at pinned versions so first connection doesn't time out
 RUN uvx google-maps-mcp-server==0.2.1 --help 2>/dev/null || true && \

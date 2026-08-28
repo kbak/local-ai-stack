@@ -84,6 +84,15 @@
         "python",
         "/opt/gmaps-searchtext-shim.py"
       ]
+    },
+    "browser": {
+      "command": "python",
+      "args": [
+        "/opt/browser-agent-server.py"
+      ],
+      "env": {
+        "BROWSER_AGENT_API_URL": "http://browser-agent-api:8092"
+      }
     }
   }
 }

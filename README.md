@@ -8,7 +8,7 @@ Self-hosted LLM stack with privacy-focused web search and research tools. Runs o
 |---|---|---|
 | llama-swap | 8080 | Model manager — switches between vLLM instances on demand |
 | SearXNG | 8081 | Privacy-focused meta search engine |
-| mcp-proxy | 8083 | MCP tool server (10 tools via streamable HTTP, no auth required) |
+| mcp-proxy | 8083 | MCP tool server (including search, fetch, maps, and headless browser tools via streamable HTTP) |
 | location-tracker | 8084 | City-presence timeline service; exposes `get_location_at` MCP tool (bearer token required) |
 | pdf-inspector | 8086 | PDF text extraction via pdf-inspector (Rust); handles Unicode, multi-column, tables |
 | voice-agent | 8087 | Browser voice-chat UI with wake-word-free VAD, streaming TTS, voice picker, and full MCP tool access via strands |
@@ -94,6 +94,7 @@ All tools are exposed via mcp-proxy on port 8083 (no authentication required —
 - **finance** — stock and financial data (yfinance)
 - **github** — read-only access via the `gh` CLI: read files, search code and repos, browse commits/issues/PRs. Custom Python MCP server (`mcp-proxy/gh-read-server.py`) using a `GITHUB_TOKEN` injected into the `gh` config — no write paths exposed.
 - **google-maps** — place search, ratings, hours, geocoding, directions (requires `GOOGLE_MAPS_API_KEY`)
+- **browser** — generic headless browsing and optional Qwen image inspection. `browser_use` waits for a result; `submit_browser_task` plus `get_browser_task` support asynchronous jobs.
 - **location-tracker** — `get_location_at(datetime)` — returns city, confidence, and source for any datetime; backed by CalDAV + local LLM + SearXNG. See [`location-tracker/README.md`](location-tracker/README.md).
 
 ### Brave-backed web search
@@ -293,6 +294,7 @@ mcp-proxy exposes each MCP server at its own streamable-http endpoint. Wire them
 http://<server-ip>:8083/servers/searxng/mcp
 http://<server-ip>:8083/servers/time/mcp
 http://<server-ip>:8083/servers/github/mcp
+http://<server-ip>:8083/servers/browser/mcp
 # etc.
 ```
 

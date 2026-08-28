@@ -143,6 +143,10 @@ mcpServers:
     url: http://mcp-proxy:8083/servers/google-maps/mcp
     type: streamable-http
     serverInstructions: false
+  browser:
+    url: http://mcp-proxy:8083/servers/browser/mcp
+    type: streamable-http
+    serverInstructions: false
   pdf-inspector:
     url: http://pdf-inspector:8085/mcp/
     type: streamable-http
