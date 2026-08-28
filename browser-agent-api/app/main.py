@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
 import logging
 import os
@@ -17,6 +18,7 @@ from urllib.parse import urlsplit, urlunsplit
 import httpx
 from browser_use import Agent, Browser, ChatOpenAI
 from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException, status
+from playwright.async_api import async_playwright
 from pydantic import BaseModel, Field, HttpUrl
 
 log = logging.getLogger("browser-agent-api")
@@ -37,9 +39,50 @@ STEEL_PROXY_URL = os.getenv("BROWSER_AGENT_STEEL_PROXY_URL", "")
 STEEL_SOLVE_CAPTCHA = os.getenv("BROWSER_AGENT_STEEL_SOLVE_CAPTCHA", "false").lower() == "true"
 STEEL_RESOLVE_WS_HOST = os.getenv("BROWSER_AGENT_STEEL_RESOLVE_WS_HOST", "true").lower() == "true"
 TASK_TIMEOUT_SECONDS = int(os.getenv("BROWSER_AGENT_TASK_TIMEOUT_SECONDS", "600"))
+IMAGE_DOWNLOAD_LIMIT_BYTES = int(os.getenv("BROWSER_AGENT_IMAGE_DOWNLOAD_LIMIT_BYTES", "12582912"))
+
+IMAGE_EXTRACTION_SCRIPT = """
+() => {
+  const found = [];
+  const seenRoots = new Set();
+  function add(url, alt, source, width = 0, height = 0) {
+    if (!url || typeof url !== 'string') return;
+    try { found.push({url: new URL(url, document.baseURI).href, alt: alt || '', source, width, height}); } catch (_) {}
+  }
+  function walk(root) {
+    if (!root || seenRoots.has(root)) return;
+    seenRoots.add(root);
+    root.querySelectorAll('img').forEach(img => {
+      add(img.currentSrc || img.src, img.alt, 'img', img.naturalWidth, img.naturalHeight);
+      for (const candidate of (img.srcset || '').split(',')) add(candidate.trim().split(/\\s+/)[0], img.alt, 'srcset', img.naturalWidth, img.naturalHeight);
+      for (const name of ['data-src', 'data-lazy-src', 'data-original']) add(img.getAttribute(name), img.alt, name, img.naturalWidth, img.naturalHeight);
+    });
+    root.querySelectorAll('source').forEach(source => {
+      for (const candidate of (source.srcset || '').split(',')) add(candidate.trim().split(/\\s+/)[0], '', 'source');
+    });
+    root.querySelectorAll('*').forEach(node => {
+      if (node.shadowRoot) walk(node.shadowRoot);
+      const bg = getComputedStyle(node).backgroundImage;
+      const match = bg && bg.match(/^url\\(["']?(.*?)["']?\\)$/);
+      if (match) add(match[1], node.getAttribute('aria-label') || '', 'background');
+    });
+  }
+  walk(document);
+  performance.getEntriesByType('resource').forEach(entry => {
+    if (['img', 'image', 'css'].includes(entry.initiatorType)) add(entry.name, '', 'performance');
+  });
+  return found;
+}
+"""
 
 app = FastAPI(title="browser-agent-api", version="0.1.0")
 task_slots = threading.BoundedSemaphore(MAX_CONCURRENT_TASKS)
+
+
+class ImageAnalysisOptions(BaseModel):
+    prompt: str = Field(min_length=1, max_length=10_000)
+    max_images: int = Field(default=20, ge=1, le=100)
+    batch_size: int = Field(default=4, ge=1, le=8)
 
 
 class TaskRequest(BaseModel):
@@ -49,6 +92,7 @@ class TaskRequest(BaseModel):
     max_steps: int = Field(default=DEFAULT_MAX_STEPS, ge=1, le=100)
     use_vision: bool = USE_VISION_DEFAULT
     output_schema: dict[str, Any] | None = None
+    image_analysis: ImageAnalysisOptions | None = None
 
 
 class TaskAccepted(BaseModel):
@@ -69,6 +113,9 @@ class TaskView(BaseModel):
     duration_seconds: float | None = None
     urls: list[str] = Field(default_factory=list)
     errors: list[str] = Field(default_factory=list)
+    image_assets: list[dict[str, Any]] = Field(default_factory=list)
+    image_analysis: list[dict[str, Any]] = Field(default_factory=list)
+    image_analysis_summary: str | None = None
 
 
 @dataclass
@@ -83,6 +130,7 @@ tasks: dict[str, TaskRecord] = {}
 @dataclass
 class BrowserResource:
     browser: Browser
+    cdp_url: str | None = None
     steel_session_id: str | None = None
 
 
@@ -136,12 +184,12 @@ async def create_browser(request: TaskRequest) -> BrowserResource:
         if not session_id or not websocket_url:
             raise RuntimeError("Steel session response omitted id or websocketUrl")
         common["cdp_url"] = rewrite_steel_websocket_url(websocket_url)
-        return BrowserResource(browser=Browser(**common), steel_session_id=session_id)
+        return BrowserResource(browser=Browser(**common), cdp_url=common["cdp_url"], steel_session_id=session_id)
     if BROWSER_CDP_URL:
         common["cdp_url"] = BROWSER_CDP_URL
     else:
         common.update(headless=True, chromium_sandbox=True)
-    return BrowserResource(browser=Browser(**common))
+    return BrowserResource(browser=Browser(**common), cdp_url=common.get("cdp_url"))
 
 
 async def release_steel_session(session_id: str) -> None:
@@ -199,6 +247,12 @@ def build_task_prompt(request: TaskRequest, effective_schema: dict[str, Any] | N
         )
     if request.start_url:
         parts.append(f"Start at this URL: {request.start_url}")
+    if request.image_analysis:
+        parts.append(
+            "A deterministic image-analysis stage runs after browsing. Navigate to the relevant page, open any gallery, "
+            "and expose the useful images in the DOM. Once that is done, finish the browser task promptly; do not extract, "
+            "enumerate, download, or visually analyze the image URLs yourself."
+        )
     if effective_schema:
         parts.append(
             "Use the browser extract action with the schema below, then return that validated JSON unchanged in your final answer. "
@@ -219,6 +273,154 @@ def parse_result(final_text: str | None, schema_requested: bool, unwrap_result: 
         return parsed.get("result") if unwrap_result and isinstance(parsed, dict) else parsed
     except json.JSONDecodeError:
         return None
+
+
+async def extract_image_assets(cdp_url: str, limit: int) -> list[dict[str, Any]]:
+    async with async_playwright() as playwright:
+        connected = await playwright.chromium.connect_over_cdp(cdp_url, timeout=30_000)
+        assets: list[dict[str, Any]] = []
+        seen: set[str] = set()
+        for context in connected.contexts:
+            for page in context.pages:
+                try:
+                    candidates = await page.evaluate(IMAGE_EXTRACTION_SCRIPT)
+                except Exception:
+                    log.exception("failed to extract image assets from %s", page.url)
+                    continue
+                candidates.sort(key=lambda item: int(item.get("width", 0)) * int(item.get("height", 0)), reverse=True)
+                for candidate in candidates:
+                    url = candidate.get("url", "")
+                    if not url.startswith(("http://", "https://")) or url in seen:
+                        continue
+                    seen.add(url)
+                    assets.append({
+                        "url": url,
+                        "alt": str(candidate.get("alt", ""))[:500],
+                        "source": str(candidate.get("source", ""))[:100],
+                        "width": int(candidate.get("width", 0)),
+                        "height": int(candidate.get("height", 0)),
+                    })
+                    if len(assets) >= limit:
+                        return assets
+        # Exiting async_playwright disconnects this CDP client. Calling
+        # Browser.close() here would shut down Steel's remote Chromium before
+        # the session release API can record and clean up the task.
+        return assets
+
+
+def select_image_assets(assets: list[dict[str, Any]], limit: int) -> list[dict[str, Any]]:
+    def score(asset: dict[str, Any]) -> int:
+        url = asset["url"].lower()
+        area = int(asset.get("width", 0)) * int(asset.get("height", 0))
+        value = min(area // 1000, 3000)
+        if any(token in url for token in ("favicon", "logo", "icon", "sprite", "tracking", "pixel")):
+            value -= 10_000
+        if url.endswith(".svg") or ".svg?" in url:
+            value -= 10_000
+        if any(token in url for token in ("/xxlarge/", "cstatic-images.com", "vehicle", "gallery")):
+            value += 5_000
+        if any(ext in url for ext in (".jpg", ".jpeg", ".webp", ".png")):
+            value += 1_000
+        return value
+
+    return sorted(assets, key=score, reverse=True)[:limit]
+
+
+async def download_image_as_data_url(client: httpx.AsyncClient, url: str) -> str | None:
+    try:
+        async with client.stream("GET", url, follow_redirects=True) as response:
+            response.raise_for_status()
+            content_type = response.headers.get("content-type", "").split(";", 1)[0]
+            if not content_type.startswith("image/") or content_type == "image/svg+xml":
+                return None
+            chunks: list[bytes] = []
+            size = 0
+            async for chunk in response.aiter_bytes():
+                size += len(chunk)
+                if size > IMAGE_DOWNLOAD_LIMIT_BYTES:
+                    return None
+                chunks.append(chunk)
+        encoded = base64.b64encode(b"".join(chunks)).decode("ascii")
+        return f"data:{content_type};base64,{encoded}"
+    except Exception:
+        log.exception("failed to download image asset %s", url)
+        return None
+
+
+async def analyze_image_assets(
+    assets: list[dict[str, Any]], options: ImageAnalysisOptions, model: str
+) -> list[dict[str, Any]]:
+    selected = assets[: options.max_images]
+    results: list[dict[str, Any]] = []
+    headers = {"Authorization": f"Bearer {LLM_API_KEY}", "Content-Type": "application/json"}
+    async with httpx.AsyncClient(timeout=httpx.Timeout(120, connect=15)) as client:
+        for offset in range(0, len(selected), options.batch_size):
+            batch = selected[offset : offset + options.batch_size]
+            content: list[dict[str, Any]] = [{
+                "type": "text",
+                "text": (
+                    f"{options.prompt}\nAnalyze only direct visual evidence. The following images are numbered "
+                    f"{offset + 1} through {offset + len(batch)}. Identify findings by image number and state uncertainty."
+                ),
+            }]
+            used_assets: list[dict[str, Any]] = []
+            for asset in batch:
+                data_url = await download_image_as_data_url(client, asset["url"])
+                if not data_url:
+                    continue
+                content.append({"type": "image_url", "image_url": {"url": data_url, "detail": "high"}})
+                used_assets.append(asset)
+            if not used_assets:
+                continue
+            response = await client.post(
+                f"{LLM_BASE_URL}/chat/completions",
+                headers=headers,
+                json={
+                    "model": model,
+                    "messages": [{"role": "user", "content": content}],
+                    "temperature": 0.1,
+                    "max_tokens": 1800,
+                },
+            )
+            response.raise_for_status()
+            text = response.json()["choices"][0]["message"]["content"]
+            results.append({
+                "image_numbers": list(range(offset + 1, offset + 1 + len(used_assets))),
+                "assets": used_assets,
+                "analysis": text,
+            })
+    return results
+
+
+async def summarize_image_analysis(
+    results: list[dict[str, Any]], original_prompt: str, model: str
+) -> str | None:
+    if not results:
+        return None
+    evidence = "\n\n".join(
+        f"Batch covering image numbers {item['image_numbers']}:\n{item['analysis']}" for item in results
+    )
+    async with httpx.AsyncClient(timeout=httpx.Timeout(120, connect=15)) as client:
+        response = await client.post(
+            f"{LLM_BASE_URL}/chat/completions",
+            headers={"Authorization": f"Bearer {LLM_API_KEY}", "Content-Type": "application/json"},
+            json={
+                "model": model,
+                "messages": [{
+                    "role": "user",
+                    "content": (
+                        f"Original image-analysis request:\n{original_prompt}\n\n"
+                        "Synthesize the batch reports below into one concise evidence-based answer. Preserve image "
+                        "numbers, merge duplicates, distinguish observed facts from uncertainty, and do not add findings.\n\n"
+                        f"{evidence}"
+                    ),
+                }],
+                "temperature": 0.1,
+                "max_tokens": 2200,
+            },
+        )
+        response.raise_for_status()
+        return response.json()["choices"][0]["message"]["content"]
 
 
 async def run_task(task_id: str) -> None:
@@ -256,6 +458,22 @@ async def run_task(task_id: str) -> None:
             view.duration_seconds = history.total_duration_seconds()
             view.urls = history.urls()
             view.errors = [str(error) for error in history.errors() if error]
+            if request.image_analysis and browser_resource.cdp_url:
+                discovered_assets = await extract_image_assets(
+                    browser_resource.cdp_url,
+                    max(request.image_analysis.max_images * 10, 100),
+                )
+                view.image_assets = select_image_assets(discovered_assets, request.image_analysis.max_images)
+                view.image_analysis = await analyze_image_assets(
+                    view.image_assets,
+                    request.image_analysis,
+                    model,
+                )
+                view.image_analysis_summary = await summarize_image_analysis(
+                    view.image_analysis,
+                    request.image_analysis.prompt,
+                    model,
+                )
             view.status = "completed" if view.final_text is not None else "failed"
         except Exception as exc:
             log.exception("browser task %s failed", task_id)

@@ -58,6 +58,27 @@ for another CDP-compatible backend. Steel's UI is host-local on port 3090. The
 agent API is also bound to loopback by default; set `BROWSER_AGENT_API_TOKEN`
 before exposing it to the LAN.
 
+For image-heavy pages, add `image_analysis`. The browsing agent only opens the
+relevant gallery; a deterministic stage then traverses the DOM and shadow DOM,
+downloads the largest discovered assets, and sends them to Qwen in small
+vision batches. Results include the source URL for every analyzed image, the
+individual batch reports, and a merged `image_analysis_summary`:
+
+```json
+{
+  "task": "Open the product listing and its photo gallery",
+  "start_url": "https://example.com/product/123",
+  "allowed_domains": ["example.com", "images.examplecdn.com"],
+  "max_steps": 12,
+  "use_vision": true,
+  "image_analysis": {
+    "prompt": "Report visible wear or damage; do not infer hidden defects.",
+    "max_images": 20,
+    "batch_size": 4
+  }
+}
+```
+
 ## MCP Tools
 
 All tools are exposed via mcp-proxy on port 8083 (no authentication required — internal Docker network only). location-tracker requires a bearer token (`MCP_PROXY_AUTH_TOKEN`).
