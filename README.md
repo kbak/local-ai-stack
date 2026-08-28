@@ -43,6 +43,28 @@ All tools are exposed via mcp-proxy on port 8083 (no authentication required —
 - **github** — read-only access via the `gh` CLI: read files, search code and repos, browse commits/issues/PRs. Custom Python MCP server (`mcp-proxy/gh-read-server.py`) using a `GITHUB_TOKEN` injected into the `gh` config — no write paths exposed.
 - **google-maps** — place search, ratings, hours, geocoding, directions (requires `GOOGLE_MAPS_API_KEY`)
 - **location-tracker** — `get_location_at(datetime)` — returns city, confidence, and source for any datetime; backed by CalDAV + local LLM + SearXNG. See [`location-tracker/README.md`](location-tracker/README.md).
+
+### Brave-backed web search
+
+General web search uses SearXNG's official Brave Search API engine. Put the key
+in the ignored root `.env` file; never add it directly to
+`searxng-settings.yml`:
+
+```env
+BRAVE_SEARCH_API_KEY=your-brave-search-api-key
+```
+
+The container generates its runtime settings from the tracked template. Apply
+key or engine changes with:
+
+```bash
+docker compose -f docker-compose.server.yml up -d --force-recreate searxng
+```
+
+The local SearXNG MCP server returns compact structured results (eight by
+default), supports result limits, pages, time ranges, languages, categories,
+engine selection, and site restrictions, and reports upstream engine failures.
+For researched answers, search first and then fetch the best two or three URLs.
 - **memory** — `remember(content)` / `search_memory(query, limit)` / two-step `forget` — agentic long-term memory via Mem0 + bge-m3 + Qdrant. Served from `memory-mcp` directly (not via mcp-proxy). LibreChat wires it as `http://memory-mcp:8089/mcp/mcp`; signal-bot talks to its REST surface.
 - **chatterbox** — `clone_voice(text, voice, ...)` / `list_clone_voices()` — voice-cloning TTS. Served from `audio-api` at `http://audio-api:8088/mcp/mcp`. Reference samples live in the host directory configured by `VOICE_SAMPLES_DIR` and are referenced by filename stem (e.g. `joe` for `joe.wav`).
 

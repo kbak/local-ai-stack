@@ -1,10 +1,9 @@
 {
   "mcpServers": {
     "searxng": {
-      "command": "npx",
+      "command": "python",
       "args": [
-        "-y",
-        "mcp-searxng@1.1.0"
+        "/opt/searxng-server.py"
       ],
       "env": {
         "SEARXNG_URL": "http://searxng:8080"

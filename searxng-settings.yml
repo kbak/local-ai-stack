@@ -73,7 +73,8 @@ search:
     # For error "CAPTCHA"
     SearxEngineCaptcha: 3600
     # For error "Too many request" and "HTTP error 429"
-    SearxEngineTooManyRequests: 180
+    # Brave's free tier is burst-sensitive; recover quickly after an accidental burst.
+    SearxEngineTooManyRequests: 10
     # Cloudflare CAPTCHA
     cf_SearxEngineCaptcha: 1296000
     cf_SearxEngineAccessDenied: 86400
@@ -811,6 +812,7 @@ engines:
   - name: duckduckgo
     engine: duckduckgo
     shortcut: ddg
+    disabled: true
 
   - name: duckduckgo images
     engine: duckduckgo_extra
@@ -1043,6 +1045,7 @@ engines:
   - name: google
     engine: google
     shortcut: go
+    disabled: true
 
   - name: google images
     engine: google_images
@@ -2000,6 +2003,7 @@ engines:
     shortcut: sp
     startpage_categ: web
     categories: [general, web]
+    disabled: true
 
   - name: startpage news
     engine: startpage
@@ -2152,6 +2156,7 @@ engines:
   - name: yahoo
     engine: yahoo
     shortcut: yh
+    # Yahoo currently fails from this host with HTTP protocol errors.
     disabled: true
 
   - name: yahoo news
@@ -2592,9 +2597,11 @@ engines:
 
   - name: braveapi
     engine: braveapi
+    shortcut: bra
     # read https://docs.searxng.org/dev/engines/online/brave.html
-    api_key: ""
-    inactive: true
+    api_key: "__BRAVE_SEARCH_API_KEY__"
+    inactive: false
+    results_per_page: 20
 
   - name: brave
     engine: brave
@@ -2603,6 +2610,7 @@ engines:
     paging: true
     categories: [general, web]
     brave_category: search
+    disabled: true
     # brave_spellcheck: true
 
   - name: brave.images

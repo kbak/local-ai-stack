@@ -16,8 +16,12 @@ services:
     restart: unless-stopped
     ports:
       - "8081:8080"
+    env_file:
+      - .env
     volumes:
-      - ./searxng-settings.yml:/etc/searxng/settings.yml
+      - ./searxng-settings.yml:/etc/searxng/settings.template.yml:ro
+      - ./searxng-entrypoint.sh:/usr/local/bin/local-searxng-entrypoint.sh:ro
+    entrypoint: ["/usr/local/bin/local-searxng-entrypoint.sh"]
     networks:
       - server-net
     mem_limit: 512m
