@@ -146,6 +146,8 @@ mcpServers:
   browser:
     url: http://mcp-proxy:8083/servers/browser/mcp
     type: streamable-http
+    timeout: 660000
+    requiresOAuth: false
     serverInstructions: false
   pdf-inspector:
     url: http://pdf-inspector:8085/mcp/

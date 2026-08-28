@@ -95,6 +95,7 @@ All tools are exposed via mcp-proxy on port 8083 (no authentication required —
 - **github** — read-only access via the `gh` CLI: read files, search code and repos, browse commits/issues/PRs. Custom Python MCP server (`mcp-proxy/gh-read-server.py`) using a `GITHUB_TOKEN` injected into the `gh` config — no write paths exposed.
 - **google-maps** — place search, ratings, hours, geocoding, directions (requires `GOOGLE_MAPS_API_KEY`)
 - **browser** — generic headless browsing and optional Qwen image inspection. `browser_use` waits for a result; `submit_browser_task` plus `get_browser_task` support asynchronous jobs.
+  LibreChat gives this server an 11-minute MCP request timeout because gallery navigation and batched vision analysis can run for several minutes.
 - **location-tracker** — `get_location_at(datetime)` — returns city, confidence, and source for any datetime; backed by CalDAV + local LLM + SearXNG. See [`location-tracker/README.md`](location-tracker/README.md).
 
 ### Brave-backed web search
