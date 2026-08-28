@@ -74,6 +74,63 @@ services:
       - server-net
     mem_limit: 512m
 
+  browser-agent-api:
+    build:
+      context: .
+      dockerfile: browser-agent-api/Dockerfile
+    container_name: browser-agent-api
+    restart: unless-stopped
+    ports:
+      # Keep the unauthenticated experiment host-local. Change to 8092:8092
+      # only after setting BROWSER_AGENT_API_TOKEN.
+      - "127.0.0.1:8092:8092"
+    environment:
+      LLM_BASE_URL: "${LLM_BASE_URL:-https://llama.kacper.me/v1}"
+      LLM_API_KEY: "${LLM_API_KEY:-vllm}"
+      LLM_MODEL: "${BROWSER_AGENT_LLM_MODEL:-qwen3.8-27B-FP8}"
+      BROWSER_AGENT_API_TOKEN: "${BROWSER_AGENT_API_TOKEN:-}"
+      BROWSER_AGENT_MAX_CONCURRENT_TASKS: "1"
+      BROWSER_AGENT_MAX_STEPS: "20"
+      BROWSER_AGENT_USE_VISION: "false"
+      BROWSER_AGENT_CDP_URL: "${BROWSER_AGENT_CDP_URL:-}"
+      BROWSER_AGENT_STEEL_BASE_URL: "${BROWSER_AGENT_STEEL_BASE_URL:-http://steel-browser:3000}"
+      BROWSER_AGENT_STEEL_PUBLIC_URL: "${BROWSER_AGENT_STEEL_PUBLIC_URL:-http://steel-browser:3000}"
+      BROWSER_AGENT_STEEL_API_KEY: "${BROWSER_AGENT_STEEL_API_KEY:-}"
+      BROWSER_AGENT_STEEL_PROXY_URL: "${BROWSER_AGENT_STEEL_PROXY_URL:-}"
+      BROWSER_AGENT_STEEL_SOLVE_CAPTCHA: "${BROWSER_AGENT_STEEL_SOLVE_CAPTCHA:-false}"
+      BROWSER_AGENT_STEEL_RESOLVE_WS_HOST: "${BROWSER_AGENT_STEEL_RESOLVE_WS_HOST:-true}"
+      BROWSER_AGENT_TASK_TIMEOUT_SECONDS: "600"
+      ANONYMIZED_TELEMETRY: "false"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - browser-agent-data:/data
+    shm_size: 1gb
+    networks:
+      - server-net
+    mem_limit: 2g
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8092/health', timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 20s
+    depends_on:
+      steel-browser:
+        condition: service_started
+
+  steel-browser:
+    image: ghcr.io/steel-dev/steel-browser@sha256:21cf2a5785aa9478d0f7933c04bce96ca79f3d7a93d9824ea184800d29d3cd02
+    container_name: steel-browser
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3090:3000"
+      - "127.0.0.1:9293:9223"
+    shm_size: 1gb
+    networks:
+      - server-net
+    mem_limit: 2g
+
   # mongo 8.0+ hard-aborts on Linux kernel >=6.19 (this host is 7.0) via a
   # version-string guard (SERVER-121912) — no env var bypasses it. The guard
   # only exists in 8.0+, and MongoDB states only "8.0 or newer" is affected, so
@@ -475,6 +532,7 @@ networks:
           gateway: 172.19.0.1
 
 volumes:
+  browser-agent-data:
   mcp-proxy-uv-cache:
   mongodb-data:
   librechat-data:

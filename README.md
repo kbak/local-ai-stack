@@ -12,6 +12,7 @@ Self-hosted LLM stack with privacy-focused web search and research tools. Runs o
 | location-tracker | 8084 | City-presence timeline service; exposes `get_location_at` MCP tool (bearer token required) |
 | pdf-inspector | 8086 | PDF text extraction via pdf-inspector (Rust); handles Unicode, multi-column, tables |
 | voice-agent | 8087 | Browser voice-chat UI with wake-word-free VAD, streaming TTS, voice picker, and full MCP tool access via strands |
+| browser-agent-api | 8092 | Generic asynchronous headless browser-agent API using Browser Use and the local Qwen endpoint |
 | audio-api | 8088 | Shared GPU-backed Whisper (STT) + Kokoro (TTS) + Chatterbox (voice cloning) service with an OpenAI-compatible API (pinned to the secondary GPU) |
 | memory-mcp | 8089 | Self-hosted agentic memory (Mem0 + bge-m3 + Qdrant) exposed as REST + MCP; Tier 2 of the hybrid memory architecture |
 | llama-swap playground | 8080/ui | Built-in llama-swap UI — model monitor, manual load/unload, and image generation playground (FLUX.1-dev) |
@@ -26,6 +27,36 @@ Self-hosted LLM stack with privacy-focused web search and research tools. Runs o
 | signal-api | 9922 | Signal REST API (bbernhard/signal-cli-rest-api, native mode) |
 | signal-bot | — | Signal messenger bot powered by uoltz + local LLM (STT/TTS via audio-api) |
 | yt-dlp-service | 8200 | Host-side yt-dlp download service (runs outside Docker) |
+
+## Headless browser-agent API (experimental)
+
+`browser-agent-api` provides a generic asynchronous HTTP interface over Browser
+Use and the local OpenAI-compatible Qwen endpoint. It is deliberately separate
+from site-specific prompts and workflows.
+
+Submit a task:
+
+```bash
+curl -X POST http://127.0.0.1:8092/v1/tasks \
+  -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer $BROWSER_AGENT_API_TOKEN" \
+  -d '{
+    "task": "Extract the first three quotes and their authors",
+    "start_url": "https://quotes.toscrape.com/",
+    "allowed_domains": ["quotes.toscrape.com"],
+    "max_steps": 10
+  }'
+```
+
+Poll `GET /v1/tasks/<task_id>` for `queued`, `running`, `completed`, or
+`failed`. Compose runs a self-hosted Steel browser on the mini PC. Each API task
+creates an isolated Steel session, connects through its returned CDP WebSocket,
+and releases the session afterward. Configure an optional proxy with
+`BROWSER_AGENT_STEEL_PROXY_URL`. Set `BROWSER_AGENT_STEEL_BASE_URL` empty to
+fall back to the API container's local Chromium, or use `BROWSER_AGENT_CDP_URL`
+for another CDP-compatible backend. Steel's UI is host-local on port 3090. The
+agent API is also bound to loopback by default; set `BROWSER_AGENT_API_TOKEN`
+before exposing it to the LAN.
 
 ## MCP Tools
 
