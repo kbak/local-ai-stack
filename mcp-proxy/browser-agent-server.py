@@ -67,7 +67,7 @@ def _task_payload(
 
 
 def _compact_result(result: dict[str, Any]) -> dict[str, Any]:
-    return {
+    compact = {
         key: result.get(key)
         for key in (
             "id",
@@ -76,7 +76,6 @@ def _compact_result(result: dict[str, Any]) -> dict[str, Any]:
             "final_text",
             "urls",
             "image_assets",
-            "image_analysis",
             "image_analysis_summary",
             "errors",
             "duration_seconds",
@@ -84,6 +83,13 @@ def _compact_result(result: dict[str, Any]) -> dict[str, Any]:
         )
         if result.get(key) not in (None, [], "")
     }
+    if result.get("image_assets"):
+        compact["image_count"] = len(result["image_assets"])
+    # Avoid duplicating a large batch payload once a merged answer exists.
+    # If merging failed, retain the batch reports as fallback evidence.
+    if result.get("image_analysis") and not result.get("image_analysis_summary"):
+        compact["image_analysis"] = result["image_analysis"]
+    return compact
 
 
 @mcp.tool()
@@ -102,6 +108,8 @@ def browser_use(
     Use `allowed_domains` to constrain navigation. For product, vehicle, property,
     or other photo-heavy pages, set `image_prompt`; the service will expose the
     gallery, extract original image assets, and inspect them with Qwen vision.
+    The returned `image_analysis_summary` is the completed visual assessment;
+    answer from it directly and do not send its URLs to another image tool.
     This tool can take several minutes on protected or image-heavy sites.
     """
     accepted = _request(

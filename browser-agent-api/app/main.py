@@ -366,7 +366,8 @@ def select_image_assets(assets: list[dict[str, Any]], limit: int) -> list[dict[s
             value += 1_000
         return value
 
-    return sorted(assets, key=score, reverse=True)[:limit]
+    selected = sorted(assets, key=score, reverse=True)[:limit]
+    return [{**asset, "index": index} for index, asset in enumerate(selected, start=1)]
 
 
 async def download_image_as_data_url(client: httpx.AsyncClient, url: str) -> str | None:
