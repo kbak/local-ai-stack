@@ -106,7 +106,9 @@ mcpServers:
   searxng:
     url: http://mcp-proxy:8083/servers/searxng/mcp
     type: streamable-http
-    serverInstructions: false
+    serverInstructions: |
+      Use web_search as the default tool for current information, market research, pricing comparisons, recent sales, news, and multi-source research.
+      Search first, then use fetch on only the most relevant results. Do not use browser_use for ordinary research.
   time:
     url: http://mcp-proxy:8083/servers/time/mcp
     type: streamable-http
@@ -114,7 +116,8 @@ mcpServers:
   fetch:
     url: http://mcp-proxy:8083/servers/fetch/mcp
     type: streamable-http
-    serverInstructions: false
+    serverInstructions: |
+      Use fetch for normal readable webpages found through web_search. Escalate a URL to browser_use only when fetch is blocked or incomplete and interaction or JavaScript rendering is genuinely required.
   arxiv:
     url: http://mcp-proxy:8083/servers/arxiv/mcp
     type: streamable-http
@@ -149,7 +152,9 @@ mcpServers:
     timeout: 660000
     requiresOAuth: false
     serverInstructions: |
-      Use browser_use for webpage navigation, extraction, galleries, and visual inspection of images found on pages.
+      browser_use is a slow, expensive fallback—not the default research tool. Use web_search for discovery, market research, prices, comparisons, recent sales, and multiple sources; use fetch for ordinary readable pages.
+      Use browser_use only when a specific page requires interaction, JavaScript rendering, bot-protection handling, or opening a gallery. Reuse browser results already present in the conversation and do not reopen the same listing for a follow-up question.
+      Normally make at most one browser_use call per user request. Do not fan broad research out into multiple browser calls.
       For product, vehicle, property, clothing, or listing photos, pass the requested assessment as image_prompt in the same browser_use call.
       Treat image_analysis_summary as the completed visual analysis and answer from it directly. Do not send browser image_assets to reverse-image-search or another vision tool.
   pdf-inspector:
