@@ -23,7 +23,7 @@ from .signal_client import send_message
 log = logging.getLogger(__name__)
 
 MAX_CHARS = 3500  # ~3-4 min of audio at Kokoro's default speed
-CLONE_MAX_CHARS = 700  # ~2 Chatterbox passes; comfortably below the 300s timeout
+CLONE_MAX_CHARS = 1400  # ~4 Chatterbox passes; typically 2-3 notes per brief
 _HTTP_TIMEOUT = httpx.Timeout(connect=10.0, read=300.0, write=60.0, pool=10.0)
 
 
@@ -267,8 +267,8 @@ def send_text_and_voice_brief(
     speech_text = prepare_for_tts(strip_markdown(text))
     # Chatterbox clone synthesis is roughly real-time and internally performs
     # one sequential generation per ~350 characters. A Kokoro-sized 3500-char
-    # request therefore exceeds the five-minute HTTP timeout. Bound cloned,
-    # multilingual requests to about two internal generations apiece.
+    # request therefore exceeds the five-minute HTTP timeout. Four internal
+    # generations keep requests bounded while avoiding a flood of short notes.
     max_chars = CLONE_MAX_CHARS if language is not None and language != "en" else MAX_CHARS
     chunks = chunk_for_voice(speech_text, max_chars=max_chars)
     log.info(

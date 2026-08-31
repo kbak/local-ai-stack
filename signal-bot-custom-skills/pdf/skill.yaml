@@ -1,5 +1,7 @@
 name: pdf
-description: Read and extract text from PDF files given a URL or file path.
+description: >
+  Read and extract text only from genuine PDF documents. Never use this skill
+  to inspect audio, images, arbitrary files, or to probe whether a path exists.
 version: "1.0.0"
 enabled: true
 command: /pdf

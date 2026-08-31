@@ -1,0 +1,13 @@
+name: music_library
+description: >
+  Verify and locate MP3 files in the bot's /music library. Use this for questions
+  about whether a music download exists, where it was saved, its size, or recent
+  downloads. This tool cannot inspect files outside /music.
+version: "1.0.0"
+enabled: true
+command: /music-check
+command_arg: query
+command_usage: "/music-check [filename or search text]"
+
+tools:
+  - "music_library:inspect_music_library"

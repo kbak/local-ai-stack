@@ -218,8 +218,9 @@ def download_music(input: str, images: list | None = None, status_fn=None) -> st
     if trim_start > 0.1 or trim_end > 0.1:
         trim_info = f" (trimmed {trim_start:.1f}s start, {trim_end:.1f}s end)"
 
+    verified_size = final_path.stat().st_size
     return (
         f"Downloaded: {meta.artist} - {meta.title}\n"
-        f"Saved to: {music_dir.subdir}/{final_path.name}{trim_info}\n"
+        f"Saved and verified: {final_path} ({verified_size} bytes){trim_info}\n"
         f"Genre: {music_dir.genre_tag}"
     )

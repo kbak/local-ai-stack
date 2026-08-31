@@ -59,7 +59,8 @@ def _call_mcp(tool_name: str, arguments: dict, timeout: int = 120) -> str:
 def read_pdf(source: str) -> str:
     """Extract text from a PDF file given a URL or file path.
 
-    Use when the user shares a PDF link or asks to read/summarize a PDF document.
+    Use only when the user shares a genuine PDF or asks to read/summarize one.
+    Never use this tool for audio, images, arbitrary files, or existence checks.
 
     Args:
         source: URL or file path to the PDF.

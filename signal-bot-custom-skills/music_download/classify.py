@@ -80,20 +80,17 @@ def classify(artist: str, title: str, genre_hint: str, user_hint: str = "") -> M
     )
 
     try:
-        import config
-        from openai import OpenAI
+        from _shared.llm import chat
 
-        client = OpenAI(base_url=config.llm.base_url, api_key=config.llm.api_key)
-        resp = client.chat.completions.create(
-            model=config.llm.model_id,
-            messages=[
-                {"role": "system", "content": "You are a music genre classifier. Reply with only the directory name, nothing else."},
-                {"role": "user", "content": prompt},
-            ],
+        result = chat(
+            "You are a music genre classifier. Reply with only the directory name.",
+            prompt,
             max_tokens=16,
-            temperature=0,
+            temperature=0.0,
         )
-        result = resp.choices[0].message.content.strip().lower()
+        if not result:
+            raise RuntimeError("music classification returned no result")
+        result = result.strip().lower()
         logger.info("LLM classified '%s - %s' as: %s", artist, title, result)
 
         for d in dirs:

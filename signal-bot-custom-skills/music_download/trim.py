@@ -98,20 +98,16 @@ def _llm_judge(clip_label: str, transcript: str) -> float:
         f"Reply with ONLY a number (integer or decimal). Nothing else."
     )
     try:
-        import config
-        from openai import OpenAI
+        from _shared.llm import chat
 
-        client = OpenAI(base_url=config.llm.base_url, api_key=config.llm.api_key)
-        resp = client.chat.completions.create(
-            model=config.llm.model_id,
-            messages=[
-                {"role": "system", "content": "You are an audio content analyst. Reply with a single integer number only. No words, no punctuation, just the number."},
-                {"role": "user", "content": prompt},
-            ],
+        result = chat(
+            "You are an audio content analyst. Reply with a single number only.",
+            prompt,
             max_tokens=8,
-            temperature=0,
+            temperature=0.0,
         )
-        result = resp.choices[0].message.content.strip()
+        if not result:
+            return 0.0
         import re
         m = re.search(r"\d+(?:\.\d+)?", result)
         if m:

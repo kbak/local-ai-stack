@@ -24,6 +24,13 @@ RUN pip install --no-cache-dir --no-deps -e /shared/
 
 RUN cp -r /uoltz/app/. .
 
+# Direct slash skills bypass the conversational agent. Persist their factual
+# outcomes into that chat's history so follow-up pronouns refer to real state.
+COPY signal-bot-patches/operation_context.py /app/operation_context.py
+RUN sed -i '/from skills import SkillRegistry/a\from operation_context import record_direct_skill' /app/bot.py && \
+    sed -i '/logger.info("Direct skill %s replied to %s (%d chars)", command, sender, len(reply))/a\                    record_direct_skill(get_agent_for(sender), command, args, reply)' /app/bot.py && \
+    sed -i '/logger.info("Direct skill %s completed silently", command)/a\                    record_direct_skill(get_agent_for(sender), command, args, None)' /app/bot.py
+
 # Built-in sub-agent skills (YouTube and webpage summarizers) call
 # config.make_model(), which normally passes LLM_MODEL straight through. The
 # stack intentionally leaves that variable empty so the resident llama-swap
@@ -50,6 +57,10 @@ RUN sed -i 's/"max_tokens": max_tok,/"max_tokens": max_tok,\n            "extra_
 # Remove the /no_think soft-switch (it would override enable_thinking=True) and
 # replace it with a tight thinking budget so reasoning stays brief and fast.
 RUN sed -i 's|^/no_think$|Think briefly before replying: a sentence or two to check facts and avoid contradicting yourself, then answer. Skip thinking for greetings and trivial messages. Keep reasoning short to stay fast.|' /app/agent.py
+
+# Ground follow-ups in explicit operation records and enforce semantic tool
+# boundaries. These rules do not depend on a particular model's behavior.
+RUN sed -i "/If you're unsure, say so./a\\Treat <completed_operation> records as authoritative facts about direct skills. For ambiguous follow-ups, use the newest relevant completed operation and any Signal reply-quote before older conversation topics. Never claim an operation succeeded or failed contrary to its recorded result. Never use an unrelated tool to probe a file: PDF tools are only for PDFs, and music-library checks use the music library tool. If no suitable verification tool exists, say exactly what is known from the operation record." /app/agent.py
 
 # Attachments without a filename arrive as {"filename": null}, so .get("filename", "")
 # returns None (the default only applies to a MISSING key) and .lower() throws,
