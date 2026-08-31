@@ -275,9 +275,10 @@ services:
       - "8086:8085"
     environment:
       TRANSPORT: http
-      PDF_LOCAL_ROOTS: /uploads
+      PDF_LOCAL_ROOTS: /uploads:/travel-attachments
     volumes:
       - librechat-uploads:/uploads:ro
+      - travel-attachments:/travel-attachments:ro
     networks:
       - server-net
     mem_limit: 512m
@@ -335,6 +336,30 @@ services:
       - ./shared:/shared:ro
     depends_on:
       - signal-api
+    networks:
+      - server-net
+    mem_limit: 512m
+
+  travel-watcher:
+    build:
+      context: .
+      dockerfile: travel-watcher/Dockerfile
+    container_name: travel-watcher
+    restart: unless-stopped
+    env_file:
+      - .env
+      - travel-watcher.env
+    environment:
+      LLM_BASE_URL: "${LLM_BASE_URL:-https://llama.kacper.me/v1}"
+      LLM_MODEL: ""
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - travel-watcher-data:/data
+      - travel-attachments:/travel-attachments
+      - ./shared:/shared:ro
+    depends_on:
+      - pdf-inspector
     networks:
       - server-net
     mem_limit: 512m
@@ -543,6 +568,8 @@ volumes:
   location-tracker-data:
   calendar-watcher-data:
   receipt-watcher-data:
+  travel-watcher-data:
+  travel-attachments:
   tg-watcher-data:
   nextcloud-db:
   nextcloud-data:
