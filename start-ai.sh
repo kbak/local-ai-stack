@@ -36,13 +36,30 @@ until curl -sf http://localhost:8080/v1/rerank \
     sleep 2
 done
 
-echo "Pre-loading 35B chat model (cuda0_main, persistent)..."
-until curl -sf http://localhost:8080/v1/chat/completions \
-    -H "Content-Type: application/json" \
-    -d '{"model":"qwen3.6-35B-A3B-FP8","messages":[{"role":"user","content":"hi"}],"max_tokens":1}' \
-    >/dev/null 2>&1; do
-    sleep 2
-done
+# Preserve the selected model when this script is run against an existing
+# llama-swap instance. Requesting 35B while another cuda0_main member is active
+# would make the group's swap policy evict it.
+running_main_model="$(
+    curl -sf http://localhost:8080/running \
+        | jq -r '.running[]
+            | select(.model == "qwen3.6-35B-A3B-FP8"
+                  or .model == "qwen3.8-27B-FP8"
+                  or .model == "muse-glimmer-30B-FP8")
+            | .model' \
+        | head -n 1
+)"
+
+if [[ -n "$running_main_model" ]]; then
+    echo "Keeping already-loaded main chat model: $running_main_model"
+else
+    echo "No main chat model is loaded; pre-loading 35B..."
+    until curl -sf http://localhost:8080/v1/chat/completions \
+        -H "Content-Type: application/json" \
+        -d '{"model":"qwen3.6-35B-A3B-FP8","messages":[{"role":"user","content":"hi"}],"max_tokens":1}' \
+        >/dev/null 2>&1; do
+        sleep 2
+    done
+fi
 
 # yt-dlp-service now runs on the Linux server box as a systemd service
 # (scripts/setup-ytdlp.sh), co-located with signal-bot — no longer launched here.

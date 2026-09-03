@@ -223,6 +223,9 @@ llama-swap --config llama-swap.yaml
 
 llama-swap listens on port 8080 and launches a `vllm serve` subprocess on demand when a model is requested. Inside the main chat group, requesting a different model swaps out the current one (`swap: true`); the group is persistent, so its selected model stays loaded. Independent persistent groups keep the autocomplete coder and reranker resident. Cold start of a vLLM model can take 5–10 minutes (compile cache miss); `healthCheckTimeout: 900` accommodates this.
 
+`start-ai.sh` preserves an already-running main chat model. It preloads the
+35B model only when `/running` reports no active `cuda0_main` member.
+
 **6. Open LibreChat**
 
 Navigate to `http://localhost:3000` (or `http://<server-ip>:3000` from another device) and register an account. The `default` model in `librechat.yaml` is `qwen3.6-35B-A3B`; every model defined in `llama-swap.yaml` is fetched dynamically and shown in the model dropdown.
@@ -241,7 +244,7 @@ Two GPUs are partitioned via `CUDA_VISIBLE_DEVICES` (Docker container env for au
 **Primary GPU (cuda0):**
 | Group | Model | Persistent | Notes |
 |---|---|---|---|
-| `cuda0_main` | qwen3.6-35B-A3B-FP8 | yes | Always loaded; never evicted |
+| `cuda0_main` | qwen3.6-35B-A3B-FP8 | yes | Startup default when no main chat model is loaded |
 | `cuda0_main` | qwen3.8-27B-FP8 | yes | Swaps with the other main chat models |
 | `cuda0_coder` | qwen-coder-7B | yes | FIM autocomplete; 0.17 gpu_util |
 | `cuda0_image` | flux-dev | no | Image gen; unloads after 10 min idle |
