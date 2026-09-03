@@ -1,5 +1,7 @@
 # Secrets
 .env
+public-api.env
+cloudflared.env
 
 # Python bytecode
 __pycache__/
@@ -22,3 +24,9 @@ yt-dlp-service/youtube_cookies.txt
 # Google service account keys and OAuth tokens — never commit
 receipt-watcher/secrets/*.json
 plc-watcher.env
+
+# Local virtual environments
+public-api-gateway/.venv/
+
+# Checksum-verified local runtime binaries
+/bin/

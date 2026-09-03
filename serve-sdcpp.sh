@@ -21,7 +21,7 @@ exec "${WORKSPACE}/bin/sd-server" \
   --vae             "${SD_MODELS}/VAE/ae.safetensors" \
   --clip_l          "${SD_MODELS}/text_encoders/clip_l.safetensors" \
   --t5xxl           "${SD_MODELS}/text_encoders/t5xxl_fp8_e4m3fn.safetensors" \
-  --listen-ip 0.0.0.0 \
+  --listen-ip 127.0.0.2 \
   --listen-port "$PORT" \
   --cfg-scale 1.0 \
   --guidance 3.5 \

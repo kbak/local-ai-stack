@@ -218,10 +218,10 @@ First startup takes a few minutes — mcp-proxy builds a custom image that pre-i
 
 **5. Start llama-swap**
 ```
-llama-swap --config llama-swap.yaml
+llama-swap -listen '[::1]:8080' --config llama-swap.yaml
 ```
 
-llama-swap listens on port 8080 and launches a `vllm serve` subprocess on demand when a model is requested. Inside the main chat group, requesting a different model swaps out the current one (`swap: true`); the group is persistent, so its selected model stays loaded. Independent persistent groups keep the autocomplete coder and reranker resident. Cold start of a vLLM model can take 5–10 minutes (compile cache miss); `healthCheckTimeout: 900` accommodates this.
+llama-swap listens on IPv6 loopback port 8080 and launches a `vllm serve` subprocess on demand when a model is requested. The existing Windows Caddy origin reaches it at `[::1]:8080`; WSL IPv4-loopback and Docker bridge clients use the private relays in `systemd/llama-swap-private-relays.service`. Inside the main chat group, requesting a different model swaps out the current one (`swap: true`); the group is persistent, so its selected model stays loaded. Independent persistent groups keep the autocomplete coder and reranker resident. Cold start of a vLLM model can take 5–10 minutes (compile cache miss); `healthCheckTimeout: 900` accommodates this.
 
 `start-ai.sh` preserves an already-running main chat model. It preloads the
 35B model only when `/running` reports no active `cuda0_main` member.

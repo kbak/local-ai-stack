@@ -25,13 +25,14 @@ docker run --rm \
   -e HF_HOME=/root/.cache/huggingface \
   -e CUDA_DEVICE_ORDER=PCI_BUS_ID \
   -e VLLM_USE_V2_MODEL_RUNNER=0 \
+  -e VLLM_HOST_IP=127.0.0.1 \
   -v "$WORKSPACE/models/hf:/root/.cache/huggingface" \
   -v "$WORKSPACE/models/vllm-muse-cache:/root/.cache/vllm" \
-  vllm/vllm-openai:muse-glimmer \
+  vllm/vllm-openai:muse-glimmer@sha256:3dd2f182bdfccde57a67b91d79a563f37c870bd3c08dc8033532e4232737519a \
   RedHatAI/Muse-Glimmer-30B-FP8-block \
   --served-model-name muse-glimmer-30B-FP8 \
   --port "$PORT" \
-  --host 0.0.0.0 \
+  --host 127.0.0.2 \
   --generation-config auto \
   --tensor-parallel-size 1 \
   --max-model-len 131072 \

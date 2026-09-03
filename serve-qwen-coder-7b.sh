@@ -16,6 +16,8 @@ export HF_HOME="$WORKSPACE/models/hf"
 export CUDA_VISIBLE_DEVICES=0
 export CUDA_DEVICE_ORDER=PCI_BUS_ID
 export TORCHINDUCTOR_COMPILE_THREADS=16
+# vLLM's unauthenticated EngineCore communication sockets must stay local.
+export VLLM_HOST_IP=127.0.0.1
 # vLLM 0.27 enables its V2 model runner for Qwen2 by default. V2 requires
 # CUDA Unified Virtual Addressing, which is unavailable on this WSL GPU path.
 export VLLM_USE_V2_MODEL_RUNNER=0
@@ -24,7 +26,7 @@ exec vllm serve Qwen/Qwen2.5-Coder-7B-Instruct \
   --trust-remote-code \
   --served-model-name qwen-coder-7B \
   --port "$PORT" \
-  --host 0.0.0.0 \
+  --host 127.0.0.2 \
   --max-model-len 8192 \
   --max-num-seqs 2 \
   --gpu-memory-utilization 0.17 \

@@ -1,4 +1,6 @@
-listen: "0.0.0.0:8080"
+# The current llama-swap build only honors its listener CLI flag. start-ai.sh
+# passes -listen [::1]:8080 to preserve the existing Windows Caddy origin
+# without accepting LAN traffic. IPv4 and Docker clients use private relays.
 
 # vLLM cold start (compile cache miss) on Qwen3.8-27B can take 5-10 min.
 # Default 120s would kill it.

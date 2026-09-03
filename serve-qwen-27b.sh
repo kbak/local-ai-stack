@@ -19,6 +19,8 @@ export HF_HUB_CACHE="$WORKSPACE/models/hf/hub"
 export CUDA_VISIBLE_DEVICES=0
 export CUDA_DEVICE_ORDER=PCI_BUS_ID
 export TORCHINDUCTOR_COMPILE_THREADS=16
+# vLLM's unauthenticated EngineCore communication sockets must stay local.
+export VLLM_HOST_IP=127.0.0.1
 
 # OrcaRouter's uncensored Qwen3.8-27B FP8 checkpoint on the primary GPU. The
 # public served-model name intentionally remains unchanged so front ends and
@@ -30,7 +32,7 @@ exec vllm serve orcarouter/Qwen3.8-27B-Uncensored-FP8 \
   --trust-remote-code \
   --served-model-name qwen3.8-27B-FP8 \
   --port "$PORT" \
-  --host 0.0.0.0 \
+  --host 127.0.0.2 \
   --max-model-len 131072 \
   --max-num-seqs 2 \
   --gpu-memory-utilization 0.45 \

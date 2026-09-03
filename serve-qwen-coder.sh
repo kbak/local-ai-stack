@@ -22,12 +22,19 @@ source .venv/bin/activate
 export HF_HOME="$WORKSPACE/models/hf"
 export CUDA_DEVICE_ORDER=PCI_BUS_ID
 export TORCHINDUCTOR_COMPILE_THREADS=16
+# vLLM's unauthenticated EngineCore communication sockets must stay local.
+export VLLM_HOST_IP=127.0.0.1
 
 # llama-swap injects CUDA_VISIBLE_DEVICES=$SECONDARY_GPU as a UUID for slot-
 # stable GPU pinning. Resolve UUIDs to a numeric index for compatibility
 # across vLLM releases and CUDA device discovery paths.
 if [[ "${CUDA_VISIBLE_DEVICES:-}" == GPU-* ]]; then
-    IDX=$(nvidia-smi --query-gpu=index,uuid --format=csv,noheader \
+    NVIDIA_SMI="${NVIDIA_SMI:-/usr/lib/wsl/lib/nvidia-smi}"
+    if [[ ! -x "$NVIDIA_SMI" ]]; then
+        echo "ERROR: nvidia-smi not found at $NVIDIA_SMI" >&2
+        exit 1
+    fi
+    IDX=$("$NVIDIA_SMI" --query-gpu=index,uuid --format=csv,noheader \
           | awk -F', ' -v uuid="$CUDA_VISIBLE_DEVICES" '$2==uuid {print $1; exit}')
     if [[ -z "$IDX" ]]; then
         echo "ERROR: GPU UUID $CUDA_VISIBLE_DEVICES not found by nvidia-smi" >&2
@@ -40,7 +47,7 @@ exec vllm serve Qwen/Qwen2.5-Coder-1.5B-Instruct \
   --trust-remote-code \
   --served-model-name qwen-coder-1.5B \
   --port "$PORT" \
-  --host 0.0.0.0 \
+  --host 127.0.0.2 \
   --max-model-len 8192 \
   --max-num-seqs 1 \
   --gpu-memory-utilization 0.25 \

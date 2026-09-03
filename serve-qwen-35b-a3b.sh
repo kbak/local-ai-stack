@@ -17,6 +17,8 @@ export HF_HOME="$WORKSPACE/models/hf"
 export CUDA_VISIBLE_DEVICES=0
 export CUDA_DEVICE_ORDER=PCI_BUS_ID
 export TORCHINDUCTOR_COMPILE_THREADS=16
+# vLLM's unauthenticated EngineCore communication sockets must stay local.
+export VLLM_HOST_IP=127.0.0.1
 # vLLM 0.27's auto-selected DeepGEMM path cannot transform this checkpoint's
 # FP8 MoE scale-factor layout on the RTX Pro 6000. Use the compatible fallback
 # MoE backend instead of bypassing DeepGEMM's layout assertion.
@@ -29,7 +31,7 @@ exec vllm serve Qwen/Qwen3.6-35B-A3B-FP8 \
   --trust-remote-code \
   --served-model-name qwen3.6-35B-A3B-FP8 \
   --port "$PORT" \
-  --host 0.0.0.0 \
+  --host 127.0.0.2 \
   --max-model-len 262144 \
   --max-num-seqs 2 \
   --gpu-memory-utilization 0.50 \

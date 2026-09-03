@@ -1,0 +1,24 @@
+[Unit]
+Description=Cloudflare Tunnel for the protected local OpenAI API
+Documentation=https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/
+After=network.target public-api-gateway.service
+Requires=public-api-gateway.service
+
+[Service]
+Type=simple
+EnvironmentFile=/mnt/wsl/workspace/local-ai-stack/cloudflared.env
+ExecStart=/mnt/wsl/workspace/local-ai-stack/bin/cloudflared tunnel --no-autoupdate run
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+LockPersonality=true
+
+[Install]
+WantedBy=default.target
