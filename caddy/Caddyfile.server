@@ -28,6 +28,7 @@ mcp.kacper.me {
 }
 
 nextcloud.kacper.me {
+	header Strict-Transport-Security "max-age=15552000"
 	reverse_proxy 127.0.0.1:8090
 }
 
