@@ -13,8 +13,7 @@ cd "$WORKSPACE/vllm-runtime"
 # shellcheck disable=SC1091
 source .venv/bin/activate
 
-# Keep large model files in the workspace, but leave HF_HOME at its default so
-# credentials written by `hf auth login` remain visible to vLLM.
+# Keep large model files in the workspace Hugging Face cache.
 export HF_HUB_CACHE="$WORKSPACE/models/hf/hub"
 export CUDA_VISIBLE_DEVICES=0
 export CUDA_DEVICE_ORDER=PCI_BUS_ID
@@ -22,13 +21,11 @@ export TORCHINDUCTOR_COMPILE_THREADS=16
 # vLLM's unauthenticated EngineCore communication sockets must stay local.
 export VLLM_HOST_IP=127.0.0.1
 
-# OrcaRouter's uncensored Qwen3.8-27B FP8 checkpoint on the primary GPU. The
-# public served-model name intentionally remains unchanged so front ends and
-# API clients do not need reconfiguration. The model natively supports 262K,
+# Stock Qwen3.8-27B-FP8 on the primary GPU. The model natively supports 262K,
 # but this single-user profile caps it at 128K to preserve VRAM headroom for
 # the persistent coder model. Use the checkpoint's bundled chat template so
 # reasoning_effort and preserve_thinking remain available to API clients.
-exec vllm serve orcarouter/Qwen3.8-27B-Uncensored-FP8 \
+exec vllm serve Qwen/Qwen3.8-27B-FP8 \
   --trust-remote-code \
   --served-model-name qwen3.8-27B-FP8 \
   --port "$PORT" \
