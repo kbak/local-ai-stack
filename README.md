@@ -180,7 +180,12 @@ The chat launchers (`serve-qwen-27b.sh`, `serve-qwen-35b-a3b.sh`) use:
 - `--gpu-memory-utilization 0.45`–`0.50` — leaves headroom for the coder model on the same GPU
 - `--reasoning-parser qwen3` plus automatic tool choice — the 27B uses vLLM's `qwen3_coder` tool parser and the 35B retains `qwen3_xml`
 - The Qwen3.8 27B launcher uses the checkpoint's bundled chat template, preserving its `reasoning_effort` and `preserve_thinking` controls; the Qwen3.6 35B retains the custom LibreChat template
-- Stock FP8 weights (`Qwen/Qwen3.8-27B-FP8`, `Qwen/Qwen3.6-35B-A3B-FP8`) — keeps tool-call JSON well-formed
+- FP8 weights (`orcarouter/Qwen3.8-27B-Uncensored-FP8`, `Qwen/Qwen3.6-35B-A3B-FP8`); the 27B checkpoint is still exposed to clients as `qwen3.8-27B-FP8`, so front-end configuration remains unchanged
+
+The OrcaRouter checkpoint is gated on Hugging Face. Accept access on its model
+page and run `hf auth login` as the same OS user that runs llama-swap. The 27B
+launcher keeps model files under `models/hf/hub` via `HF_HUB_CACHE` while using
+the normal Hugging Face credential location.
 
 The coder model (`qwen-coder-7B`) pins itself to the primary GPU via `CUDA_VISIBLE_DEVICES=0` in its launcher script and runs with `--gpu-memory-utilization 0.17` so it coexists with the chat models.
 Its launcher disables vLLM's V2 model runner because that runner requires CUDA
