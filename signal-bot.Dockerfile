@@ -24,6 +24,11 @@ RUN pip install --no-cache-dir --no-deps -e /shared/
 
 RUN cp -r /uoltz/app/. .
 
+# Image tools need trusted conversation context around cancellable agent calls.
+COPY signal-bot-patches/image_tools.py /app/image_tools.py
+COPY signal-bot-patches/install_image_tools.py /tmp/install_image_tools.py
+RUN pip install --no-cache-dir Pillow==12.3.0 && python /tmp/install_image_tools.py
+
 # Direct slash skills bypass the conversational agent. Persist their factual
 # outcomes into that chat's history so follow-up pronouns refer to real state.
 COPY signal-bot-patches/operation_context.py /app/operation_context.py
@@ -72,6 +77,6 @@ RUN sed -i 's|a.get("filename", "").lower()|(a.get("filename") or "").lower()|' 
 # only ready entry, causing the tool-using Signal agent to switch to qwen-coder
 # (which intentionally has no automatic tool-call parser) and fail with HTTP
 # 400. Rerankers, embedders, and image models are likewise not chat models.
-RUN sed -i 's|ids = \[entry.get("model") for entry in running if entry.get("model")\]|ids = [entry.get("model") for entry in running if entry.get("model") and not any(token in entry.get("model").lower() for token in ("coder", "reranker", "embed", "bge-", "flux", "stable-diffusion"))]|' /app/agent.py
+RUN sed -i 's|ids = \[entry.get("model") for entry in running if entry.get("model")\]|ids = [entry.get("model") for entry in running if entry.get("model") and not any(token in entry.get("model").lower() for token in ("coder", "reranker", "embed", "bge-", "flux", "stable-diffusion", "qwen-image"))]|' /app/agent.py
 
 CMD ["python", "bot.py"]

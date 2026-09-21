@@ -25,7 +25,7 @@ import httpx
 log = logging.getLogger(__name__)
 
 _DEFAULT_CODER_PATTERN = re.compile(
-    r"coder|reranker|embed|bge-|flux|stable-diffusion", re.IGNORECASE
+    r"coder|reranker|embed|bge-|flux|stable-diffusion|qwen-image", re.IGNORECASE
 )
 _PARAM_COUNT_PATTERN = re.compile(r"(\d+(?:\.\d+)?)B", re.IGNORECASE)
 
