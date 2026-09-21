@@ -9,6 +9,8 @@ Strategy:
 """
 
 import logging
+import math
+import re
 import os
 import subprocess
 import tempfile
@@ -116,6 +118,41 @@ def _llm_judge(clip_label: str, transcript: str) -> float:
     except Exception as e:
         logger.error("LLM trim judge failed: %s", e)
     return 0.0
+
+
+def parse_offset(value: str | float | int) -> float:
+    """Parse nonnegative seconds, MM:SS, or HH:MM:SS."""
+    text = str(value).strip()
+    if not re.fullmatch(r"\d+(?:\.\d+)?|\d+:\d{2}(?:\.\d+)?|\d+:\d{2}:\d{2}(?:\.\d+)?", text):
+        raise ValueError("Trim offsets must be nonnegative seconds, MM:SS, or HH:MM:SS")
+    parts = [float(part) for part in text.split(":")]
+    if len(parts) > 1 and any(part >= 60 for part in parts[1:]):
+        raise ValueError("Minutes/seconds after a colon must be less than 60")
+    seconds = 0.0
+    for part in parts:
+        seconds = seconds * 60 + part
+    if not math.isfinite(seconds):
+        raise ValueError("Trim offsets must be finite")
+    return seconds
+
+
+def trim_exact(src: str, dest: str, start: float, end: float) -> tuple[float, float]:
+    """Remove explicit durations from the original audio; bypass automatic analysis."""
+    start, end = parse_offset(start), parse_offset(end)
+    total = _get_duration(src)
+    duration = total - start - end
+    if not math.isfinite(total) or duration <= 0:
+        raise ValueError(f"Trim ({start:g}s start + {end:g}s end) would remove the entire {total:g}s track")
+    # Re-encode for accurate offsets rather than MP3 frame-aligned stream copy.
+    subprocess.run(
+        ["ffmpeg", "-y", "-i", src, "-ss", str(start), "-t", str(duration),
+         "-map", "0:a:0", "-c:a", "libmp3lame", "-q:a", "0", dest],
+        capture_output=True, check=True,
+    )
+    actual = _get_duration(dest)
+    if not math.isfinite(actual) or abs(actual - duration) > 0.15:
+        raise RuntimeError(f"Trim verification failed: expected {duration:.3f}s, got {actual:.3f}s")
+    return start, end
 
 
 def trim_audio(src: str, dest: str) -> tuple[float, float]:

@@ -3,9 +3,11 @@
 import logging
 import os
 import re
+import shlex
 import sys
 import tempfile
 from pathlib import Path
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from strands import tool
 
@@ -28,6 +30,8 @@ SongMeta = _metadata_mod.SongMeta
 classify = _classify_mod.classify
 load_music_dirs = _classify_mod.load_music_dirs
 trim_audio = _trim_mod.trim_audio
+trim_exact = _trim_mod.trim_exact
+parse_offset = _trim_mod.parse_offset
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +55,79 @@ def _parse_input(text: str) -> tuple[str, str]:
         return "", url_match.group(0)
 
     return "", text
+
+
+def _youtube_offset(url: str) -> tuple[str, float | None]:
+    """Extract YouTube playback offsets and remove them before downloading."""
+    parts = urlsplit(url)
+    host = (parts.hostname or "").lower()
+    if host not in {"youtube.com", "www.youtube.com", "m.youtube.com", "music.youtube.com", "youtu.be", "www.youtu.be"}:
+        return url, None
+    values = []
+    def strip_offsets(encoded):
+        kept = []
+        for key, value in parse_qsl(encoded, keep_blank_values=True):
+            if key in {"t", "start", "time_continue"}:
+                match = re.fullmatch(r"(?:(\d+)h)?(?:(\d+)m)?(?:(\d+(?:\.\d+)?)s)?", value)
+                if match and any(part is not None for part in match.groups()):
+                    seconds = sum(float(part or 0) * scale for part, scale in zip(match.groups(), (3600, 60, 1)))
+                    values.append(parse_offset(seconds))
+                else:
+                    values.append(parse_offset(value))
+            else:
+                kept.append((key, value))
+        return urlencode(kept)
+    query = strip_offsets(parts.query)
+    fragment = strip_offsets(parts.fragment) if "=" in parts.fragment else parts.fragment
+    if not values:
+        return url, None
+    if any(value != values[0] for value in values):
+        raise ValueError("Conflicting YouTube timestamps")
+    return urlunsplit(parts._replace(query=query, fragment=fragment)), values[0]
+
+
+def _parse_trim_options(input: str, trim_start: str | None, trim_end: str | None):
+    """Support explicit tool arguments and direct /music command flags."""
+    offsets = {"--trim-start": trim_start, "--trim-end": trim_end}
+    # Preserve apostrophes in normal artist/title inputs.
+    if re.search(r"(?:^|\s)--trim-(?:start|end)(?:=|\s|$)", input):
+        tokens = shlex.split(input)
+        kept = []
+        i = 0
+        while i < len(tokens):
+            name, sep, value = tokens[i].partition("=")
+            if name in offsets:
+                if offsets[name] is not None:
+                    raise ValueError(f"Duplicate {name} offset")
+                if not sep:
+                    i += 1
+                    if i >= len(tokens):
+                        raise ValueError(f"Missing value for {name}")
+                    value = tokens[i]
+                offsets[name] = value
+            else:
+                kept.append(tokens[i])
+            i += 1
+        input = " ".join(kept)
+    url_match = _URL_RE.search(input)
+    if url_match:
+        trailing = input[url_match.end():].strip()
+        if trailing:
+            # A value immediately after the URL means skip from the beginning.
+            positional = parse_offset(trailing)
+            if offsets["--trim-start"] is not None and parse_offset(offsets["--trim-start"]) != positional:
+                raise ValueError("Conflicting start offsets")
+            offsets["--trim-start"] = positional
+            input = input[:url_match.end()]
+        clean_url, url_start = _youtube_offset(url_match.group(0))
+        input = input[:url_match.start()] + clean_url + input[url_match.end():]
+        # An explicit argument/flag or trailing value overrides the link timestamp.
+        if offsets["--trim-start"] is None and url_start is not None:
+            offsets["--trim-start"] = url_start
+    explicit = any(value is not None for value in offsets.values())
+    start = parse_offset(offsets["--trim-start"]) if offsets["--trim-start"] is not None else 0.0
+    end = parse_offset(offsets["--trim-end"]) if offsets["--trim-end"] is not None else 0.0
+    return input, explicit, start, end
 
 
 def _set_tags(path: str, artist: str, title: str, album: str, year: str, genre: str, cover_url: str):
@@ -98,8 +175,11 @@ def _set_tags(path: str, artist: str, title: str, album: str, year: str, genre: 
 
 
 @tool
-def download_music(input: str, images: list | None = None, status_fn=None) -> str:
-    """Download a song as MP3 from a Shazam or Spotify link (or a screenshot of either app).
+def download_music(
+    input: str, images: list | None = None, status_fn=None,
+    trim_start: str | None = None, trim_end: str | None = None,
+) -> str:
+    """Download a song as MP3 from a YouTube, Shazam or Spotify link (or screenshot).
 
     Finds the song on YouTube, downloads the highest quality audio, trims non-music
     content from start and end, classifies it into the right directory, and sets
@@ -108,12 +188,23 @@ def download_music(input: str, images: list | None = None, status_fn=None) -> st
     Usage patterns:
     - /music https://shazam.com/track/...
     - /music https://open.spotify.com/track/...
+    - /music rock https://www.youtube.com/watch?v=... 1:25
+    - /music rock https://youtu.be/...?t=85s
     - /music brasileira https://shazam.com/track/...   (inline genre hint)
     - Send a screenshot of Shazam/Spotify together with /music or just the text
 
     Args:
-        input: A Shazam/Spotify URL, optionally preceded by a genre directory hint.
+        input: A YouTube/Shazam/Spotify URL, optionally preceded by a genre directory hint.
+               A trailing offset after the URL ("1:25" or "85") skips that duration.
+               YouTube t/start timestamps also set the start offset.
                May also be an artist/title string if URL parsing failed upstream.
+        trim_start: Duration to remove from the ORIGINAL beginning, in seconds or
+                    MM:SS/HH:MM:SS (e.g. "85" or "1:25"). Use this whenever the user
+                    requests skipping an intro. Overrides any timestamp in the URL.
+        trim_end: Duration to remove from the ORIGINAL end, in the same formats.
+                  If either offset is supplied, automatic trimming is disabled and
+                  the unspecified end is kept. "0" explicitly keeps an end.
+                  Direct /music commands accept --trim-start and --trim-end flags.
         images: Optional list of OpenAI-format image content blocks (from bot image handling).
     """
 
@@ -123,6 +214,12 @@ def download_music(input: str, images: list | None = None, status_fn=None) -> st
             status_fn(msg)
 
     base_dir = "/music"
+
+    # Validate before downloading or creating library files.
+    try:
+        input, explicit_trim, start_seconds, end_seconds = _parse_trim_options(input, trim_start, trim_end)
+    except ValueError as e:
+        return f"Invalid trim request: {e}. No file saved."
 
     # --- Parse input ---
     user_hint, url = _parse_input(input)
@@ -182,8 +279,14 @@ def download_music(input: str, images: list | None = None, status_fn=None) -> st
         # --- Trim ---
         trimmed_mp3 = os.path.join(tmp, "trimmed.mp3")
         try:
-            trim_start, trim_end = trim_audio(raw_mp3, trimmed_mp3)
+            if explicit_trim:
+                trim_start, trim_end = trim_exact(raw_mp3, trimmed_mp3, start_seconds, end_seconds)
+            else:
+                trim_start, trim_end = trim_audio(raw_mp3, trimmed_mp3)
         except Exception as e:
+            if explicit_trim:
+                logger.exception("Requested trim failed")
+                return f"Requested trim failed: {e}. No file saved."
             logger.warning("Trim failed (%s), using untrimmed file", e)
             import shutil
             shutil.copy2(raw_mp3, trimmed_mp3)
@@ -215,7 +318,7 @@ def download_music(input: str, images: list | None = None, status_fn=None) -> st
         )
 
     trim_info = ""
-    if trim_start > 0.1 or trim_end > 0.1:
+    if explicit_trim or trim_start > 0.1 or trim_end > 0.1:
         trim_info = f" (trimmed {trim_start:.1f}s start, {trim_end:.1f}s end)"
 
     verified_size = final_path.stat().st_size

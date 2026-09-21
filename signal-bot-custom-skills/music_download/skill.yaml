@@ -1,14 +1,19 @@
 name: music_download
 description: >
-  Download music from Shazam or Spotify links (or screenshots/photos of either app)
+  Download music from YouTube, Shazam or Spotify links (or screenshots/photos of either app)
   as high-quality MP3. Automatically finds the song on YouTube, downloads it,
   trims silence/ads from start and end, classifies it into the right music directory,
   and sets ID3 metadata. Optionally accepts an inline classification hint.
-version: "1.0.0"
+  For requests to skip/trim a specific duration, pass trim_start/trim_end as seconds
+  or MM:SS (e.g. trim_start: "1:25" skips 85 seconds from the original source).
+  Explicit offsets override automatic trimming; the unspecified end is kept.
+  Also accepts a trailing offset after the URL (1:25 or 85), or YouTube timestamps
+  such as ?t=85s or &t=1m25s. Explicit start offsets override URL timestamps.
+version: "1.2.0"
 enabled: true
 command: /music
 command_arg: input
-command_usage: "/music [genre] <shazam-or-spotify-url>"
+command_usage: "/music [genre] <url> [start-offset] [--trim-end MM:SS]"
 
 tools:
   - "music:download_music"
