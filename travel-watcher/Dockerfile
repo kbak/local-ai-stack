@@ -7,9 +7,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends libssl-dev ca-c
     && rm -rf /var/lib/apt/lists/*
 
 COPY shared/ /shared/
-COPY travel-watcher/pyproject.toml ./
+COPY travel-watcher/pyproject.toml travel-watcher/uv.lock ./
+RUN uv export --frozen --no-dev --no-emit-project -o /tmp/requirements.txt && \
+    grep -v '^-e ' /tmp/requirements.txt > /tmp/requirements-filtered.txt && \
+    pip install --no-cache-dir -r /tmp/requirements-filtered.txt && \
+    pip install --no-cache-dir --no-deps -e /shared/
 COPY travel-watcher/travel_watcher/ ./travel_watcher/
-RUN uv pip install --system . /shared
 RUN mkdir -p /data /travel-attachments
 
 CMD ["python", "-m", "travel_watcher.main"]

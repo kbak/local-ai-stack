@@ -18,3 +18,7 @@ build-backend = "hatchling.build"
 
 [tool.uv.sources]
 stack-shared = { path = "../shared", editable = true }
+
+# Preserve deployed API major versions when refreshing the lockfile.
+[tool.uv]
+constraint-dependencies = ["openai<3", "mcp<2", "fastmcp<4", "apscheduler<4", "caldav<4", "icalendar<8"]

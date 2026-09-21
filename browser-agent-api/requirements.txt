@@ -1,5 +1,9 @@
-browser-use[core]==0.13.7
-playwright==1.55.0
-fastapi==0.135.1
-uvicorn[standard]==0.41.0
-uv==0.8.17
+browser-use[core]==0.13.9
+playwright==1.63.0
+fastapi==0.141.1
+uvicorn[standard]==0.53.0
+uv==0.12.17
+
+# 0.13.10 requires MCP 2; keep the existing SDK major during maintenance.
+mcp<2
+openai<3

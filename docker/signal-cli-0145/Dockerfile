@@ -1,5 +1,5 @@
 # Thin overlay on bbernhard/signal-cli-rest-api that swaps the bundled
-# signal-cli for the reviewed upstream 0.14.6 release.
+# signal-cli for the reviewed upstream 0.14.8 release.
 #
 # Originally needed because Signal stopped including `serverGuid` in some
 # sealed-sender envelopes; signal-cli <=0.14.4.1 throws
@@ -27,11 +27,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && CC=clang CXX=clang++ RUSTFLAGS="-C linker=clang -C link-arg=-fuse-ld=lld" \
       cargo build --manifest-path signal-call-tunnel/Cargo.toml --release
 
-FROM bbernhard/signal-cli-rest-api:latest-dev
+FROM bbernhard/signal-cli-rest-api:latest-dev@sha256:b7c0fb311a5d009fd05b45aad2468b57c4ee14662bed7e034afb97814f24931f
 
-ARG SIGNAL_CLI_VERSION=0.14.6
+ARG SIGNAL_CLI_VERSION=0.14.8
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN mkdir -p /var/lib/apt/lists/partial && \
+    apt-get update && apt-get install -y --no-install-recommends \
       espeak-ng pulseaudio pulseaudio-utils \
     && rm -rf /var/lib/apt/lists/*
 

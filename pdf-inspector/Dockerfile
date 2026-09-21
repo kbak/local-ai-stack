@@ -24,7 +24,7 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends poppler-utils && \
     rm -rf /var/lib/apt/lists/*
 COPY --from=builder /wheels /wheels
-RUN pip install --no-cache-dir httpx fastmcp /wheels/*.whl && \
+RUN pip install --no-cache-dir httpx "fastmcp<4" "mcp<2" /wheels/*.whl && \
     rm -rf /wheels
 
 WORKDIR /app

@@ -6,14 +6,14 @@ RUN apt-get update && \
 
 WORKDIR /app
 
-# Bump UOLTZ_REV (any new value) to force a fresh git clone of kbak/uoltz.
-# Otherwise Docker caches the clone layer indefinitely and pushes to the
-# fork won't be picked up by `docker compose build`.
-ARG UOLTZ_REV=2026-08-20-45d402c
-RUN echo "uoltz rev: ${UOLTZ_REV}" && git clone https://github.com/kbak/uoltz.git /uoltz
-RUN pip install --no-cache-dir -r /uoltz/app/requirements.txt && \
+# Preserve the deployed source revision when refreshing dependencies/base images.
+ARG UOLTZ_REV=45d402cc7b154d54d7c752f93827a3dd576d0e28
+RUN git clone https://github.com/kbak/uoltz.git /uoltz && \
+    git -C /uoltz checkout "${UOLTZ_REV}"
+RUN printf 'openai<3\nmcp<2\n' > /tmp/constraints.txt && \
+    pip install --no-cache-dir -c /tmp/constraints.txt -r /uoltz/app/requirements.txt && \
     pip install --no-cache-dir mutagen==1.48.1 && \
-    pip install --no-cache-dir yt-dlp==2026.7.4 && \
+    pip install --no-cache-dir yt-dlp==2026.8.19 && \
     pip install --no-cache-dir lingua-language-detector==2.2.0
 
 # stack_shared (resolve_model, etc.). Installed editable at /shared so the

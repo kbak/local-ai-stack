@@ -30,3 +30,7 @@ public-api-gateway/.venv/
 
 # Checksum-verified local runtime binaries
 /bin/
+
+# Local dependency-update backups and logs
+.maintenance/
+yt-dlp-service/.venv/

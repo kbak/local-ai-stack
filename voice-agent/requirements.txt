@@ -1,8 +1,12 @@
 fastapi==0.141.1
-uvicorn[standard]==0.52.1
+uvicorn[standard]==0.53.0
 httpx==0.28.1
-strands-agents[openai]==1.51.0
-strands-agents-tools==0.8.6
+strands-agents[openai]==1.56.0
+strands-agents-tools==0.8.9
 pyyaml==6.0.3
 websockets==13.1
 python-multipart==0.0.32
+
+# Keep the existing SDK major versions during routine maintenance.
+mcp<2
+openai<3
