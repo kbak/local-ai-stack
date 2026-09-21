@@ -51,6 +51,14 @@ models:
     checkEndpoint: /v1/models
     ttl: 600
 
+  # Qwen Research License: evaluation/research only. Separate CUDA runtime
+  # keeps the existing FLUX binary available. See docs/qwen-image-2.1.md.
+  qwen-image-2.1:
+    cmd: bash ./serve-qwen-image.sh ${PORT}
+    proxy: http://127.0.0.2:${PORT}
+    checkEndpoint: /v1/models
+    ttl: 600
+
   # Cross-encoder reranker on the 5060 Ti (~1.1 GB weights, persistent).
   # vLLM uses --runner pooling for cross-encoder scoring.
   # Endpoint: POST /v1/score with {"model":"bge-reranker-v2-m3","text_1":"query","text_2":["doc1","doc2"]}
@@ -64,7 +72,7 @@ models:
 #   cuda0 (RTX 6000 / 96 GB):
 #     - cuda0_main:     35B-A3B, 27B, or Muse Glimmer; one is always loaded.
 #     - cuda0_coder:    coder-7B, persistent, primary-GPU autocomplete.
-#     - cuda0_image:    FLUX-dev, swap=true + ttl:600 to reclaim VRAM when idle.
+#     - cuda0_image:    FLUX-dev or Qwen-Image 2.1, ttl:600 when idle.
 #   cuda1 (5060 Ti / 16 GB):
 #     - cuda1_reranker: bge-reranker-v2-m3, persistent, tiny footprint.
 groups:
@@ -91,6 +99,7 @@ groups:
     exclusive: false
     members:
       - "flux-dev"
+      - "qwen-image-2.1"
 
   # Reranker on the 5060 Ti alongside audio-api. Persistent: tiny model, no
   # reason to pay the vLLM startup cost on each request.

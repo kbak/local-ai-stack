@@ -158,6 +158,22 @@ services:
     environment:
       AUDIO_API_BASE_URL: "${AUDIO_API_URL:-https://audio.kacper.me}"
       LLM_BASE_URL: "${LLM_BASE_URL:-https://llama.kacper.me/v1}"
+      # LibreChat's existing image toolkit talks to our local image model.
+      IMAGE_GEN_OAI_BASEURL: "${IMAGE_GEN_OAI_BASEURL:-${LLM_BASE_URL:-https://llama.kacper.me/v1}}"
+      IMAGE_GEN_OAI_API_KEY: "${IMAGE_GEN_OAI_API_KEY:-vllm}"
+      IMAGE_GEN_OAI_MODEL: "qwen-image-2.1"
+      LOCAL_IMAGE_TOOLS: "true"
+      IMAGE_GEN_OAI_PROMPT_DESCRIPTION: >-
+        Describe the new image in detail, including subject, composition, style,
+        text, and background. This tool uses local Qwen-Image 2.1. For transparent
+        output, include in the prompt: "This is an RGBA image with transparency.
+        The image has alpha channel and the background is transparent."
+        Use image_edit_oai when the request depends on uploaded or generated images.
+      IMAGE_EDIT_OAI_PROMPT_DESCRIPTION: >-
+        Describe the changes to the referenced images and what should stay the
+        same. This tool uses local Qwen-Image 2.1 and accepts up to 10 reference
+        images. For transparent output, explicitly request an RGBA image with
+        an alpha channel and a transparent background in the prompt.
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:

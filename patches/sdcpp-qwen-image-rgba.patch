@@ -1,0 +1,19 @@
+diff --git a/examples/server/routes_openai.cpp b/examples/server/routes_openai.cpp
+index 0f12292..5f8e0bb 100644
+--- a/examples/server/routes_openai.cpp
++++ b/examples/server/routes_openai.cpp
+@@ -164,12 +164,12 @@ static bool build_openai_edit_request(const httplib::Request& req,
+             reinterpret_cast<const char*>(bytes.data()),
+             static_cast<int>(bytes.size()),
+             img_w, img_h,
+-            width, height, 3);
++            width, height, 4);
+         if (raw_pixels == nullptr) {
+             continue;
+         }
+ 
+-        SDImageOwner image_owner({(uint32_t)img_w, (uint32_t)img_h, 3, raw_pixels});
++        SDImageOwner image_owner({(uint32_t)img_w, (uint32_t)img_h, 4, raw_pixels});
+         request.gen_params.set_width_and_height_if_unset(image_owner.get().width, image_owner.get().height);
+         request.gen_params.ref_images.push_back(std::move(image_owner));
+     }

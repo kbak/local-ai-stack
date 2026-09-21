@@ -22,13 +22,17 @@ export TORCHINDUCTOR_COMPILE_THREADS=16
 # vLLM's unauthenticated EngineCore communication sockets must stay local.
 export VLLM_HOST_IP=127.0.0.1
 
-# OrcaRouter's uncensored Qwen3.8-27B FP8 checkpoint on the primary GPU. The
-# public served-model name intentionally remains unchanged so front ends and
-# API clients do not need reconfiguration. The model natively supports 262K,
-# but this single-user profile caps it at 128K to preserve VRAM headroom for
-# the persistent coder model. Use the checkpoint's bundled chat template so
-# reasoning_effort and preserve_thinking remain available to API clients.
-exec vllm serve orcarouter/Qwen3.8-27B-Uncensored-FP8 \
+# OrcaRouter's uncensored Qwen3.8-27B FP8 checkpoint on the primary GPU. Load
+# the immutable local snapshot rather than resolving a mutable Hub ref at
+# process start. The public served-model name intentionally remains unchanged
+# so front ends and API clients do not need reconfiguration. The model natively
+# supports 262K, but this single-user profile caps it at 128K to preserve VRAM
+# headroom for the persistent coder model. Use the checkpoint's bundled chat
+# template so reasoning_effort and preserve_thinking remain available.
+MODEL_REVISION="0f3cdb83820a8190ffedaef5b29cf4a635e49b4d"
+MODEL_SNAPSHOT="$WORKSPACE/models/hf/hub/models--orcarouter--Qwen3.8-27B-Uncensored-FP8/snapshots/$MODEL_REVISION"
+
+exec vllm serve "$MODEL_SNAPSHOT" \
   --trust-remote-code \
   --served-model-name qwen3.8-27B-FP8 \
   --port "$PORT" \

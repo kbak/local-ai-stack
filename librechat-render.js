@@ -143,8 +143,9 @@ function patchPdfUploadAsText() {
 patchPdfUploadAsText();
 
 async function patchAgentInstructions() {
-  if (!instructions) {
-    console.log('[render] instructions empty — skipping agent patch.');
+  const enableImageTools = process.env.LOCAL_IMAGE_TOOLS === 'true';
+  if (!instructions && !enableImageTools) {
+    console.log('[render] no agent configuration changes requested.');
     return;
   }
   let MongoClient;
@@ -164,15 +165,25 @@ async function patchAgentInstructions() {
       console.warn(`[render] agent "${AGENT_NAME}" not found — nothing patched.`);
       return;
     }
-    if (doc.instructions === instructions) {
-      console.log(`[render] agent "${AGENT_NAME}" instructions already up to date.`);
+    const update = {};
+    if (instructions && doc.instructions !== instructions) {
+      update.$set = { instructions };
+    }
+    if (enableImageTools && !(doc.tools ?? []).includes('image_gen_oai')) {
+      // LibreChat expands this toolkit into generation and editing tools.
+      // Keep all existing MCP and built-in tools on the agent.
+      update.$addToSet = { tools: 'image_gen_oai' };
+    }
+    if (Object.keys(update).length === 0) {
+      console.log(`[render] agent "${AGENT_NAME}" configuration already up to date.`);
       return;
     }
+    update.$set = { ...update.$set, updatedAt: new Date() };
     await agents.updateOne(
       { _id: doc._id },
-      { $set: { instructions, updatedAt: new Date() } },
+      update,
     );
-    console.log(`[render] agent "${AGENT_NAME}" instructions updated. Length: ${instructions.length} chars.`);
+    console.log(`[render] agent "${AGENT_NAME}" configuration updated; local image tools: ${enableImageTools}.`);
   } catch (e) {
     console.error('[render] failed to patch agent instructions:', e.message);
   } finally {

@@ -384,6 +384,13 @@ LibreChat serves on `:443` via Tailscale — voice-agent is on `:8443` to avoid 
 
 ## Image generation (FLUX.1-dev via stable-diffusion.cpp)
 
+**Qwen-Image 2.1** is also configured as an on-demand image model, with generation,
+reference-image editing and RGBA PNG output (clean transparency is experimental).
+It shares the image GPU group with FLUX and uses a separately built CUDA runtime. See
+[Qwen-Image installation and LibreChat activation](docs/qwen-image-2.1.md).
+The LibreChat configuration uses its built-in image toolkit and enables it on
+agent `006` when the server-side files are deployed and LibreChat is recreated.
+
 Image generation runs as a llama-swap model — no separate Docker containers. `sd-server` (stable-diffusion.cpp) is spawned on demand by llama-swap when the `flux-dev` model is first requested, and auto-unloads after 10 minutes idle.
 
 **UI:** `http://localhost:8080/ui` → select `flux-dev` in the model dropdown → Images tab.
