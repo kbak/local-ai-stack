@@ -1,0 +1,16 @@
+name: image_generation
+description: >
+  Generate new images and edit uploaded or previously generated images with Qwen Image 2.1.
+  Use generate_image when the user asks to create, draw or render an image.
+  Use edit_image for changes to an existing image, including follow-ups like "make it blue".
+  Use the supplied image reference IDs; latest means the most recent image in this conversation.
+  If the intended reference is ambiguous, ask which image. Ordinary image descriptions use
+  your own vision; image origin/identity research uses image_search. Images are sent directly
+  to Signal by these tools. Never claim to have sent an image without a successful tool result.
+  For transparent output, explicitly request an RGBA image with a transparent background
+  in the prompt; transparency is experimental. Default to one image per user request.
+version: "1.0.0"
+enabled: true
+tools:
+  - "image_generation:generate_image"
+  - "image_generation:edit_image"

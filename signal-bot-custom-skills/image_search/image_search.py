@@ -96,7 +96,7 @@ def analyze_image(source: str) -> str:
     """Identify people, objects, and memes in an image using AI vision + web search.
 
     Use this tool when:
-    - The user sends an image or photo attachment
+    - The user explicitly asks to research or identify an image or photo
     - The user asks "who is this?", "what is this?", "explain this meme"
     - The image appears to be a meme, photoshop, or composite
 

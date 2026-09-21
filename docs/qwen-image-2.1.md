@@ -102,6 +102,55 @@ editing worked; inspect the alpha channel before relying on clean cutouts.
 
 ## API and checks
 
+### Signal bot
+
+The Signal bot on the server host exposes `generate_image` and `edit_image`
+to its current chat model. Requests go to the existing image endpoints with
+`model=qwen-image-2.1`; no model-host changes are required.
+
+Example Signal messages:
+
+- "Draw a red robot holding a HELLO sign."
+- Attach a photo and say "Change the background to a beach."
+- "Make it blue, keeping the same composition."
+
+The bot posts a progress message, then sends the resulting PNG attachment.
+Uploads and outputs get opaque references scoped to the conversation (a DM
+or group). The latest reference is supplied on subsequent turns and survives
+bot restarts. References expire after seven days; each active conversation
+retains at most 20 images. Files are pruned when that conversation is used.
+References live in the existing bot data volume under `/app/data/images`.
+The first version edits one reference at a time and supports 1024×1024,
+768×1024 and 1024×768 output. Ambiguous references should be clarified.
+
+`SIGNAL_IMAGE_BASE_URL` and `SIGNAL_IMAGE_API_KEY` in `signal-bot.env` optionally
+override `LLM_BASE_URL` and `LLM_API_KEY`. Compose sets a 360-second agent
+timeout; override with `SIGNAL_AGENT_TIMEOUT_S` in the stack `.env`.
+Image HTTP requests have a 240-second read timeout. Cancellation prevents
+later image delivery, although the model server may continue its computation.
+
+Deploy changes on the Signal host:
+
+```bash
+docker compose -f docker-compose.server.yml build signal-bot
+docker compose -f docker-compose.server.yml up -d --no-deps signal-bot
+```
+
+Tests in `signal-bot-patches/test_image_tools.py` intercept both inference and
+Signal delivery. `scripts/check-signal-images.py` exercises real chat routing,
+generation and follow-up editing, intercepting Signal delivery and writing
+PNGs to `/tmp` inside its container instead of messaging anyone.
+
+Validated on the Signal host on 2026-09-21: all nine automated tests passed;
+the built bot discovered both tools. A live Qwen 27B conversation called
+`generate_image`, then `edit_image` on "Make that robot blue". Inspection of
+both 1024×1024 outputs confirmed the red-to-blue change while preserving the
+composition and HELLO sign. Signal delivery was intercepted during this test;
+no test messages were sent to real chats.
+After deployment, the user confirmed the Signal workflow was working.
+
+### Endpoint checks
+
 Endpoints through the existing llama-swap listener:
 
 - `POST /v1/images/generations`: JSON with `model`, `prompt`, `size` and `n`.

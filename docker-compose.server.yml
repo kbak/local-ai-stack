@@ -240,6 +240,8 @@ services:
       MEMORY_DIR_MOUNT: /memory
       MEMORY_DEFAULT_USER_ID: ${MEMORY_DEFAULT_USER_ID:-default}
       OFFLINE_EXCUSES_FILE: /app/config/offline-excuses.txt
+      # Image inference can take longer when the worker must load its weights.
+      AGENT_TIMEOUT_S: "${SIGNAL_AGENT_TIMEOUT_S:-360}"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
