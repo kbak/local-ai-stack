@@ -6,6 +6,10 @@ share `cuda0_image`: only one image model runs at a time, and it unloads after
 600 seconds without requests. The main chat model and autocomplete can stay
 loaded independently.
 
+`start-ai.sh` preloads Qwen-Image as the default image model, swapping out FLUX
+if it is already loaded. FLUX stays configured for on-demand use and is not
+preloaded at startup. The ten-minute idle unload still applies to both models.
+
 ## AI host installation
 
 Run from this repository on the NVIDIA GPU host:

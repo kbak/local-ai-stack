@@ -79,4 +79,12 @@ until docker logs audio-api 2>&1 | grep -q "Chatterbox warmup complete"; do
     sleep 3
 done
 
+echo "Pre-loading qwen-image-2.1 (cuda0_image, default image model)..."
+# Loading Qwen swaps out FLUX if it was selected. Query the upstream model
+# endpoint to load the weights without generating an image.
+until curl -sf http://localhost:8080/upstream/qwen-image-2.1/v1/models \
+    >/dev/null 2>&1; do
+    sleep 2
+done
+
 echo "AI stack is up."

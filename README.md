@@ -171,7 +171,7 @@ Each model entry shells out to a `serve-qwen-*.sh` script that activates `~/vllm
 
 - **Primary GPU (`cuda0_main` group, persistent and swappable):** `qwen3.6-35B-A3B-FP8`, `qwen3.8-27B-FP8`, or `muse-glimmer-30B-FP8` — exactly one main chat model stays loaded, and requesting another swaps it in. Glimmer runs in the dedicated `vllm/vllm-openai:muse-glimmer` container, leaving the local Qwen vLLM environment unchanged.
 - **Primary GPU (`cuda0_coder` group, persistent):** `qwen-coder-7B` (Qwen2.5-Coder-7B-Instruct, bfloat16) for FIM tab-complete — always loaded so tab-complete never pays a cold-start cost. Runs at `--gpu-memory-utilization 0.17`, leaving enough headroom to coexist with the chat models on the same GPU.
-- **Primary GPU (`cuda0_image` group, swap):** `flux-dev` — stable-diffusion.cpp serving FLUX.1-dev FP8 via `/v1/images/generations`. Loads on first image request, unloads after 10 min idle (`ttl: 600`). Use the llama-swap playground at `http://localhost:8080/ui` to generate images.
+- **Primary GPU (`cuda0_image` group, swap):** `qwen-image-2.1` — preloaded by `start-ai.sh` for image generation and editing. `flux-dev` remains available on demand. Only one image model runs at a time; either unloads after 10 min idle (`ttl: 600`). Use the llama-swap playground at `http://localhost:8080/ui` to generate images.
 - **Secondary GPU (`cuda1_reranker` group, persistent):** `bge-reranker-v2-m3` — cross-encoder reranker via vLLM (`--runner pooling`). Endpoint through llama-swap: `POST /upstream/bge-reranker-v2-m3/v1/score`. ~1.1 GB, loaded alongside audio-api on the 5060 Ti.
 
 The chat launchers (`serve-qwen-27b.sh`, `serve-qwen-35b-a3b.sh`) use:
@@ -225,6 +225,8 @@ llama-swap listens on IPv6 loopback port 8080 and launches a `vllm serve` subpro
 
 `start-ai.sh` preserves an already-running main chat model. It preloads the
 35B model only when `/running` reports no active `cuda0_main` member.
+It also preloads `qwen-image-2.1`, swapping out `flux-dev` if loaded. FLUX is
+never preloaded by the startup script and remains available on demand.
 
 **6. Open LibreChat**
 
@@ -247,7 +249,8 @@ Two GPUs are partitioned via `CUDA_VISIBLE_DEVICES` (Docker container env for au
 | `cuda0_main` | qwen3.6-35B-A3B-FP8 | yes | Startup default when no main chat model is loaded |
 | `cuda0_main` | qwen3.8-27B-FP8 | yes | Swaps with the other main chat models |
 | `cuda0_coder` | qwen-coder-7B | yes | FIM autocomplete; 0.17 gpu_util |
-| `cuda0_image` | flux-dev | no | Image gen; unloads after 10 min idle |
+| `cuda0_image` | qwen-image-2.1 | no | Startup default; generation and editing; unloads after 10 min idle |
+| `cuda0_image` | flux-dev | no | On demand; swaps with Qwen-Image; unloads after 10 min idle |
 
 **Secondary GPU (cuda1 / 5060 Ti, `SECONDARY_GPU`):**
 | Group | Model | Persistent | Notes |
