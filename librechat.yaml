@@ -100,13 +100,15 @@ endpoints:
       summarize: false
       forcePrompt: false
       modelDisplayLabel: "llama.cpp"
-      maxContextTokens: 65536
+      maxContextTokens: 114688
 
 mcpServers:
   searxng:
     url: http://mcp-proxy:8083/servers/searxng/mcp
     type: streamable-http
     serverInstructions: |
+      Search only when external information is needed or the user requests research. Answer simple facts, explanations, estimates, and arithmetic directly when possible.
+      For simple lookups, normally use one search and at most one short page read, then answer. Stop once you have enough evidence.
       Use web_search as the default tool for current information, market research, pricing comparisons, recent sales, news, and multi-source research.
       Search first, then use fetch on only the most relevant results. Do not use browser_use for ordinary research.
   time:
@@ -118,10 +120,12 @@ mcpServers:
     type: streamable-http
     serverInstructions: |
       Use fetch for normal readable webpages found through web_search. Escalate a URL to browser_use only when fetch is blocked or incomplete and interaction or JavaScript rendering is genuinely required.
+      For ordinary lookups, use raw=false and max_length of at most 5000 characters. Do not repeatedly fetch or paginate documents once you can answer the question.
   arxiv:
     url: http://mcp-proxy:8083/servers/arxiv/mcp
     type: streamable-http
-    serverInstructions: false
+    serverInstructions: |
+      Use arXiv when the user asks for academic papers or the question requires scientific literature. Do not use it for everyday facts or estimates.
   youtube:
     url: http://mcp-proxy:8083/servers/youtube/mcp
     type: streamable-http
@@ -132,10 +136,6 @@ mcpServers:
     serverInstructions: false
   currency:
     url: http://mcp-proxy:8083/servers/currency/mcp
-    type: streamable-http
-    serverInstructions: false
-  finance:
-    url: http://mcp-proxy:8083/servers/finance/mcp
     type: streamable-http
     serverInstructions: false
   github:
