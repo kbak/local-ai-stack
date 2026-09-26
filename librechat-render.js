@@ -4,8 +4,8 @@
 // Why both: modelSpecs.promptPrefix carries ${TIER1_MEMORY} for legacy custom-
 // endpoint chats, but the agents endpoint ignores promptPrefix — agents build
 // their system prompt from the `instructions` field stored on the agent
-// document. All instructions live in the memory MD files; the Mongo field is
-// fully overwritten on every container start.
+// document. Memory instructions plus the LibreChat tool policy below refresh
+// the Mongo field on every container start.
 //
 // Expected usage in librechat.yaml.template:
 //     promptPrefix: |
@@ -15,6 +15,18 @@ const fs = require('fs');
 
 const AGENT_NAME = process.env.TIER1_AGENT_NAME || '006';
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://mongodb:27017/LibreChat';
+// The agent's Mongo setting overrides the custom endpoint's YAML limit.
+// Reserve 8192 for output and another 8192 for overhead/tokenizer differences
+// below vLLM's 131072 total-token cap.
+const AGENT_CONTEXT_LIMIT = 114688;
+const TOOL_POLICY = `<librechat_tool_policy>
+These LibreChat-specific tool rules override general encouragement to search in the memory instructions above.
+Answer simple facts, explanations, estimates, and arithmetic directly when possible. Use tools when external information, user data, or an action is needed, or the user explicitly requests research.
+For a simple lookup, normally use one search and at most one short page read, then answer. Stop when you have enough evidence. For estimates, state reasonable assumptions and calculate rather than researching every input to excessive precision.
+Use arXiv for requests about papers or questions requiring scientific literature, not everyday facts or estimates.
+For ordinary fetch calls, use raw=false and max_length of at most 5000 characters. Avoid full-document reads and repeated pagination unless the task requires them. After a tool error, make at most one corrected retry, then use available evidence and state any uncertainty.
+Do more extensive research when requested or necessary for the task.
+</librechat_tool_policy>`;
 
 function readIf(path) {
   try { return fs.readFileSync(path, 'utf8').trim(); }
@@ -144,10 +156,6 @@ patchPdfUploadAsText();
 
 async function patchAgentInstructions() {
   const enableImageTools = process.env.LOCAL_IMAGE_TOOLS === 'true';
-  if (!instructions && !enableImageTools) {
-    console.log('[render] no agent configuration changes requested.');
-    return;
-  }
   let MongoClient;
   try {
     ({ MongoClient } = require('mongodb'));
@@ -166,13 +174,28 @@ async function patchAgentInstructions() {
       return;
     }
     const update = {};
-    if (instructions && doc.instructions !== instructions) {
-      update.$set = { instructions };
+    const baseInstructions = (instructions || doc.instructions || '')
+      .replace(/\s*<librechat_tool_policy>[\s\S]*?<\/librechat_tool_policy>/g, '').trim();
+    const agentInstructions = [baseInstructions, TOOL_POLICY].filter(Boolean).join('\n\n');
+    if (doc.instructions !== agentInstructions) {
+      update.$set = { instructions: agentInstructions };
     }
-    if (enableImageTools && !(doc.tools ?? []).includes('image_gen_oai')) {
+    const tools = (doc.tools ?? []).filter((tool) => !tool.endsWith('_mcp_finance'));
+    if (enableImageTools && !tools.includes('image_gen_oai')) {
       // LibreChat expands this toolkit into generation and editing tools.
-      // Keep all existing MCP and built-in tools on the agent.
-      update.$addToSet = { tools: 'image_gen_oai' };
+      tools.push('image_gen_oai');
+    }
+    if (JSON.stringify(tools) !== JSON.stringify(doc.tools ?? [])) {
+      update.$set = { ...update.$set, tools };
+    }
+    const servers = (doc.mcpServerNames ?? []).filter((server) => server !== 'finance');
+    if (JSON.stringify(servers) !== JSON.stringify(doc.mcpServerNames ?? [])) {
+      update.$set = { ...update.$set, mcpServerNames: servers };
+    }
+    const currentLimit = Number(doc.model_parameters?.maxContextTokens);
+    // Migrate our previous 64K default while preserving smaller custom budgets.
+    if (!Number.isFinite(currentLimit) || currentLimit <= 0 || currentLimit === 65536 || currentLimit > AGENT_CONTEXT_LIMIT) {
+      update.$set = { ...update.$set, 'model_parameters.maxContextTokens': AGENT_CONTEXT_LIMIT };
     }
     if (Object.keys(update).length === 0) {
       console.log(`[render] agent "${AGENT_NAME}" configuration already up to date.`);
