@@ -1,11 +1,10 @@
 import io
 import logging
 import os
-import tempfile
-from pathlib import Path
 from typing import Iterator
 
 from . import audio_encode, config
+from .inference import inference_lock
 
 logger = logging.getLogger(__name__)
 
@@ -64,18 +63,39 @@ def _resolve_lang(lang: str) -> str:
     return config.LANG_MAP.get(lang, lang)
 
 
+def _create_samples(text: str, voice: str, lang: str, speed: float):
+    """Retry overflowing chunks in smaller pieces, preserving every word."""
+    import numpy as np
+
+    if _kokoro is None:
+        raise RuntimeError("Kokoro model not loaded")
+    with inference_lock:
+        try:
+            return _kokoro.create(
+                text, voice=voice, speed=speed, lang=_resolve_lang(lang)
+            )
+        except IndexError as exc:
+            if len(text) <= 1:
+                raise RuntimeError("Kokoro could not synthesize a minimal chunk") from exc
+            midpoint = len(text) // 2
+            cut = text.rfind(" ", 0, midpoint + 1)
+            if cut <= 0:
+                cut = midpoint
+            logger.warning("Retrying Kokoro overflow on %d characters", len(text))
+            left, sr = _create_samples(text[:cut].strip(), voice, lang, speed)
+            right, right_sr = _create_samples(text[cut:].strip(), voice, lang, speed)
+            if sr != right_sr:
+                raise RuntimeError("Kokoro sample rate changed between chunks")
+            return np.concatenate([left, right]), sr
+
+
 def synthesize_wav(text: str, voice: str, lang: str, speed: float) -> tuple[bytes, int]:
     import soundfile as sf
 
     if _kokoro is None:
         raise RuntimeError("Kokoro model not loaded")
 
-    samples, sample_rate = _kokoro.create(
-        text,
-        voice=voice,
-        speed=speed,
-        lang=_resolve_lang(lang),
-    )
+    samples, sample_rate = _create_samples(text, voice, lang, speed)
 
     buf = io.BytesIO()
     sf.write(buf, samples, sample_rate, format="WAV")
@@ -105,13 +125,7 @@ def synthesize(text: str, voice: str, lang: str, speed: float, response_format: 
     sample_rate: int | None = None
     for sentence in sentences:
         for chunk in _chunk_long(sentence):
-            try:
-                samples, sr = _kokoro.create(
-                    chunk, voice=voice, speed=speed, lang=_resolve_lang(lang)
-                )
-            except IndexError:
-                logger.warning("Kokoro token overflow on chunk of %d chars, skipping", len(chunk))
-                continue
+            samples, sr = _create_samples(chunk, voice, lang, speed)
             sample_rate = sr
             pieces.append(samples)
 
@@ -136,20 +150,17 @@ def _chunk_long(sentence: str, max_chars: int = _MAX_CHARS) -> list[str]:
     buf = ""
     for p in parts:
         if len(p) > max_chars:
-            # Still too long — hard-split on whitespace.
-            words = p.split()
-            sub = ""
-            for w in words:
-                candidate = (sub + " " + w).strip()
-                if len(candidate) > max_chars and sub:
-                    chunks.append(sub)
-                    sub = w
-                else:
-                    sub = candidate
-            if sub:
-                if buf:
-                    chunks.append(buf); buf = ""
-                chunks.append(sub)
+            # Flush the earlier clause before appending any part of this one.
+            if buf:
+                chunks.append(buf)
+                buf = ""
+            while len(p) > max_chars:
+                cut = p.rfind(" ", 0, max_chars + 1)
+                if cut <= 0:
+                    cut = max_chars
+                chunks.append(p[:cut])
+                p = p[cut:].lstrip()
+            buf = p
             continue
         candidate = (buf + " " + p).strip()
         if len(candidate) > max_chars and buf:
@@ -179,9 +190,5 @@ def synthesize_stream(
 
     for sentence in sentences:
         for chunk in _chunk_long(sentence):
-            try:
-                wav_bytes, _ = synthesize_wav(chunk, voice, lang, speed)
-            except IndexError:
-                logger.warning("Kokoro token overflow on chunk of %d chars, skipping", len(chunk))
-                continue
+            wav_bytes, _ = synthesize_wav(chunk, voice, lang, speed)
             yield audio_encode.encode(wav_bytes, response_format)

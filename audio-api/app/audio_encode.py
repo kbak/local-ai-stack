@@ -11,7 +11,9 @@ _FORMATS: dict[str, tuple[str, list[str]]] = {
     "wav":  ("wav",   []),  # passthrough
     "ogg":  ("ogg",   ["-c:a", "libopus", "-b:a", "24k", "-vbr", "on", "-application", "voip", "-f", "ogg"]),
     "opus": ("ogg",   ["-c:a", "libopus", "-b:a", "24k", "-vbr", "on", "-application", "voip", "-f", "ogg"]),
-    "mp3":  ("mpeg",  ["-c:a", "libmp3lame", "-b:a", "64k", "-f", "mp3"]),
+    # Sentence streams concatenate MP3 frames; repeated ID3/Xing headers
+    # between sentences cause decoder errors in browser/ffmpeg playback.
+    "mp3":  ("mpeg",  ["-c:a", "libmp3lame", "-b:a", "64k", "-write_xing", "0", "-id3v2_version", "0", "-f", "mp3"]),
     "flac": ("flac",  ["-c:a", "flac", "-f", "flac"]),
     # ADTS-framed AAC is stream-safe (no seek needed); audio/aac is the MIME.
     # Fragmented MP4 for m4a so it can be piped without seeking.

@@ -2,7 +2,7 @@
 # Bootstrap AI-side services on this machine.
 # - native llama-swap (port 8080) and yt-dlp-service (port 8200)
 # - docker-compose.ai.yml (audio-api)
-# Waits for models + Chatterbox warmup before exiting.
+# Waits for all audio models to finish warming before exiting.
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -74,8 +74,8 @@ fi
 echo "Starting Docker services (ai)..."
 docker compose -f "$SCRIPT_DIR/docker-compose.ai.yml" up -d --wait
 
-echo "Waiting for audio-api to load Whisper + Kokoro + Chatterbox..."
-until docker logs audio-api 2>&1 | grep -q "Chatterbox warmup complete"; do
+echo "Waiting for audio-api to load Whisper + Kokoro + voice cloning..."
+until curl -sf --max-time 3 http://127.0.0.1:8088/health >/dev/null; do
     sleep 3
 done
 

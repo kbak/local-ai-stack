@@ -47,7 +47,7 @@ services:
     env_file:
       - ./audio-api.env
     environment:
-      CUDA_VISIBLE_DEVICES: ${SECONDARY_GPU:-0}
+      CUDA_VISIBLE_DEVICES: ${SECONDARY_GPU:?SECONDARY_GPU must select the audio GPU}
       HF_HOME: /app/hf-cache
       VOICE_SAMPLES_DIR: /app/voice-samples
     volumes:
@@ -55,7 +55,7 @@ services:
       - audio-api-hf-cache:/app/hf-cache
     networks:
       - ai-net
-    mem_limit: 8000m
+    mem_limit: 12000m
 
 networks:
   ai-net:

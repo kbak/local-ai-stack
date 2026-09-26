@@ -1,24 +1,20 @@
-"""Chatterbox TTS engine — voice cloning for English + 22 other languages.
+"""Chatterbox V3 cloning, with an optional original English transformer.
 
-Loads both the English-only ChatterboxTTS and the ChatterboxMultilingualTTS
-sharing the same VoiceEncoder and S3Gen vocoder weights on the GPU. Only the
-T3 transformer (~2.1 GB) and the tokenizer differ between the two — everything
-else is reused, so total VRAM is ~5.5 GB instead of ~7 GB for two independent
-instances.
-
-Routing:
-    language="en" (default)  → ChatterboxTTS
-    language=<other>         → ChatterboxMultilingualTTS with that language_id
-
-`load()` is called once at startup; both models warm up so the CUDA arena is
-sized for peak working set.
+The English and multilingual models share the vocoder and voice encoder.
+Set CHATTERBOX_ENGLISH_MODEL=multilingual to use V3 for every language and
+avoid loading the extra English transformer. Inference is serialized and
+request conditioning is restored, including when generation fails.
 """
+import copy
 import io
 import logging
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Optional
 
 from . import audio_encode, config
+from .inference import inference_lock
+from .cloning_common import list_voices, resolve_voice, split_for_generation as _split_for_generation
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +33,7 @@ def _build_models(device: str):
     footprint compared to constructing them independently.
     """
     import torch
+    import inspect
     from chatterbox.tts import ChatterboxTTS, Conditionals, EnTokenizer
     from chatterbox.mtl_tts import ChatterboxMultilingualTTS, MTLTokenizer
     from chatterbox.models.t3 import T3
@@ -46,17 +43,30 @@ def _build_models(device: str):
     from huggingface_hub import hf_hub_download
     from safetensors.torch import load_file
 
-    # ── Download all needed files once each (HF cache dedupes) ────────────
+    if config.CHATTERBOX_MULTILINGUAL_VERSION not in {"v2", "v3"}:
+        raise ValueError("CHATTERBOX_MULTILINGUAL_VERSION must be v2 or v3")
+    if config.CHATTERBOX_ENGLISH_MODEL not in {"original", "multilingual"}:
+        raise ValueError("CHATTERBOX_ENGLISH_MODEL must be original or multilingual")
+    if config.CHATTERBOX_MULTILINGUAL_VERSION == "v3" and "t3_model" not in inspect.signature(
+        ChatterboxMultilingualTTS.from_pretrained
+    ).parameters:
+        raise RuntimeError("Chatterbox V3 requires the pinned upstream runtime; rebuild audio-api")
+    multilingual_file = f"t3_mtl23ls_{config.CHATTERBOX_MULTILINGUAL_VERSION}.safetensors"
+
+    # ── Download a reproducible set of shared and selected weights ────────
     needed = [
         "ve.safetensors",
         "s3gen.safetensors",
-        "tokenizer.json",
-        "t3_cfg.safetensors",
-        "t3_mtl23ls_v2.safetensors",
+        multilingual_file,
         "grapheme_mtl_merged_expanded_v1.json",
         "conds.pt",
     ]
-    paths = {f: hf_hub_download(repo_id=_REPO_ID, filename=f) for f in needed}
+    if config.CHATTERBOX_ENGLISH_MODEL == "original":
+        needed.extend(["tokenizer.json", "t3_cfg.safetensors"])
+    paths = {
+        f: hf_hub_download(repo_id=_REPO_ID, filename=f, revision=config.CHATTERBOX_REVISION)
+        for f in needed
+    }
     ckpt_dir = Path(paths["ve.safetensors"]).parent
 
     # ── Shared components (one copy on GPU, both models reference these) ──
@@ -75,23 +85,24 @@ def _build_models(device: str):
         conds = Conditionals.load(ckpt_dir / "conds.pt", map_location=map_loc).to(device)
 
     # ── English-only T3 + tokenizer ───────────────────────────────────────
-    logger.info("Loading English T3 ...")
-    t3_en = T3()
-    t3_en_state = load_file(paths["t3_cfg.safetensors"])
-    if "model" in t3_en_state.keys():
-        t3_en_state = t3_en_state["model"][0]
-    t3_en.load_state_dict(t3_en_state)
-    t3_en.to(device).eval()
-    en_tok = EnTokenizer(paths["tokenizer.json"])
-
-    en_model = ChatterboxTTS(
-        t3=t3_en, s3gen=s3gen, ve=ve, tokenizer=en_tok, device=device, conds=conds,
-    )
+    en_model = None
+    if config.CHATTERBOX_ENGLISH_MODEL == "original":
+        logger.info("Loading English T3 ...")
+        t3_en = T3()
+        t3_en_state = load_file(paths["t3_cfg.safetensors"])
+        if "model" in t3_en_state.keys():
+            t3_en_state = t3_en_state["model"][0]
+        t3_en.load_state_dict(t3_en_state)
+        t3_en.to(device).eval()
+        en_tok = EnTokenizer(paths["tokenizer.json"])
+        en_model = ChatterboxTTS(
+            t3=t3_en, s3gen=s3gen, ve=ve, tokenizer=en_tok, device=device, conds=conds,
+        )
 
     # ── Multilingual T3 + tokenizer ───────────────────────────────────────
-    logger.info("Loading Multilingual T3 ...")
+    logger.info("Loading Multilingual T3 %s ...", config.CHATTERBOX_MULTILINGUAL_VERSION)
     t3_mtl = T3(T3Config.multilingual())
-    t3_mtl_state = load_file(paths["t3_mtl23ls_v2.safetensors"])
+    t3_mtl_state = load_file(paths[multilingual_file])
     if "model" in t3_mtl_state.keys():
         t3_mtl_state = t3_mtl_state["model"][0]
     t3_mtl.load_state_dict(t3_mtl_state)
@@ -107,13 +118,16 @@ def _build_models(device: str):
 
 def load() -> None:
     global _en_model, _mtl_model, _supported_languages
-    if _en_model is not None and _mtl_model is not None:
+    if is_ready():
         return
 
     import torch
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    logger.info("Loading Chatterbox dual-model (device=%s, HF_HOME=%s)...", device, config.HF_HOME)
+    logger.info(
+        "Loading Chatterbox %s (English=%s, device=%s)...",
+        config.CHATTERBOX_MULTILINGUAL_VERSION, config.CHATTERBOX_ENGLISH_MODEL, device,
+    )
 
     _en_model, _mtl_model = _build_models(device)
 
@@ -123,88 +137,38 @@ def load() -> None:
         _supported_languages = []
     logger.info("Multilingual languages: %s", ",".join(_supported_languages) or "(unknown)")
 
-    # Warmup — one English pass via the EN model sizes the CUDA arena. The
-    # multilingual T3 will JIT on first non-English request (~one slow call,
-    # then steady state). This keeps startup fast.
-    try:
-        warmup_text = (
-            "The quick brown fox jumps over the lazy dog. "
-            "Voice cloning warmup pass to size the GPU memory arena."
-        )
-        _en_model.generate(warmup_text)
-        logger.info("Chatterbox warmup complete.")
-    except Exception:
-        logger.exception("Chatterbox warmup failed (non-fatal)")
+    # Exercise both configured routes before the API accepts requests.
+    synthesize("The quick brown fox jumps over the lazy dog.", language="en")
+    synthesize("Dzień dobry. To jest próba głosu.", language="pl")
+    logger.info("Chatterbox warmup complete.")
 
 
 def is_ready() -> bool:
-    return _en_model is not None and _mtl_model is not None
-
-
-def list_voices() -> list[str]:
-    if not config.VOICE_SAMPLES_DIR.exists():
-        return []
-    return sorted(p.stem for p in config.VOICE_SAMPLES_DIR.glob("*.wav"))
+    return _mtl_model is not None and (
+        _en_model is not None or config.CHATTERBOX_ENGLISH_MODEL == "multilingual"
+    )
 
 
 def supported_languages() -> list[str]:
     """Return the list of `language` codes accepted by `synthesize()`.
 
-    Always includes 'en' (handled by the English-only model). Other codes
-    come from the multilingual model's published language list.
+    Includes English regardless of which configured model handles it.
     """
     return sorted({"en", *_supported_languages})
 
 
-def resolve_voice(voice: Optional[str]) -> Optional[str]:
-    """Map a voice identifier to an absolute .wav path, or None for default."""
-    if not voice:
-        return None
-    p = Path(voice)
-    if p.is_absolute() and p.suffix == ".wav":
-        if not p.exists():
-            raise FileNotFoundError(f"voice file not found: {p}")
-        return str(p)
-    candidate = config.VOICE_SAMPLES_DIR / f"{voice}.wav"
-    if not candidate.exists():
-        raise FileNotFoundError(f"voice not found: {candidate}")
-    return str(candidate)
-
-
-# T3 caps generation at ~40 s of audio, so long texts must be synthesized in
-# sentence-grouped pieces and concatenated. ~350 chars stays safely under the cap.
-_MAX_GEN_CHARS = 350
-_SENTENCE_RE = None  # compiled lazily
-
-
-def _split_for_generation(text: str, max_chars: int = _MAX_GEN_CHARS) -> list[str]:
-    """Split text into sentence groups of at most max_chars each."""
-    import re
-    global _SENTENCE_RE
-    if _SENTENCE_RE is None:
-        _SENTENCE_RE = re.compile(r"(?<=[.!?…])\s+")
-    pieces: list[str] = []
-    current = ""
-    for sentence in _SENTENCE_RE.split(text):
-        if not sentence:
-            continue
-        # hard-split a single over-long sentence
-        while len(sentence) > max_chars:
-            cut = sentence.rfind(" ", 0, max_chars)
-            cut = cut if cut > 0 else max_chars
-            if current:
-                pieces.append(current)
-                current = ""
-            pieces.append(sentence[:cut])
-            sentence = sentence[cut:].lstrip()
-        if len(current) + len(sentence) + 1 > max_chars and current:
-            pieces.append(current)
-            current = sentence
-        else:
-            current = f"{current} {sentence}".strip()
-    if current:
-        pieces.append(current)
-    return pieces
+@contextmanager
+def _voice_conditioning(model, reference: str | None, exaggeration: float):
+    """Keep per-request voice state isolated and restore the built-in default."""
+    with inference_lock:
+        saved = model.conds
+        try:
+            model.conds = copy.deepcopy(saved)
+            if reference:
+                model.prepare_conditionals(reference, exaggeration=exaggeration)
+            yield
+        finally:
+            model.conds = saved
 
 
 def synthesize(
@@ -219,15 +183,14 @@ def synthesize(
 
     voice: filename stem under VOICE_SAMPLES_DIR (no .wav), or absolute path
            to a .wav file, or None for Chatterbox's built-in default voice.
-    language: ISO code. "en" routes to the English-only model; everything else
-              goes through the multilingual model. Use `supported_languages()`
-              to see what's available.
+    language: ISO code. English uses the configured original or multilingual
+              model; other languages use the multilingual model.
     response_format: any value accepted by audio_encode (wav, ogg, opus, mp3,
                      aac, m4a, flac, pcm). Defaults to wav (no re-encode).
     """
     import soundfile as sf
 
-    if _en_model is None or _mtl_model is None:
+    if not is_ready():
         raise RuntimeError("Chatterbox models not loaded")
 
     lang = (language or "en").lower()
@@ -239,27 +202,27 @@ def synthesize(
 
     ref = resolve_voice(voice)
     kwargs = {"exaggeration": exaggeration, "cfg_weight": cfg_weight}
-    if ref:
-        kwargs["audio_prompt_path"] = ref
-
     import torch
 
-    model = _en_model if lang == "en" else _mtl_model
+    model = _en_model if lang == "en" and _en_model is not None else _mtl_model
     sr = model.sr
-    if lang != "en":
+    if model is _mtl_model:
         kwargs["language_id"] = lang
+        # Match the current upstream V3 decoding default; v2 keeps its old value.
+        kwargs["repetition_penalty"] = (
+            1.2 if config.CHATTERBOX_MULTILINGUAL_VERSION == "v3" else 2.0
+        )
 
     pieces = _split_for_generation(text)
     waves = []
     gap = None
-    for piece in pieces:
-        waves.append(model.generate(piece, **kwargs))
-        if gap is None and len(pieces) > 1:
-            # 200 ms inter-piece silence, matching the wave's shape/device
-            gap = torch.zeros(
-                *waves[0].shape[:-1], int(sr * 0.2),
-                dtype=waves[0].dtype, device=waves[0].device,
-            )
+    with _voice_conditioning(model, ref, exaggeration):
+        for piece in pieces:
+            waves.append(model.generate(piece, **kwargs).detach().cpu())
+            if gap is None and len(pieces) > 1:
+                gap = torch.zeros(
+                    *waves[0].shape[:-1], int(sr * 0.2), dtype=waves[0].dtype,
+                )
     if len(waves) == 1:
         wav = waves[0]
     else:

@@ -5,6 +5,7 @@ from pathlib import Path
 from faster_whisper import WhisperModel
 
 from . import config
+from .inference import inference_lock
 
 logger = logging.getLogger(__name__)
 
@@ -62,8 +63,9 @@ def transcribe_bytes(data: bytes, suffix: str = ".bin", language: str | None = N
         tmp_path = tmp.name
 
     try:
-        segments, info = _model.transcribe(tmp_path, language=language)
-        seg_list = list(segments)
+        with inference_lock:
+            segments, info = _model.transcribe(tmp_path, language=language)
+            seg_list = list(segments)
         text = " ".join(s.text for s in seg_list).strip()
         logger.info(
             "Transcribed %d bytes: lang=%s (%.0f%%), %d chars",

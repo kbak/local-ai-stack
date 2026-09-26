@@ -4,17 +4,19 @@ from typing import Literal, Optional
 
 from fastapi import FastAPI, File, Form, HTTPException, Response, UploadFile
 from fastapi.responses import JSONResponse, PlainTextResponse, StreamingResponse
+from starlette.concurrency import run_in_threadpool
 from mcp.server.fastmcp import FastMCP
 from pydantic import BaseModel, Field
 
-from . import audio_encode, chatterbox_engine, config, kokoro_engine, whisper_engine
+from . import audio_encode, cloning_engine, config, kokoro_engine, whisper_engine
+from .inference import validate_audio_gpu
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger("audio-api")
 
 
 # ── MCP tool surface ───────────────────────────────────────────────────
-# Chatterbox is the voice-cloning model — exposed as an MCP tool so LibreChat
+# The selected voice-cloning model is exposed as an MCP tool so LibreChat
 # agents can clone a voice on demand. Whisper/Kokoro stay REST-only because
 # LibreChat already speaks to them via its built-in OpenAI-compat speech config.
 
@@ -30,27 +32,25 @@ def clone_voice(
     cfg_weight: float = 0.5,
     response_format: str = "wav",
 ) -> dict:
-    """Synthesize speech that clones a target voice using Chatterbox.
+    """Synthesize speech using the configured voice-cloning model.
 
     Use this when the user wants speech rendered in a specific voice — either
     a named sample (e.g. "joe") or an absolute path to a reference .wav file.
-    Returns base64-encoded audio. For the built-in default voice (no cloning),
+    Returns base64-encoded audio. For an unconditioned voice (no cloning),
     pass an empty `voice`.
 
     Args:
         text: The text to synthesize. Required.
         voice: Filename stem under the voice-samples directory (e.g. "joe"
                for joe.wav), OR an absolute .wav path, OR empty for the
-               built-in default voice.
-        language: ISO code for the language of `text`. Defaults to "en"
-               (routed through the English-only model). Other supported
-               codes (ar, da, de, el, es, fi, fr, he, hi, it, ja, ko, ms,
-               nl, no, pl, pt, ru, sv, sw, tr, zh) route through the
-               multilingual model. The reference voice can be in any
-               language — only `text`'s language matters.
-        exaggeration: 0.0–1.0. Higher values push more expressive prosody.
-        cfg_weight: Classifier-free guidance weight, 0.0–1.0. Higher values
-                    track the reference voice more strictly.
+               unconditioned voice.
+        language: ISO code for the language of `text`, such as "en" or "pl".
+               VoxCPM2 infers pronunciation from the text itself; this field
+               validates supported languages and does not translate text.
+        exaggeration: Legacy Chatterbox control; unused by VoxCPM2, which
+               follows the reference style.
+        cfg_weight: Legacy Chatterbox control; VoxCPM2 uses the server's
+               VOXCPM_CFG_VALUE setting instead.
         response_format: "wav" (default), "mp3", "ogg" / "opus" (Signal voice
                     notes via signal-cli), "aac" / "m4a" (iOS-native voice
                     memos), "flac", or "pcm".
@@ -65,7 +65,7 @@ def clone_voice(
             "supported": list(audio_encode.SUPPORTED_FORMATS),
         }
     try:
-        audio_bytes = chatterbox_engine.synthesize(
+        audio_bytes = cloning_engine.synthesize(
             text=text,
             voice=voice or None,
             language=language,
@@ -74,9 +74,9 @@ def clone_voice(
             response_format=response_format,
         )
     except FileNotFoundError as e:
-        return {"error": str(e), "available_voices": chatterbox_engine.list_voices()}
+        return {"error": str(e), "available_voices": cloning_engine.list_voices()}
     except ValueError as e:
-        return {"error": str(e), "supported_languages": chatterbox_engine.supported_languages()}
+        return {"error": str(e), "supported_languages": cloning_engine.supported_languages()}
     except Exception as e:
         logger.exception("clone_voice failed")
         return {"error": str(e)}
@@ -95,8 +95,9 @@ def clone_voice(
 def list_clone_voices() -> dict:
     """List the voice samples available for clone_voice."""
     return {
-        "voices": chatterbox_engine.list_voices(),
+        "voices": cloning_engine.list_voices(),
         "voice_dir": str(config.VOICE_SAMPLES_DIR),
+        "backend": config.CLONE_BACKEND,
     }
 
 
@@ -110,9 +111,11 @@ mcp_app = mcp.streamable_http_app()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    validate_audio_gpu()
     whisper_engine.load()
     kokoro_engine.load()
-    chatterbox_engine.load()
+    cloning_engine.load()
+    logger.info("Audio warmup complete (cloning=%s).", config.CLONE_BACKEND)
     async with mcp_app.router.lifespan_context(mcp_app):
         yield
 
@@ -125,15 +128,16 @@ def health() -> Response:
     if (
         whisper_engine.is_ready()
         and kokoro_engine.is_ready()
-        and chatterbox_engine.is_ready()
+        and cloning_engine.is_ready()
     ):
-        return JSONResponse({"status": "ok"})
+        return JSONResponse({"status": "ok", "cloning_backend": config.CLONE_BACKEND})
     return JSONResponse(
         {
             "status": "loading",
             "whisper": whisper_engine.is_ready(),
             "kokoro": kokoro_engine.is_ready(),
-            "chatterbox": chatterbox_engine.is_ready(),
+            "cloning": cloning_engine.is_ready(),
+            "cloning_backend": config.CLONE_BACKEND,
         },
         status_code=503,
     )
@@ -152,9 +156,10 @@ def voices() -> dict:
 @app.get("/v1/voices/clone")
 def clone_voices() -> dict:
     return {
-        "voices": chatterbox_engine.list_voices(),
+        "voices": cloning_engine.list_voices(),
         "voice_dir": str(config.VOICE_SAMPLES_DIR),
-        "languages": chatterbox_engine.supported_languages(),
+        "languages": cloning_engine.supported_languages(),
+        "backend": config.CLONE_BACKEND,
     }
 
 
@@ -186,7 +191,9 @@ async def transcriptions(
         suffix = ".bin"
 
     try:
-        result = whisper_engine.transcribe_bytes(data, suffix=suffix, language=language)
+        result = await run_in_threadpool(
+            whisper_engine.transcribe_bytes, data, suffix=suffix, language=language
+        )
     except Exception as e:
         logger.exception("Transcription failed")
         raise HTTPException(status_code=500, detail=str(e))
@@ -256,7 +263,7 @@ def clone(req: CloneRequest) -> Response:
     if not req.text.strip():
         raise HTTPException(status_code=400, detail="text must not be empty")
     try:
-        audio_bytes = chatterbox_engine.synthesize(
+        audio_bytes = cloning_engine.synthesize(
             text=req.text,
             voice=req.voice,
             language=req.language,

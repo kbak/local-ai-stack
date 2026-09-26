@@ -63,6 +63,22 @@ urllib.request.urlretrieve(base + '/voices-v1.0.bin', '/app/kokoro-models/voices
 RUN python -c "from chatterbox.tts import ChatterboxTTS; ChatterboxTTS.from_pretrained(device='cpu')" || \
     echo "Chatterbox weight prefetch failed — first container start will download instead"
 
+# V3 needs the current decoder, not just new weights. The PyPI 0.1.7 decoder
+# can stop on two repeated acoustic tokens and truncate otherwise valid speech.
+# Keep the cu128 torch wheels and explicit dependencies above when updating it.
+ARG CHATTERBOX_COMMIT=5de7a54aa4e5e2baadb0182dde554908b48b85c2
+RUN pip install --no-cache-dir "setuptools==80.9.0" "wheel==0.45.1" && \
+    pip install --no-cache-dir --no-deps --no-build-isolation --force-reinstall \
+    "chatterbox-tts @ git+https://github.com/resemble-ai/chatterbox.git@${CHATTERBOX_COMMIT}"
+ENV PKUSEG_HOME=/app/hf-cache/pkuseg
+
+# Use the exact VoxCPM runtime auditioned locally. Optional Gradio, denoiser,
+# normalizer and training dependencies are unnecessary for this inference path.
+ARG VOXCPM_COMMIT=f772e498a45fbb5fb8e13fbf9b9c48be9fe33e69
+RUN pip install --no-cache-dir "setuptools-scm==8.3.1" && \
+    pip install --no-cache-dir --no-deps --no-build-isolation \
+    "voxcpm @ git+https://github.com/OpenBMB/VoxCPM.git@${VOXCPM_COMMIT}"
+
 COPY audio-api/app /app/app
 COPY audio-api/entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh

@@ -13,7 +13,7 @@ Self-hosted LLM stack with privacy-focused web search and research tools. Runs o
 | pdf-inspector | 8086 | PDF text extraction via pdf-inspector (Rust); handles Unicode, multi-column, tables |
 | voice-agent | 8087 | Browser voice-chat UI with wake-word-free VAD, streaming TTS, voice picker, and full MCP tool access via strands |
 | browser-agent-api | 8092 | Generic asynchronous headless browser-agent API using Browser Use and the local Qwen endpoint |
-| audio-api | 8088 | Shared GPU-backed Whisper (STT) + Kokoro (TTS) + Chatterbox (voice cloning) service with an OpenAI-compatible API (pinned to the secondary GPU) |
+| audio-api | 8088 | Shared GPU-backed Whisper (STT) + Kokoro (TTS) + VoxCPM2 (voice cloning) service with an OpenAI-compatible API (pinned to the 5060 Ti) |
 | memory-mcp | 8089 | Self-hosted agentic memory (Mem0 + bge-m3 + Qdrant) exposed as REST + MCP; Tier 2 of the hybrid memory architecture |
 | llama-swap playground | 8080/ui | Built-in llama-swap UI — model monitor, manual load/unload, and image generation playground (FLUX.1-dev) |
 | qdrant | 6333 | Vector store backing memory-mcp |
@@ -163,7 +163,7 @@ Edit `.env` and set:
 - `MEMORY_DIR` — absolute host path for memory storage (`USER.md`, `MEMORY.md`, Qdrant volume). Keep outside the repo.
 - `VOICE_SAMPLES_DIR` — absolute host path containing `.wav` reference samples for Chatterbox voice cloning. Mounted read-only into audio-api and read-write into signal-bot (so `/sample` can write new samples) at `/app/voice-samples` in both. **Required** — no default.
 - `MUSIC_HOST_DIR` — absolute host path to your music library, mounted read-write into signal-bot at `/music`. **Required** — no default.
-- `SECONDARY_GPU` — index or UUID of the secondary GPU. Hosts audio-api (Whisper + Kokoro + Chatterbox). Defaults to `0` for single-GPU hosts.
+- `SECONDARY_GPU` — index or UUID of the secondary GPU. Hosts audio-api (Whisper + Kokoro + VoxCPM2). Required for audio-api; this deployment uses the 5060 Ti UUID. Startup verifies that exactly one GPU is visible and that it is the 5060 Ti.
 
 **3. Configure models in `llama-swap.yaml`**
 
@@ -255,7 +255,7 @@ Two GPUs are partitioned via `CUDA_VISIBLE_DEVICES` (Docker container env for au
 **Secondary GPU (cuda1 / 5060 Ti, `SECONDARY_GPU`):**
 | Group | Model | Persistent | Notes |
 |---|---|---|---|
-| — | audio-api (Docker) | always-on | Whisper + Kokoro + Chatterbox |
+| — | audio-api (Docker) | always-on | Whisper + Kokoro + VoxCPM2 |
 | `cuda1_reranker` | bge-reranker-v2-m3 | yes | Cross-encoder reranker; ~1.1 GB |
 
 Single-GPU hosts: set `SECONDARY_GPU=0` and everything coexists on one card (mind the VRAM budget).
@@ -314,16 +314,16 @@ A single GPU-backed service exposing OpenAI-compatible endpoints — used by Lib
 
 - **Whisper** (faster-whisper) — speech-to-text
 - **Kokoro** (kokoro-onnx) — fast streaming TTS, fixed voice library
-- **Chatterbox** — voice-cloning TTS; clones from a short reference `.wav` in English plus 22 other languages
+- **VoxCPM2** — voice-cloning TTS; 48 kHz output, English and Polish among 30 supported languages
 
 Endpoints:
 
 - `POST /v1/audio/transcriptions` — Whisper transcription (OpenAI-compatible)
 - `POST /v1/audio/speech` — Kokoro TTS; supports `stream: true` for sentence-by-sentence chunks
-- `POST /v1/audio/clone` — Chatterbox voice cloning. Body: `{text, voice, language, exaggeration, cfg_weight, response_format}`. `voice` is a filename stem under `VOICE_SAMPLES_DIR` (e.g. `joe` → `joe.wav`) or an absolute `.wav` path; omit it for Chatterbox's built-in default voice. `language` defaults to `"en"` and routes to the English-only model; any other code routes to the multilingual model (`ar, da, de, el, es, fi, fr, he, hi, it, ja, ko, ms, nl, no, pl, pt, ru, sv, sw, tr, zh`). The reference voice can be in any language — only `text`'s language matters. Output formats: `wav`, `mp3`, `ogg`/`opus`, `aac`/`m4a`, `flac`, `pcm`.
+- `POST /v1/audio/clone` — VoxCPM2 voice cloning. Body: `{text, voice, language, response_format}`. `voice` is a filename stem under `VOICE_SAMPLES_DIR` (e.g. `joe` → `joe.wav`) or an absolute `.wav` path; omit it for unconditioned generation. `language` defaults to `"en"` and is validated against the model's supported list; VoxCPM2 infers pronunciation from the supplied text, without translating it. Legacy `exaggeration` and `cfg_weight` fields remain accepted but apply only to the optional Chatterbox backend. Output formats: `wav`, `mp3`, `ogg`/`opus`, `aac`/`m4a`, `flac`, `pcm`. WAV uses native 48 kHz output; raw PCM remains mono 24 kHz for compatibility.
 - `GET /v1/voices` — `{voices, default, lang, speed}` — installed Kokoro voices plus the current server-side defaults
-- `GET /v1/voices/clone` — `{voices, voice_dir, languages}` — `.wav` files discovered under `VOICE_SAMPLES_DIR` and the language codes accepted by `/v1/audio/clone`
-- `GET /health` — returns 200 only once all three models are loaded AND warmed up (CUDA kernels JIT-compiled). `start.sh` waits for `Chatterbox warmup complete` in the logs before considering audio-api ready.
+- `GET /v1/voices/clone` — `{voices, voice_dir, languages, backend}` — reference WAVs, supported language codes, and the selected cloning backend
+- `GET /health` — returns 200 once the audio engines are ready, including VoxCPM2 warmup; includes `cloning_backend`. `start-ai.sh` polls this endpoint before considering audio-api ready.
 - `POST /mcp/mcp` — MCP streamable-http surface exposing `clone_voice` and `list_clone_voices` as tools (LibreChat wires this as the `chatterbox` server).
 
 Defaults in `audio-api.env` (**single source of truth** for voice/lang/speed):
@@ -336,15 +336,22 @@ ONNX_PROVIDER=CUDAExecutionProvider
 DEFAULT_VOICE=bm_george
 DEFAULT_LANG=b
 DEFAULT_SPEED=1.0
+CLONE_BACKEND=voxcpm2
+VOXCPM_CFG_VALUE=2.0
+VOXCPM_INFERENCE_STEPS=10
+VOXCPM_SEED=20260925
+CHATTERBOX_MULTILINGUAL_VERSION=v3
+CHATTERBOX_ENGLISH_MODEL=multilingual
+CHATTERBOX_REVISION=5bb1f6ee58e50c3b8d408bc82a6d3740c2db6e18
 ```
 
 Callers (voice-agent, calendar-watcher, rss-watcher, etc.) omit `voice`/`lang`/`speed` from their requests so these defaults apply. Pass them explicitly only to override per-request. To change the stack-wide default voice, edit `DEFAULT_VOICE` here and `docker compose restart audio-api` — no other service needs updating. `signal-bot` is the one exception (it reads `TTS_VOICE` from `signal-bot.env` because the uoltz upstream expects it); `librechat.yaml` also pins a UI default under `speechTab.textToSpeech.voice`.
 
-All three models run on the GPU. Post-warmup, first Kokoro request latency is ~0.7s; Chatterbox is heavier (≈seconds-per-sentence on first cold call, faster afterwards because the CUDA arena was pre-sized at warmup). Long sentences are auto-chunked at commas/whitespace before hitting Kokoro's 510-token cap.
+All three models run on the 5060 Ti. Kokoro serves fast English speech; VoxCPM2 provides the selected cloning quality with longer generation times. Long sentences are auto-chunked before synthesis. GPU inference is serialized to bound workspace usage and protect request state.
 
-**Chatterbox dual-model layout.** audio-api loads two Chatterbox variants — the English-only model and the 23-language multilingual model — but they **share the same `s3gen` vocoder and `VoiceEncoder` instances on the GPU**. Only the T3 transformer (~2.1 GB) and tokenizer differ between them, so the combined VRAM footprint is ~5.5 GB instead of ~7 GB for two independent loads. The English model handles `language="en"`; everything else goes through the multilingual model. The first non-English request is slightly slower (multilingual T3 kernels JIT on first use); subsequent ones run at steady state.
+VoxCPM2 weights persist in the audio HF cache volume. Only the selected cloning backend is loaded. To use Chatterbox V3, set `CLONE_BACKEND=chatterbox` and recreate audio-api: `docker compose -f docker-compose.ai.yml up -d --no-deps audio-api`.
 
-**Voice cloning samples.** Drop reference `.wav` files into the host directory you set as `VOICE_SAMPLES_DIR` (mounted read-only at `/app/voice-samples`). Five to fifteen seconds of clean speech per voice works well. The filename stem becomes the `voice` argument: `joe.wav` → `clone_voice(text=..., voice="joe")`. The reference clip's language doesn't have to match `text`'s language — Chatterbox extracts speaker timbre from the audio prompt and synthesises whatever you ask in the target language.
+**Voice cloning samples.** Drop reference `.wav` files into the host directory you set as `VOICE_SAMPLES_DIR` (mounted read-only at `/app/voice-samples`). The filename stem becomes the `voice` argument: `joe.wav` → `clone_voice(text=..., voice="joe")`. The existing samples are reused by VoxCPM2 without reference transcripts. The reference clip's language does not have to match the text.
 
 ## voice-agent (browser voice chat)
 
