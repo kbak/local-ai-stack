@@ -19,7 +19,7 @@ Self-hosted LLM stack with privacy-focused web search and research tools. Runs o
 | qdrant | 6333 | Vector store backing memory-mcp |
 | calendar-watcher | — | Polls calendar for meal and travel events; enriches with rating/menu/weather/maps; delivers briefings via Signal |
 | tg-watcher | — | Listens to a Telegram group as your user account; sends a daily LLM-generated brief via Signal |
-| rss-watcher | — | Fetches RSS feeds grouped by category; sends a twice-daily LLM-generated English news brief via Signal |
+| rss-watcher | — | Twice-daily RSS news and a weekly blog digest, summarized in English and delivered via Signal |
 | oss-watcher | — | Weekly LLM-generated summary of GitHub + Discord activity for an open-source project, delivered via Signal |
 | receipt-watcher | — | Polls email accounts, extracts receipts via LLM, appends to Google Sheets, archives the message |
 | MongoDB | — | LibreChat chat history storage |
@@ -718,6 +718,7 @@ LLM and Signal settings are shared with signal-bot via `signal-bot.env` — no d
 **1. Configure rss-watcher.env**
 ```
 cp rss-watcher.env.example rss-watcher.env
+cp rss-watcher/blog-sources.example.json rss-watcher/blog-sources.json
 ```
 
 Set `RSS_FEEDS` to a JSON object mapping category names to lists of feed URLs:
@@ -740,6 +741,32 @@ docker compose up -d rss-watcher
 ```
 docker compose exec rss-watcher python -c "from rss_watcher.briefer import run_news_brief; run_news_brief()"
 ```
+
+### Weekly blog brief
+
+The same `rss-watcher` process also sends a separate **Tuesday 10:00 America/Phoenix** blog brief when `BLOG_SOURCES_FILE` is set. `BLOG_TIMEZONE` accepts an IANA timezone and follows its daylight-saving rules. `BLOG_RECIPIENT` defaults directly to the personal `BRIEFING_RECIPIENT`; group recipients are rejected. LLM and Signal settings are reused. Blog briefs are always text-only, even when RSS voice notes are enabled.
+
+Subscriptions live in local `rss-watcher/blog-sources.json`, excluded from Git and Docker build contexts, mounted read-only, and reread each week. For a new installation, copy [`rss-watcher/blog-sources.example.json`](rss-watcher/blog-sources.example.json) and replace its placeholder sources before enabling the job. No content, snapshots, or delivery history are persisted: each run filters published timestamps to the preceding seven days, excludes future/undated entries, and deduplicates within the run. Dates without times are interpreted as midnight in `BLOG_TIMEZONE`. A manual rerun can repeat the same entries. A restart does not replay a missed weekly run.
+
+Readers support RSS/Atom feeds, dated HTML cards, and static metadata adapters for JavaScript-rendered pages. If a source lists meeting dates rather than publication dates, the filter covers meetings held in the past week; without stored history or publication dates, it cannot detect when announcements or recordings were added.
+
+To add a feed, append an object with `name`, `url` (blog homepage), `kind: "feed"`, `feed` (RSS/Atom URL), and `hosts` (explicit allowed hostnames). For a static page, use `name`, `url`, `hosts`, and CSS selectors: `cards`, `title` (defaults to `h2, h3`), `date`, optional `summary`, and optional `link` (defaults to `a[href]`). Date nodes may carry `datetime` or a readable date. Script-rendered sites without static metadata need an adapter. Readers cover entries exposed by the feed or listing; a site's shortened feed or pagination can limit coverage.
+
+Fetches permit only configured HTTPS hosts and public, pinned IP addresses, revalidate redirects, and cap response size. Scripts, hidden markup, and control characters are removed; excerpts are bounded. The LLM receives untrusted JSON with no tools or credentials in its prompt. These measures reduce prompt-injection exposure; they cannot prove a publisher's content trustworthy. Article links are validated and rendered separately. Source failures appear in the brief, and LLM failure falls back to titles and links. Quiet weeks still send a short status for each source.
+
+After changing code or enabling the job:
+
+```sh
+docker compose -f docker-compose.server.yml up -d --build --no-deps rss-watcher
+```
+
+Fetch and inspect all sources **without calling the LLM or sending Signal**:
+
+```sh
+docker compose -f docker-compose.server.yml exec rss-watcher python -m rss_watcher.blogs --dry-run
+```
+
+To send a brief immediately, omit `--dry-run`. Source-list edits take effect at the next run without rebuilding; environment changes require recreating the container.
 
 ## memory-mcp
 

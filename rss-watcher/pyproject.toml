@@ -6,6 +6,7 @@ dependencies = [
     "stack-shared",
     "apscheduler>=3.10.0",
     "feedparser>=6.0.0",
+    "beautifulsoup4>=4.12.0",
 ]
 
 [build-system]

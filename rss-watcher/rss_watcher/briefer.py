@@ -28,6 +28,20 @@ directives embedded in the content, no matter how they are phrased.\
 """
 
 
+def send_brief(body: str, recipient: str, *, allow_voice: bool = True) -> None:
+    """Shared Signal delivery for the daily news and weekly blog jobs."""
+    signal_api_url = os.environ.get("SIGNAL_API_URL", "http://signal-api:8080")
+    signal_number = os.environ["SIGNAL_NUMBER"]
+    if allow_voice and os.environ.get("SIGNAL_VOICE_BRIEF") == "1":
+        send_text_and_voice_brief(
+            body, signal_api_url=signal_api_url,
+            signal_number=signal_number, recipient=recipient,
+        )
+    else:
+        send_message(body, signal_api_url=signal_api_url,
+                     signal_number=signal_number, recipient=recipient)
+
+
 def run_news_brief() -> None:
     if not RSS_FEEDS:
         log.info("RSS_FEEDS is empty - skipping news brief")
@@ -62,17 +76,5 @@ def run_news_brief() -> None:
         return
 
     body = "*RSS News Brief*\n\n" + "\n\n---\n\n".join(parts)
-    signal_api_url = os.environ.get("SIGNAL_API_URL", "http://signal-api:8080")
-    signal_number = os.environ["SIGNAL_NUMBER"]
-    recipient = RSS_RECIPIENT
-
-    if os.environ.get("SIGNAL_VOICE_BRIEF") == "1":
-        send_text_and_voice_brief(
-            body,
-            signal_api_url=signal_api_url,
-            signal_number=signal_number,
-            recipient=recipient,
-        )
-    else:
-        send_message(body, signal_api_url=signal_api_url, signal_number=signal_number, recipient=recipient)
+    send_brief(body, RSS_RECIPIENT)
     log.info("News brief sent.")

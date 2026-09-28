@@ -4,5 +4,6 @@
 **/__pycache__
 .env
 **/*.env
+rss-watcher/blog-sources.json
 receipt-watcher/secrets
 yt-dlp-service/youtube_cookies.txt

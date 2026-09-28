@@ -446,6 +446,7 @@ services:
       - "host.docker.internal:host-gateway"
     volumes:
       - ./shared:/shared:ro
+      - ./rss-watcher/blog-sources.json:/app/blog-sources.json:ro
     depends_on:
       - signal-api
     networks:

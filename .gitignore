@@ -13,6 +13,7 @@ signal-bot.env
 
 tg-watcher.env
 rss-watcher.env
+rss-watcher/blog-sources.json
 oss-watcher.env
 audio-api.env
 receipt-watcher.env
