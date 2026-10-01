@@ -7,15 +7,14 @@ analyze_image     — VLM describes image → SearXNG searches → VLM synthesiz
 reverse_image_search — Yandex + SauceNAO visual fingerprint search.
                        Best for original, unmodified images that exist on the web.
 
-Both tools accept either an HTTP/HTTPS URL or a local file path (e.g. a Signal
-attachment stored under /signal-cli-data/attachments/).
+Both tools accept an HTTP/HTTPS URL or an opaque image reference from the
+current Signal conversation (including "latest"). Images are uploaded externally.
 """
 
 from __future__ import annotations
 
 import base64
 import json
-from pathlib import Path
 
 import httpx
 from strands import tool
@@ -82,11 +81,10 @@ def _is_url(source: str) -> bool:
 
 
 def _read_as_b64(path: str) -> tuple[str, str]:
-    """Read a local file and return (base64_string, filename)."""
-    p = Path(path)
-    if not p.exists():
-        raise FileNotFoundError(f"File not found: {path}")
-    return base64.b64encode(p.read_bytes()).decode(), p.name
+    """Resolve a conversation image ID; never interpret model input as a path."""
+    from image_tools import read_conversation_image
+    image_id, data = read_conversation_image(path)
+    return base64.b64encode(data).decode(), f"{image_id}.png"
 
 
 # ── Tools ─────────────────────────────────────────────────────────────────────
@@ -105,8 +103,8 @@ def analyze_image(source: str) -> str:
     a final answer — handling cases where even Google Lens would fail.
 
     Args:
-        source: HTTP/HTTPS image URL, or absolute path to a local file
-                (e.g. /signal-cli-data/attachments/some-image.jpg).
+        source: HTTP/HTTPS image URL, or the opaque image reference supplied
+                in the conversation (or "latest"). Local paths are rejected.
     """
     try:
         if _is_url(source):
@@ -130,8 +128,8 @@ def reverse_image_search(source: str) -> str:
     analyze_image for those instead.
 
     Args:
-        source: HTTP/HTTPS image URL, or absolute path to a local file
-                (e.g. /signal-cli-data/attachments/some-image.jpg).
+        source: HTTP/HTTPS image URL, or the opaque image reference supplied
+                in the conversation (or "latest"). Local paths are rejected.
     """
     try:
         if _is_url(source):

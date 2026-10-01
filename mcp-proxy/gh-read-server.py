@@ -11,6 +11,8 @@ verbs are structured (noun verb ...), a small allowlist catches write attempts
 without having to parse every possible flag.
 """
 
+import os
+import re
 import shlex
 import subprocess
 import sys
@@ -48,28 +50,52 @@ ALLOWED: set[tuple[str, ...]] = {
     ("label", "list"),
     ("ruleset", "view"),
     ("ruleset", "list"),
-    ("auth", "status"),
 }
 
 
 def _is_allowed(tokens: list[str]) -> tuple[bool, str]:
     if not tokens:
         return False, "empty command"
-    first = tokens[0]
-    if (first,) in ALLOWED:
-        if first == "api":
-            upper = [t.upper() for t in tokens[1:]]
-            for write_verb in ("-X", "--method"):
-                if write_verb in tokens[1:]:
-                    idx = tokens.index(write_verb, 1)
-                    if idx + 1 < len(tokens) and tokens[idx + 1].upper() != "GET":
-                        return False, f"gh api with non-GET method is not allowed"
-            if any(t in ("POST", "PUT", "PATCH", "DELETE") for t in upper):
-                return False, "gh api with write verb is not allowed"
+    if tokens[0] == "api":
+        # REST GET only; no field, file, hostname, header or method flags.
+        if len(tokens) != 2 or not re.fullmatch(r"[A-Za-z0-9_/.-]+(?:\?[^\s#]*)?", tokens[1]):
+            return False, "api accepts only one relative REST endpoint; no flags"
+        endpoint = tokens[1].split("?", 1)[0]
+        if endpoint.startswith(("/", ".")) or ".." in endpoint or endpoint.split("/", 1)[0] == "graphql":
+            return False, "only relative REST endpoints are permitted"
         return True, ""
-    if len(tokens) >= 2 and (tokens[0], tokens[1]) in ALLOWED:
-        return True, ""
-    return False, f"subcommand not in read-only allowlist: {' '.join(tokens[:2])}"
+    if len(tokens) < 2 or tuple(tokens[:2]) not in ALLOWED:
+        return False, "subcommand not in read-only allowlist"
+    # No debug/token flags, templates, file flags, web launch or host override.
+    value_flags = {"--json", "--repo", "-R", "--limit", "-L", "--state",
+                   "--author", "--assignee", "--label", "--base", "--head",
+                   "--sort", "--order", "--language", "--owner", "--visibility",
+                   "--created", "--updated", "--match", "--filename", "--extension"}
+    switches = {"--comments", "--patch", "--include-forks", "--archived"}
+    i = 2
+    while i < len(tokens):
+        token = tokens[i]
+        if token in switches:
+            i += 1
+            continue
+        flag, sep, value = token.partition("=")
+        if flag in value_flags:
+            if not sep:
+                i += 1
+                if i >= len(tokens):
+                    return False, "missing flag value"
+                value = tokens[i]
+            if flag in {"--repo", "-R"} and not re.fullmatch(r"[\w.-]+/[\w.-]+", value):
+                return False, "repository must be owner/name on github.com"
+        else:
+            if token.startswith("-") or "://" in token:
+                return False, "unsupported flag or URL"
+            if tuple(tokens[:2]) == ("repo", "view") and not re.fullmatch(r"[\w.-]+/[\w.-]+", token):
+                return False, "repository must be owner/name on github.com"
+            if tuple(tokens[:2]) == ("repo", "list") and not re.fullmatch(r"[\w.-]+", token):
+                return False, "owner must be a github.com account name"
+        i += 1
+    return True, ""
 
 
 @mcp.tool()
@@ -84,8 +110,7 @@ def gh_read(args: str) -> dict:
       - args="repo view owner/repo --json name,description,defaultBranchRef"
       - args="issue list --repo owner/repo --state open --limit 20 --json number,title,labels"
       - args="pr view 42 --repo owner/repo --json title,body,files,comments"
-      - args="api 'repos/owner/repo/contents/path/to/file.py' --jq .content"
-      - args="api graphql -f query='query { repository(owner:\\"o\\", name:\\"r\\") { discussions(first:5){nodes{title body}} } }'"
+      - args="api repos/owner/repo/contents/path/to/file.py"
       - args="search issues 'is:open label:bug repo:owner/repo' --limit 10"
 
     Only read operations are permitted (the server enforces an allowlist). Use
@@ -104,7 +129,9 @@ def gh_read(args: str) -> dict:
 
     try:
         result = subprocess.run(
-            ["gh", *tokens],
+            ["gh", *tokens, "--method", "GET"] if tokens[0] == "api" else ["gh", *tokens],
+            env={**{k: v for k, v in os.environ.items() if k not in {"GH_DEBUG", "DEBUG", "GH_HOST"}},
+                 "GH_HOST": "github.com", "GH_PROMPT_DISABLED": "1"},
             capture_output=True,
             text=True,
             timeout=30,

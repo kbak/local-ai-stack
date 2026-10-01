@@ -28,6 +28,8 @@ RUN pip install --no-cache-dir httpx "fastmcp<4" "mcp<2" /wheels/*.whl && \
     rm -rf /wheels
 
 WORKDIR /app
+COPY shared/ /shared/
+RUN pip install --no-cache-dir --no-deps -e /shared/
 COPY pdf-inspector/server.py ./server.py
 
 EXPOSE 8085

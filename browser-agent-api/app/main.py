@@ -20,6 +20,7 @@ from browser_use import Agent, Browser, ChatOpenAI
 from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException, status
 from playwright.async_api import async_playwright
 from pydantic import BaseModel, Field, HttpUrl
+from stack_shared.public_http import AsyncPublicHTTPTransport
 
 log = logging.getLogger("browser-agent-api")
 
@@ -187,10 +188,9 @@ async def create_browser(request: TaskRequest) -> BrowserResource:
         common["cdp_url"] = rewrite_steel_websocket_url(websocket_url)
         return BrowserResource(browser=Browser(**common), cdp_url=common["cdp_url"], steel_session_id=session_id)
     if BROWSER_CDP_URL:
-        common["cdp_url"] = BROWSER_CDP_URL
+        raise ValueError("External CDP browsers are disabled: their public-only egress cannot be enforced")
     else:
-        common.update(headless=True, chromium_sandbox=True)
-    return BrowserResource(browser=Browser(**common), cdp_url=common.get("cdp_url"))
+        raise ValueError("Browser tasks require the isolated Steel backend and public-only egress proxy")
 
 
 async def release_steel_session(session_id: str) -> None:
@@ -397,7 +397,12 @@ async def analyze_image_assets(
     selected = assets[: options.max_images]
     results: list[dict[str, Any]] = []
     headers = {"Authorization": f"Bearer {LLM_API_KEY}", "Content-Type": "application/json"}
-    async with httpx.AsyncClient(timeout=httpx.Timeout(120, connect=15)) as client:
+    # Separate page-supplied URLs from the trusted model control plane.
+    async with (
+        httpx.AsyncClient(timeout=httpx.Timeout(120, connect=15)) as client,
+        httpx.AsyncClient(timeout=httpx.Timeout(30, connect=15),
+                          transport=AsyncPublicHTTPTransport(), trust_env=False) as image_client,
+    ):
         for offset in range(0, len(selected), options.batch_size):
             batch = selected[offset : offset + options.batch_size]
             content: list[dict[str, Any]] = [{
@@ -410,7 +415,7 @@ async def analyze_image_assets(
             }]
             used_assets: list[dict[str, Any]] = []
             for asset in batch:
-                data_url = await download_image_as_data_url(client, asset["url"])
+                data_url = await download_image_as_data_url(image_client, asset["url"])
                 if not data_url:
                     continue
                 content.append({"type": "text", "text": f"Asset image {asset['index']}:"})

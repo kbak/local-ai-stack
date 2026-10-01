@@ -90,6 +90,27 @@ def _reference(directory: Path, image_id: str) -> tuple[str, bytes]:
     return image_id, path.read_bytes()
 
 
+def read_conversation_image(image_id: str) -> tuple[str, bytes]:
+    """Read only an opaque reference belonging to the trusted current turn."""
+    turn = _turn.get()
+    if turn is None:
+        raise ValueError("Image references require an active Signal conversation.")
+    return _reference(turn.directory, image_id)
+
+
+def identify_direct(func, source, images, signal, recipient):
+    """Trusted slash-command entry point; never exposed as an agent tool."""
+    directory = _directory(recipient)
+    _prune(directory)
+    if images:
+        source = _save(directory, images[0]["image"]["source"]["bytes"])
+    token = _turn.set(Turn(signal, recipient, directory))
+    try:
+        return func(source=source or "latest")
+    finally:
+        _turn.reset(token)
+
+
 async def invoke_with_images(agent, text, images, signal, recipient):
     """Called inside the bot's cancellable agent task, including continuations."""
     directory = _directory(recipient)

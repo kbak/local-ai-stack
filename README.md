@@ -51,10 +51,10 @@ curl -X POST http://127.0.0.1:8092/v1/tasks \
 Poll `GET /v1/tasks/<task_id>` for `queued`, `running`, `completed`, or
 `failed`. Compose runs a self-hosted Steel browser on the mini PC. Each API task
 creates an isolated Steel session, connects through its returned CDP WebSocket,
-and releases the session afterward. Configure an optional proxy with
-`BROWSER_AGENT_STEEL_PROXY_URL`. Set `BROWSER_AGENT_STEEL_BASE_URL` empty to
-fall back to the API container's local Chromium, or use `BROWSER_AGENT_CDP_URL`
-for another CDP-compatible backend. Steel's UI is host-local on port 3090. The
+and releases the session afterward. Steel is isolated on an internal Docker
+network and routes browser traffic through the public-only `public-egress` proxy.
+Local Chromium and external CDP fallbacks are disabled; browser tasks require
+this isolated Steel deployment. Steel's UI is host-local on port 3090. The
 agent API is also bound to loopback by default; set `BROWSER_AGENT_API_TOKEN`
 before exposing it to the LAN.
 
@@ -81,7 +81,7 @@ individual batch reports, and a merged `image_analysis_summary`:
 
 ## MCP Tools
 
-All tools are exposed via mcp-proxy on port 8083 (no authentication required — internal Docker network only). location-tracker requires a bearer token (`MCP_PROXY_AUTH_TOKEN`).
+mcp-proxy exposes its tools on host port 8083 without authentication; access depends on the host firewall, LAN, and Tailscale configuration. Other MCP services have their own published ports. Restrict these ports to trusted clients. location-tracker requires a bearer token (`MCP_PROXY_AUTH_TOKEN`).
 
 - **searxng** — web search (via local SearXNG)
 - **fetch** — fetch URL content
@@ -92,7 +92,7 @@ All tools are exposed via mcp-proxy on port 8083 (no authentication required —
 - **weather** — current weather and forecast
 - **currency** — exchange rates
 - **finance** — stock and financial data (yfinance)
-- **github** — read-only access via the `gh` CLI: read files, search code and repos, browse commits/issues/PRs. Custom Python MCP server (`mcp-proxy/gh-read-server.py`) using a `GITHUB_TOKEN` injected into the `gh` config — no write paths exposed.
+- **github** — read-only access via the `gh` CLI: read files, search code and repos, browse commits/issues/PRs. Custom Python MCP server (`mcp-proxy/gh-read-server.py`) using `GITHUB_TOKEN`. The tool permits a restricted set of read commands and REST GET endpoints; authentication inspection, GraphQL, host overrides, arbitrary CLI flags, and templates are rejected. Use a read-only token as an additional boundary.
 - **google-maps** — place search, ratings, hours, geocoding, directions (requires `GOOGLE_MAPS_API_KEY`)
 - **browser** — generic headless browsing and optional Qwen image inspection. `browser_use` waits for a result; `submit_browser_task` plus `get_browser_task` support asynchronous jobs.
   LibreChat gives this server an 11-minute MCP request timeout because gallery navigation and batched vision analysis can run for several minutes.
@@ -837,7 +837,7 @@ Workflow: copy the template into a new folder, customize the focus areas in `CLA
 
 - LibreChat chat history is persisted in MongoDB (`mongodb-data` volume) — survives container restarts
 - MCP package cache is persisted — tool calls are fast after first use
-- SearXNG runs locally — no search queries leave your network
+- SearXNG runs locally but forwards search queries to external search engines. Image identification/reverse search uploads selected conversation images to Litterbox (one-hour expiry) and sends image URLs/queries to external providers.
 - llama-swap routes image gen (`flux-dev`), reranking (`bge-reranker-v2-m3`), and all LLM traffic through a single port (8080). Each model is in its own group; `exclusive: false` lets them coexist on the same GPU when VRAM permits
 - llama-swap unloads the previous model within a group when another is requested; persistent groups (`cuda0_main`, `cuda0_coder`, `cuda1_reranker`) are never evicted by swap events
 - signal-cli-data volume is shared between signal-api (read-write) and signal-bot (read-only)
@@ -846,3 +846,5 @@ Workflow: copy the template into a new folder, customize the focus areas in `CLA
 - audio-api owns the default voice/lang/speed (`DEFAULT_VOICE` in `audio-api.env`). voice-agent and the watchers omit these fields so the server-side defaults apply; `signal-bot.env` still sets `TTS_VOICE` (uoltz reads it) and `librechat.yaml` pins a UI default. To swap voices stack-wide, change `DEFAULT_VOICE` and restart audio-api
 - `./shared/` is bind-mounted (`:ro`) into every watcher (`calendar-watcher`, `tg-watcher`, `oss-watcher`, `rss-watcher`, `receipt-watcher`, `location-tracker`) and installed editable — edit `shared/stack_shared/*.py` and `docker compose restart <watcher>` without rebuilding the image
 - memory-mcp and audio-api both expose REST + MCP on a single port. MCP clients use `/mcp/mcp` (audio-api: `clone_voice`; memory-mcp: `remember`, `search_memory`, two-step `forget`); REST clients use `/v1/...`
+
+Security boundaries: receipt rows are written to Sheets as RAW values so email-derived text cannot execute as formulas; formatted date and currency strings remain text. Image tools accept conversation-scoped image references rather than local filesystem paths. PDF and browser image downloads reject non-public destination addresses at connection time, including redirects and DNS changes. Steel runs on an internal Docker network and Chromium uses the public-egress proxy for navigation, redirects, subresources, and WebSockets. The proxy validates and pins public destination addresses. External CDP and local-browser fallbacks are disabled because their egress boundary cannot be enforced.

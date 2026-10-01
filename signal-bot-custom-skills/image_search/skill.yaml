@@ -10,7 +10,7 @@ version: "1.0.0"
 enabled: true
 command: /identify
 command_arg: source
-command_usage: "/identify <image url or attachment path>"
+command_usage: "/identify <image url or conversation image reference>"
 
 tools:
   - "image_search:analyze_image"

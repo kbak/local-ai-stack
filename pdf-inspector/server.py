@@ -12,6 +12,7 @@ from urllib.parse import urlparse
 import httpx
 import pdf_inspector
 from fastmcp import FastMCP
+from stack_shared.public_http import PublicHTTPTransport
 
 log = logging.getLogger(__name__)
 
@@ -34,7 +35,8 @@ def _is_url(source: str) -> bool:
 
 def _fetch_pdf(url: str) -> Path:
     """Download a PDF from a URL to a temp file, return the path."""
-    with httpx.Client(timeout=60, follow_redirects=True) as client:
+    with httpx.Client(timeout=60, follow_redirects=True,
+                      transport=PublicHTTPTransport(), trust_env=False) as client:
         resp = client.get(url)
         resp.raise_for_status()
     suffix = ".pdf"

@@ -91,7 +91,7 @@ class SheetsClient:
         resp = self._values().append(
             spreadsheetId=target.id,
             range=target.tab,
-            valueInputOption="USER_ENTERED",
+            valueInputOption="RAW",
             insertDataOption="INSERT_ROWS",
             body={"values": [row]},
         ).execute()

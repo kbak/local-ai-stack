@@ -11,6 +11,8 @@ COPY browser-agent-api/requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r /app/requirements.txt && \
     browser-use install
 
+COPY shared/ /shared/
+RUN pip install --no-cache-dir --no-deps -e /shared/
 COPY browser-agent-api/app /app/app
 
 RUN useradd --create-home --uid 10001 browser-agent && \
