@@ -8,6 +8,8 @@ RUN pip install --no-cache-dir \
     starlette
 
 WORKDIR /app
+COPY shared/ /shared/
+RUN pip install --no-cache-dir --no-deps -e /shared/
 COPY reverse-image-search/server.py ./server.py
 
 EXPOSE 8091

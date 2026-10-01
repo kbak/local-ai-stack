@@ -23,6 +23,7 @@ from urllib.parse import quote
 import httpx
 from bs4 import BeautifulSoup
 from fastmcp import FastMCP
+from stack_shared.llm_model import resolve_model
 
 log = logging.getLogger(__name__)
 
@@ -30,7 +31,6 @@ log = logging.getLogger(__name__)
 
 SAUCENAO_API_KEY = os.environ.get("SAUCENAO_API_KEY", "")
 LLM_BASE_URL = os.environ.get("LLM_BASE_URL", "").rstrip("/")
-VLM_MODEL = os.environ.get("VLM_MODEL", "qwen3.6-35B-A3B-FP8")
 SEARXNG_URL = os.environ.get("SEARXNG_URL", "http://searxng:8080")
 
 _MIME = {
@@ -218,11 +218,13 @@ In 2-3 sentences, answer: what is in this image and who/what was identified?
 
 
 def _vlm(messages: list[dict], max_tokens: int = 1024) -> str:
+    model = resolve_model(base_url=LLM_BASE_URL, use_cache=False)
+    log.info("Image analysis using loaded model: %s", model)
     with httpx.Client(timeout=90) as client:
         resp = client.post(
             f"{LLM_BASE_URL}/chat/completions",
             json={
-                "model": VLM_MODEL,
+                "model": model,
                 "messages": messages,
                 "max_tokens": max_tokens,
                 "temperature": 0.2,
