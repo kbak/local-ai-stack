@@ -20,8 +20,9 @@ workers can run together.
 Copy missing examples without overwriting existing files:
 
 ```bash
-for example in .env.example *.env.example; do
-    target="${example%.example}"
+for example in .env.example examples/env/*.env.example; do
+    target="${example##*/}"
+    target="${target%.example}"
     [ -e "$target" ] || cp "$example" "$target"
 done
 ```
@@ -39,7 +40,7 @@ some services are selected. Populate the settings for the services you use:
   in `rss-watcher.env` for the optional weekly digest. Defaults are UTC.
 - Configure Signal using [the Signal guide](signal.md); watchers use its account
   and recipient. Configure other integrations using their matching examples.
-- Copy `rss-watcher/blog-sources.example.json` to `rss-watcher/blog-sources.json`
+- Copy `services/rss-watcher/blog-sources.example.json` to `services/rss-watcher/blog-sources.json`
   before starting the RSS service, and replace the example subscriptions.
 
 Generate a secret with `openssl rand -hex 32`. Use different values for unrelated
@@ -64,7 +65,7 @@ remote AI host. Set memory's allowed hosts and origins to match its proxy URL.
 
 Native inference binds to loopback. The [private relays](public-openai-api.md#local-services)
 bridge IPv4 and Docker clients to llama-swap's IPv6 listener. Configure the
-`AI_BRIDGE_ADDRESS` to match your network's gateway. HTTPS proxy templates are under `caddy/`;
+`AI_BRIDGE_ADDRESS` to match your network's gateway. HTTPS proxy templates are under `config/caddy/`;
 set `STACK_DOMAIN`, `ACME_EMAIL`, and the DNS provider token before installing.
 
 ## Validate and start

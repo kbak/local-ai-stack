@@ -6,8 +6,8 @@ operational records belong to an installation.
 
 ## Local files
 
-Copy `.env.example` and the required `*.env.example` files to their ignored
-runtime names. Startup scripts read `.env`; Compose also loads service-specific
+Copy `.env.example` and the required `examples/env/*.env.example` files to their ignored
+runtime names at the repository root. Startup scripts read `.env`; Compose also loads service-specific
 environment files. Keep values containing spaces quoted for shell compatibility.
 
 | Setting | Purpose |
@@ -59,7 +59,7 @@ can be reproduced. Review resolved configuration before restarting services.
 
 ## Host service templates
 
-`systemd/*.service` files contain `@STACK_ROOT@` placeholders. Render them for the
+`config/systemd/*.service` files contain `@STACK_ROOT@` placeholders. Render them for the
 installation path before linking or copying them into systemd:
 
 ```bash
@@ -77,6 +77,25 @@ such as `/opt/local-ai-stack`, and use `--root /opt/local-ai-stack` when renderi
 for that location.
 
 ## Existing installations
+
+Service source lives under `services/`; shared configuration and host templates
+live under `config/`. Keep `.env` and service `*.env` files at the repository
+root. Git does not relocate ignored files when pulling a directory move: move
+existing receipt `accounts.yaml`, `vendors.yaml`, and `secrets/`, RSS
+`blog-sources.json`, and yt-dlp `youtube_cookies.txt` into their corresponding
+`services/<name>/` directories before recreating those services. Preserve their
+permissions and do not overwrite an existing destination.
+
+Recreate native Python virtual environments at their new service paths and
+update installed service units before restarting them. A temporary, ignored
+`yt-dlp-service` symlink to `services/yt-dlp-service` can preserve an existing
+native installation while it is migrated. Re-render gateway units with
+`scripts/render-systemd.py`. Start llama-swap from the repository root with
+`--config config/llama-swap.yaml`; `start-ai.sh` supplies this path.
+
+Recreate containers whose configuration bind paths changed using the existing
+image tag and `--no-build --pull never`. Their volume names and container paths
+are unchanged.
 
 Before adopting generic defaults, set the installation's actual endpoints,
 agent name, timezones, audio GPU name check, greeting, and memory allowlist

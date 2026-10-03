@@ -18,7 +18,7 @@ services:
     pull_policy: never
     build:
       context: .
-      dockerfile: memory-mcp/Dockerfile
+      dockerfile: services/memory-mcp/Dockerfile
     container_name: memory-mcp
     restart: unless-stopped
     ports:
@@ -43,7 +43,7 @@ services:
     pull_policy: never
     build:
       context: .
-      dockerfile: audio-api/Dockerfile
+      dockerfile: services/audio-api/Dockerfile
     container_name: audio-api
     restart: unless-stopped
     ports:

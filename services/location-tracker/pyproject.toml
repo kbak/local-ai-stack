@@ -1,0 +1,22 @@
+[project]
+name = "location-tracker"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "stack-shared",
+    "fastmcp>=2.3.4",
+    "openai>=1.30.0",
+    "starlette>=0.41.0",
+    "uvicorn>=0.30.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv.sources]
+stack-shared = { path = "../../shared", editable = true }
+
+# Preserve deployed API major versions when refreshing the lockfile.
+[tool.uv]
+constraint-dependencies = ["openai<3", "mcp<2", "fastmcp<4", "apscheduler<4", "caldav<4", "icalendar<8"]

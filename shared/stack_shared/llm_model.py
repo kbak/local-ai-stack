@@ -8,7 +8,7 @@ one would make llama-swap change the active model.
 
 All stack services should call `resolve_model()` instead of reading
 `LLM_MODEL` directly. That way adding/renaming/removing a model in
-`llama-swap.yaml` doesn't break every caller.
+`config/llama-swap.yaml` doesn't break every caller.
 """
 
 from __future__ import annotations

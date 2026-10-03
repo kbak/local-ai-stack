@@ -7,15 +7,16 @@ Recipients and integration credentials are local configuration.
 | Service | Purpose | Configuration |
 | --- | --- | --- |
 | calendar-watcher | Meal/travel enrichment and Signal reminders | `.env`, `signal-bot.env` |
-| location-tracker | Calendar-derived city timeline | [.env.example](../.env.example), [service guide](../location-tracker/README.md) |
+| location-tracker | Calendar-derived city timeline | [.env.example](../.env.example), [service guide](../services/location-tracker/README.md) |
 | tg-watcher | Daily Telegram group summary | `tg-watcher.env`, `signal-bot.env` |
 | rss-watcher | Twice-daily news and optional weekly blogs | `rss-watcher.env`, `signal-bot.env` |
 | oss-watcher | GitHub/Discord project summary | `oss-watcher.env`, `signal-bot.env` |
-| receipt-watcher | Email receipts to Sheets | [service guide](../receipt-watcher/README.md) |
-| travel-watcher | Travel emails to calendar events | [service guide](../travel-watcher/README.md) |
+| receipt-watcher | Email receipts to Sheets | [service guide](../services/receipt-watcher/README.md) |
+| travel-watcher | Travel emails to calendar events | [service guide](../services/travel-watcher/README.md) |
 | plc-watcher | Historical-region weather briefing | `plc-watcher.env`, `signal-bot.env` |
 
-Copy each required `*.env.example` to its runtime name. Start the chosen service
+Copy each required `examples/env/*.env.example` to its runtime name at the
+repository root. Start the chosen service
 with its dependencies:
 
 ```bash
@@ -49,8 +50,8 @@ user account; it does not add a bot to the group.
 12:05 UTC and cover the preceding 12 hours. Each category is summarized
 independently. Set the sources and optional voice delivery in `rss-watcher.env`.
 
-For the weekly digest, copy `rss-watcher/blog-sources.example.json` to the ignored
-`rss-watcher/blog-sources.json`, replace its examples, and set `BLOG_SOURCES_FILE`.
+For the weekly digest, copy `services/rss-watcher/blog-sources.example.json` to the ignored
+`services/rss-watcher/blog-sources.json`, replace its examples, and set `BLOG_SOURCES_FILE`.
 The digest runs Tuesday at 10:00 in `BLOG_TIMEZONE` (UTC by default).
 
 The blog job accepts feeds and dated HTML articles. It filters to the preceding

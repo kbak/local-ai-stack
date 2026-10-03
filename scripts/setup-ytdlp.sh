@@ -6,7 +6,7 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SVC_DIR="$REPO_ROOT/yt-dlp-service"
+SVC_DIR="$REPO_ROOT/services/yt-dlp-service"
 USER_NAME="$(id -un)"
 
 echo "[1] system deps: ffmpeg, nodejs, python venv"
@@ -23,7 +23,7 @@ if [[ -f "$SVC_DIR/youtube_cookies.txt" ]]; then
   echo "    found youtube_cookies.txt"
 else
   echo "    !! NO youtube_cookies.txt — copy it from Windows or YouTube auth will fail:"
-  echo "       scp <win>:~/local-ai-stack/yt-dlp-service/youtube_cookies.txt $SVC_DIR/"
+  echo "       scp <win>:~/local-ai-stack/services/yt-dlp-service/youtube_cookies.txt $SVC_DIR/"
 fi
 
 echo "[4] systemd unit -> /etc/systemd/system/yt-dlp-service.service"

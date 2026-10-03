@@ -30,7 +30,7 @@ EnvironmentFile=/etc/caddy/caddy.env
 EOF
 
 echo "[3] install Caddyfile"
-install -m 0644 "$REPO_ROOT/caddy/Caddyfile.server" /etc/caddy/Caddyfile
+install -m 0644 "$REPO_ROOT/config/caddy/Caddyfile.server" /etc/caddy/Caddyfile
 
 echo "[4] check ports 80/443 are free"
 ss -tlnp 2>/dev/null | grep -E ':80 |:443 ' && echo "  WARNING: something already on 80/443 (above)" || echo "  80/443 free"

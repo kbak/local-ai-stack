@@ -13,28 +13,28 @@ signal-bot.env
 
 tg-watcher.env
 rss-watcher.env
-rss-watcher/blog-sources.json
+services/rss-watcher/blog-sources.json
 oss-watcher.env
 audio-api.env
 receipt-watcher.env
 travel-watcher.env
 
 # YouTube cookies — contains session tokens, never commit
-yt-dlp-service/youtube_cookies.txt
+services/yt-dlp-service/youtube_cookies.txt
 
 # Google service account keys and OAuth tokens — never commit
-receipt-watcher/secrets/*.json
+services/receipt-watcher/secrets/*.json
 plc-watcher.env
 
 # Local virtual environments
-public-api-gateway/.venv/
+services/public-api-gateway/.venv/
 
 # Checksum-verified local runtime binaries
 /bin/
 
 # Local dependency-update backups and logs
 .maintenance/
-yt-dlp-service/.venv/
+services/yt-dlp-service/.venv/
 
 # Installation-specific files and generated artifacts
 .local/
@@ -56,3 +56,7 @@ yt-dlp-service/.venv/
 .agents/
 *.session
 *.session-journal
+
+# Optional editor settings and legacy native-service compatibility link
+.continue/
+/yt-dlp-service

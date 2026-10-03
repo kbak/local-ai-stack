@@ -10,13 +10,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends ${SYSTEM_PACKAG
 
 # Each service retains its own dependency lock and installed environment.
 COPY shared/pyproject.toml /shared/pyproject.toml
-COPY ${SERVICE}/pyproject.toml ${SERVICE}/uv.lock ./
+COPY services/${SERVICE}/pyproject.toml services/${SERVICE}/uv.lock ./
 RUN uv export --frozen --no-dev --no-emit-project -o /tmp/requirements.txt && \
     grep -v '^-e ' /tmp/requirements.txt > /tmp/requirements-filtered.txt && \
     pip install --no-cache-dir -r /tmp/requirements-filtered.txt
 COPY shared/ /shared/
 RUN pip install --no-cache-dir --no-deps /shared/
-COPY ${SERVICE}/${MODULE}/ /app/${MODULE}/
+COPY services/${SERVICE}/${MODULE}/ /app/${MODULE}/
 RUN mkdir -p /data /travel-attachments
 
 ARG STACK_REVISION=dev
@@ -25,4 +25,4 @@ LABEL org.opencontainers.image.revision=$STACK_REVISION
 CMD ["python"]
 
 FROM watcher AS telegram
-COPY tg-watcher/auth.py /app/auth.py
+COPY services/tg-watcher/auth.py /app/auth.py

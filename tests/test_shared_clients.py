@@ -12,7 +12,7 @@ from unittest.mock import Mock, patch
 import httpx
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path[:0] = [str(ROOT / 'shared'), str(ROOT / 'signal-bot-custom-skills')]
+sys.path[:0] = [str(ROOT / 'shared'), str(ROOT / 'services/signal-bot/skills')]
 
 from stack_shared import llm_chat, mcp_client
 from _shared import llm as bot_llm
@@ -29,7 +29,7 @@ SKILLS = {
 
 
 def load_skill(name):
-    path = ROOT / 'signal-bot-custom-skills' / f'{name}.py'
+    path = ROOT / 'services/signal-bot/skills' / f'{name}.py'
     spec = importlib.util.spec_from_file_location(f'test_skills.{name.replace("/", ".")}', path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -47,7 +47,7 @@ import sys
 root = Path(sys.argv[1])
 sys.path.insert(0, str(root / 'shared'))
 for name in sys.argv[2:]:
-    path = root / 'signal-bot-custom-skills' / (name + '.py')
+    path = root / 'services/signal-bot/skills' / (name + '.py')
     spec = importlib.util.spec_from_file_location('custom_skills.' + name.replace('/', '.'), path)
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module

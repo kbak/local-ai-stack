@@ -17,7 +17,7 @@ supplied profile runs several models and needs substantial GPU memory.
 | --- | --- |
 | [docker-compose.server.yml](docker-compose.server.yml) | LibreChat, Signal, tools, watchers, and Nextcloud |
 | [docker-compose.ai.yml](docker-compose.ai.yml) | Speech, memory, and vector storage |
-| [llama-swap.yaml](llama-swap.yaml) | Chat, autocomplete, images, and reranking |
+| [llama-swap.yaml](config/llama-swap.yaml) | Chat, autocomplete, images, and reranking |
 | [.env.example](.env.example) | Endpoints, host paths, and integration settings |
 
 Most service ports are intended for a trusted network. Public chat access uses a
@@ -28,7 +28,7 @@ separate [authenticated gateway](docs/public-openai-api.md).
 - [Architecture and service map](docs/architecture.md)
 - [Deployment configuration](docs/deployment.md)
 - [Models and GPU allocation](docs/models.md)
-- [Search, MCP tools, and editor integration](docs/tools.md)
+- [Search and MCP tools](docs/tools.md)
 - [Browser agent](docs/browser-agent.md)
 - [Audio and voice chat](docs/audio.md)
 - [Image generation and editing](docs/qwen-image-2.1.md)
@@ -36,7 +36,7 @@ separate [authenticated gateway](docs/public-openai-api.md).
 - [Scheduled watchers](docs/watchers.md)
 - [Operations and backups](docs/operations.md)
 
-The [knowledge-base template](llm-kb-template/GUIDE.md) is a standalone companion
+The [knowledge-base template](examples/knowledge-base/GUIDE.md) is a standalone companion
 for organizing source documents and generated notes.
 
 ## Contributing and license

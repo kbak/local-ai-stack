@@ -23,7 +23,7 @@ def main() -> None:
     parser.add_argument("--output", type=Path, default=ROOT / ".local/systemd")
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
-    for template in sorted((ROOT / "systemd").glob("*.service")):
+    for template in sorted((ROOT / "config/systemd").glob("*.service")):
         target = args.output / template.name
         target.write_text(render(template.read_text(), args.root))
         print(target)

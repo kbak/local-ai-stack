@@ -1,6 +1,6 @@
 # Model serving
 
-`llama-swap.yaml` defines the available models and their lifecycle groups.
+`config/llama-swap.yaml` defines the available models and their lifecycle groups.
 `scripts/serve-*.sh` launchers contain runtime arguments. Clients use the stable model
 IDs below; weights and runtime caches live outside the repository.
 

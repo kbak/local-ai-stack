@@ -32,9 +32,9 @@ Initialize local secrets and install the pinned gateway dependencies:
 
 ```bash
 ./scripts/init-public-api-secrets.sh
-cd public-api-gateway
+cd services/public-api-gateway
 UV_CACHE_DIR=/tmp/public-api-uv-cache uv sync --frozen --no-dev
-cd ..
+cd ../..
 ```
 
 Install the checksum-pinned `cloudflared` binary beside the stack:

@@ -27,7 +27,7 @@ class AudioDeviceTests(unittest.TestCase):
         package.config = SimpleNamespace(EXPECTED_AUDIO_GPU=expected)
         cuda = SimpleNamespace(device_count=lambda: count, get_device_name=lambda _: actual)
         with patch.dict(sys.modules, {"app": package, "torch": SimpleNamespace(cuda=cuda)}):
-            module = load("app.inference", "audio-api/app/inference.py")
+            module = load("app.inference", "services/audio-api/app/inference.py")
             with patch.dict(os.environ, {"CUDA_VISIBLE_DEVICES": selection}):
                 module.validate_audio_gpu()
 
@@ -53,13 +53,13 @@ class MemoryConfigurationTests(unittest.TestCase):
             "MEMORY_ALLOWED_HOSTS": " memory.example.com, memory.internal:8089, ",
             "MEMORY_ALLOWED_ORIGINS": " https://memory.example.com, ",
         }):
-            config = load("memory_config", "memory-mcp/app/config.py")
+            config = load("memory_config", "services/memory-mcp/app/config.py")
         self.assertEqual(config.ALLOWED_HOSTS, ["memory.example.com", "memory.internal:8089"])
         self.assertEqual(config.ALLOWED_ORIGINS, ["https://memory.example.com"])
 
     def test_defaults_do_not_allow_arbitrary_hosts(self):
         with patch.dict(os.environ, {}, clear=True):
-            config = load("memory_config", "memory-mcp/app/config.py")
+            config = load("memory_config", "services/memory-mcp/app/config.py")
         self.assertIn("localhost:*", config.ALLOWED_HOSTS)
         self.assertNotIn("*", config.ALLOWED_HOSTS)
         self.assertNotIn("*", config.ALLOWED_ORIGINS)
@@ -69,7 +69,7 @@ class SystemdTemplateTests(unittest.TestCase):
     def test_all_templates_render_for_a_custom_checkout(self):
         renderer = load("render_systemd", "scripts/render-systemd.py")
         root = Path('/opt/AI Stack/100% ready')
-        for template in (ROOT / "systemd").glob("*.service"):
+        for template in (ROOT / "config/systemd").glob("*.service"):
             with self.subTest(template=template.name):
                 rendered = renderer.render(template.read_text(), root)
                 self.assertNotIn("@STACK_ROOT@", rendered)

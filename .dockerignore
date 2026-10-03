@@ -4,9 +4,9 @@
 **/__pycache__
 .env
 **/*.env
-rss-watcher/blog-sources.json
-receipt-watcher/secrets
-yt-dlp-service/youtube_cookies.txt
+services/rss-watcher/blog-sources.json
+services/receipt-watcher/secrets
+services/yt-dlp-service/youtube_cookies.txt
 .local
 .deployment
 .env.*
@@ -17,7 +17,10 @@ yt-dlp-service/youtube_cookies.txt
 models
 runtimes
 **/*.log
-receipt-watcher/accounts.yaml
-receipt-watcher/vendors.yaml
+services/receipt-watcher/accounts.yaml
+services/receipt-watcher/vendors.yaml
 **/*.session
 **/*.session-journal
+
+.continue
+yt-dlp-service

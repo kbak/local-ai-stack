@@ -19,7 +19,7 @@ services:
     env_file:
       - .env
     volumes:
-      - ./searxng-settings.yml:/etc/searxng/settings.template.yml:ro
+      - ./config/searxng-settings.yml:/etc/searxng/settings.template.yml:ro
     entrypoint: ["/usr/local/bin/local-searxng-entrypoint.sh"]
     networks:
       - server-net
@@ -28,7 +28,7 @@ services:
   mcp-proxy:
     image: ${STACK_IMAGE_PREFIX:-local-ai-stack}/mcp-proxy:${STACK_VERSION:-dev}
     pull_policy: never
-    build: ./mcp-proxy
+    build: ./services/mcp-proxy
     container_name: mcp-proxy
     restart: unless-stopped
     ports:
@@ -36,7 +36,7 @@ services:
     env_file:
       - .env
     volumes:
-      - ./mcp-proxy-config.json:/config.json
+      - ./config/mcp-proxy-config.json:/config.json
       - mcp-proxy-uv-cache:/root/.cache/uv
     environment:
       MCP_PROXY_AUTH_TOKEN: ""
@@ -56,7 +56,7 @@ services:
     pull_policy: never
     build:
       context: .
-      dockerfile: voice-agent/Dockerfile
+      dockerfile: services/voice-agent/Dockerfile
       args:
         STACK_REVISION: ${STACK_VERSION:-dev}
     container_name: voice-agent
@@ -80,7 +80,7 @@ services:
     pull_policy: never
     build:
       context: .
-      dockerfile: browser-agent-api/Dockerfile
+      dockerfile: services/browser-agent-api/Dockerfile
     container_name: browser-agent-api
     restart: unless-stopped
     ports:
@@ -143,7 +143,7 @@ services:
     pull_policy: never
     build:
       context: .
-      dockerfile: public-egress/Dockerfile
+      dockerfile: services/public-egress/Dockerfile
     restart: unless-stopped
     ports:
       - "127.0.0.1:3090:3000"
@@ -205,7 +205,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
-      - ./librechat.yaml:/app/librechat.yaml.template:ro
+      - ./config/librechat.yaml:/app/librechat.yaml.template:ro
       - librechat-data:/app/client/public/images
       - librechat-uploads:/app/uploads
       - ${MEMORY_DIR:?MEMORY_DIR must be set in .env}:/memory:ro
@@ -253,7 +253,7 @@ services:
     pull_policy: never
     build:
       context: .
-      dockerfile: signal-bot.Dockerfile
+      dockerfile: services/signal-bot/Dockerfile
       args:
         STACK_REVISION: ${STACK_VERSION:-dev}
     container_name: signal-bot
@@ -324,7 +324,7 @@ services:
     pull_policy: never
     build:
       context: .
-      dockerfile: pdf-inspector/Dockerfile
+      dockerfile: services/pdf-inspector/Dockerfile
     container_name: pdf-inspector
     restart: unless-stopped
     ports:
@@ -403,9 +403,9 @@ services:
       - "host.docker.internal:host-gateway"
     volumes:
       - receipt-watcher-data:/data
-      - ./receipt-watcher/accounts.yaml:/app/accounts.yaml:ro
-      - ./receipt-watcher/vendors.yaml:/app/vendors.yaml:ro
-      - ./receipt-watcher/secrets:/app/secrets:ro
+      - ./services/receipt-watcher/accounts.yaml:/app/accounts.yaml:ro
+      - ./services/receipt-watcher/vendors.yaml:/app/vendors.yaml:ro
+      - ./services/receipt-watcher/secrets:/app/secrets:ro
     depends_on:
       - signal-api
     networks:
@@ -531,7 +531,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
-      - ./rss-watcher/blog-sources.json:/app/blog-sources.json:ro
+      - ./services/rss-watcher/blog-sources.json:/app/blog-sources.json:ro
     depends_on:
       - signal-api
     networks:
@@ -647,7 +647,7 @@ services:
     pull_policy: never
     build:
       context: .
-      dockerfile: reverse-image-search/Dockerfile
+      dockerfile: services/reverse-image-search/Dockerfile
     container_name: reverse-image-search
     restart: unless-stopped
     ports:

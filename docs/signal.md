@@ -1,12 +1,12 @@
 # Signal bot
 
 The bot routes Signal messages to local models, MCP tools, and custom skills.
-`signal-bot.Dockerfile` builds a pinned uoltz fork with the integration patches
+`services/signal-bot/Dockerfile` builds a pinned uoltz fork with the integration patches
 in this repository. Speech uses audio-api; media downloads use yt-dlp-service.
 
 ## Setup
 
-Copy `signal-bot.env.example` to `signal-bot.env`. Configure `SIGNAL_NUMBER`,
+Copy `examples/env/signal-bot.env.example` to `signal-bot.env`. Configure `SIGNAL_NUMBER`,
 `BRIEFING_RECIPIENT`, and any integration credentials. Set `ALLOWED_NUMBERS` to
 restrict senders; an unset list allows anyone who messages the account.
 
@@ -29,7 +29,7 @@ presentation settings are listed in [deployment configuration](deployment.md).
 
 ## Skills
 
-Custom skills live in `signal-bot-custom-skills/`. Each directory provides a
+Custom skills live in `services/signal-bot/skills/`. Each directory provides a
 `skill.yaml` manifest and Python implementation, discovered at startup. Shared
 skill helpers live in `_shared/`. Images bundle skills outside the persistent
 bot data directory, at `/app/custom_skills`; browser voice uses `/app/skills`.

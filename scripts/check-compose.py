@@ -29,8 +29,8 @@ def main() -> None:
             target = checkout / name
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(source, target)
-        for example in checkout.glob("*.env.example"):
-            shutil.copyfile(example, example.with_suffix(""))
+        for example in (checkout / "examples/env").glob("*.env.example"):
+            shutil.copyfile(example, checkout / example.with_suffix("").name)
         shutil.copyfile(checkout / ".env.example", checkout / ".env")
         for host in ("server", "ai"):
             name = f"docker-compose.{host}.yml"
@@ -47,7 +47,7 @@ def main() -> None:
                     except ValueError:
                         continue  # Operator data directories are runtime inputs.
                     if (source.suffix in {".py", ".js", ".sh"}
-                            or relative in {"shared", "signal-bot-custom-skills", "voice-agent/static", "nextcloud/hooks"}):
+                            or relative in {"shared", "services/signal-bot/skills", "services/voice-agent/static", "nextcloud/hooks"}):
                         raise ValueError(f"{name}: production mounts executable source {relative}")
             dev = json.loads(subprocess.check_output(
                 [*command, "-f", f"docker-compose.{host}.dev.yml", "config", "--format", "json"],

@@ -10,7 +10,7 @@ launchers. Other operational helpers live in `scripts/`:
 
 | Scripts | Purpose |
 | --- | --- |
-| `serve-*.sh` | Model workers invoked by `llama-swap.yaml` |
+| `serve-*.sh` | Model workers invoked by `config/llama-swap.yaml` |
 | `setup-*.sh`, `install-*.sh`, `render-systemd.py` | Host and runtime installation |
 | `init-public-api-secrets.sh`, `set-cloudflared-token.sh` | Local API credentials |
 | `dns-sync.sh`, `run-llama-swap-private-relays.sh` | Private network access |
@@ -21,7 +21,7 @@ launchers. Other operational helpers live in `scripts/`:
 Container startup adapters live beside their Dockerfiles in `docker/`.
 Model launchers resolve runtime and model paths relative to the checkout;
 run llama-swap from the repository root. After updating launcher paths in
-`llama-swap.yaml`, restart the router before requesting another model worker.
+`config/llama-swap.yaml`, restart the router before requesting another model worker.
 
 ## Inspect services
 

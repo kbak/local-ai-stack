@@ -5,63 +5,63 @@ services:
       PYTHONPATH: /shared:/app
     volumes:
       - ./shared:/shared:ro
-      - ./signal-bot-custom-skills:/app/custom_skills:ro
+      - ./services/signal-bot/skills:/app/custom_skills:ro
   voice-agent:
     environment:
       PYTHONPATH: /shared:/app
     volumes:
       - ./shared:/shared:ro
-      - ./signal-bot-custom-skills:/app/skills:ro
-      - ./voice-agent/app:/app/app:ro
-      - ./voice-agent/static:/app/static:ro
+      - ./services/signal-bot/skills:/app/skills:ro
+      - ./services/voice-agent/app:/app/app:ro
+      - ./services/voice-agent/static:/app/static:ro
   calendar-watcher:
     environment:
       PYTHONPATH: /shared:/app
     volumes:
       - ./shared:/shared:ro
-      - ./calendar-watcher/calendar_watcher:/app/calendar_watcher:ro
+      - ./services/calendar-watcher/calendar_watcher:/app/calendar_watcher:ro
   receipt-watcher:
     environment:
       PYTHONPATH: /shared:/app
     volumes:
       - ./shared:/shared:ro
-      - ./receipt-watcher/receipt_watcher:/app/receipt_watcher:ro
+      - ./services/receipt-watcher/receipt_watcher:/app/receipt_watcher:ro
   travel-watcher:
     environment:
       PYTHONPATH: /shared:/app
     volumes:
       - ./shared:/shared:ro
-      - ./travel-watcher/travel_watcher:/app/travel_watcher:ro
+      - ./services/travel-watcher/travel_watcher:/app/travel_watcher:ro
   tg-watcher:
     environment:
       PYTHONPATH: /shared:/app
     volumes:
       - ./shared:/shared:ro
-      - ./tg-watcher/tg_watcher:/app/tg_watcher:ro
+      - ./services/tg-watcher/tg_watcher:/app/tg_watcher:ro
   oss-watcher:
     environment:
       PYTHONPATH: /shared:/app
     volumes:
       - ./shared:/shared:ro
-      - ./oss-watcher/oss_watcher:/app/oss_watcher:ro
+      - ./services/oss-watcher/oss_watcher:/app/oss_watcher:ro
   rss-watcher:
     environment:
       PYTHONPATH: /shared:/app
     volumes:
       - ./shared:/shared:ro
-      - ./rss-watcher/rss_watcher:/app/rss_watcher:ro
+      - ./services/rss-watcher/rss_watcher:/app/rss_watcher:ro
   plc-watcher:
     environment:
       PYTHONPATH: /shared:/app
     volumes:
       - ./shared:/shared:ro
-      - ./plc-watcher/plc_watcher:/app/plc_watcher:ro
+      - ./services/plc-watcher/plc_watcher:/app/plc_watcher:ro
   location-tracker:
     environment:
       PYTHONPATH: /shared:/app
     volumes:
       - ./shared:/shared:ro
-      - ./location-tracker/location_tracker:/app/location_tracker:ro
+      - ./services/location-tracker/location_tracker:/app/location_tracker:ro
   librechat:
     volumes:
       - ./docker/librechat/render.js:/app/librechat-render.js:ro

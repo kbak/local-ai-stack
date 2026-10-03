@@ -9,5 +9,5 @@ set -a
 source "$REPO_ROOT/public-api.env"
 set +a
 
-exec "$REPO_ROOT/public-api-gateway/.venv/bin/python" \
-  "$REPO_ROOT/public-api-gateway/validate.py"
+exec "$REPO_ROOT/services/public-api-gateway/.venv/bin/python" \
+  "$REPO_ROOT/services/public-api-gateway/validate.py"

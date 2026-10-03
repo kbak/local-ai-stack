@@ -6,13 +6,13 @@ remain loaded and inference is serialized to bound GPU workspace use.
 
 ## Configure audio
 
-Copy `audio-api.env.example` to `audio-api.env`. Select exactly one device using
+Copy `examples/env/audio-api.env.example` to `audio-api.env`. Select exactly one device using
 `SECONDARY_GPU` in `.env`. Optionally set `EXPECTED_AUDIO_GPU` to the device name
 reported by PyTorch to detect an incorrect assignment.
 
 `DEFAULT_VOICE`, `DEFAULT_LANG`, and `DEFAULT_SPEED` control requests that omit
 those fields. Signal also reads `TTS_VOICE` from `signal-bot.env`, and LibreChat
-has a UI voice default in `librechat.yaml`. Recreate audio-api after changing its
+has a UI voice default in `config/librechat.yaml`. Recreate audio-api after changing its
 environment:
 
 ```bash
@@ -59,7 +59,7 @@ Use a free port on your host and open the resulting URL on your client device.
 
 ## Evaluation
 
-`audio-api/evaluation/` contains manual listening and transcription checks.
+`services/audio-api/evaluation/` contains manual listening and transcription checks.
 Run candidates sequentially on an explicitly selected GPU UUID. Set
 `EVAL_EN_VOICE` and `EVAL_PL_VOICE` to reference filenames available on that host.
 Generated clips and reports belong outside the repository.
