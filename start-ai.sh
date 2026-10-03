@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Bootstrap AI-side services on this machine.
-# - native llama-swap (port 8080) and yt-dlp-service (port 8200)
+# - native llama-swap (port 8080)
 # - docker-compose.ai.yml (audio-api)
 # Waits for all audio models to finish warming before exiting.
 set -e
@@ -61,8 +61,7 @@ else
     done
 fi
 
-# yt-dlp-service now runs on the Linux server box as a systemd service
-# (scripts/setup-ytdlp.sh), co-located with signal-bot — no longer launched here.
+# yt-dlp-service is managed separately by scripts/setup-ytdlp.sh on the server host.
 
 echo "Waiting for dockerd socket..."
 for i in $(seq 1 60); do docker info >/dev/null 2>&1 && break; sleep 1; done

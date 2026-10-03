@@ -178,7 +178,7 @@ async def run_image(prompt: str, size: str, image_id: str | None = None) -> str:
     except httpx.HTTPError:
         log.warning("Image progress notification failed")
 
-    base = os.getenv("SIGNAL_IMAGE_BASE_URL", os.getenv("LLM_BASE_URL", "https://llama.kacper.me/v1")).rstrip("/")
+    base = os.getenv("SIGNAL_IMAGE_BASE_URL", os.getenv("LLM_BASE_URL", "http://host.docker.internal:8080/v1")).rstrip("/")
     key = os.getenv("SIGNAL_IMAGE_API_KEY", os.getenv("LLM_API_KEY", "vllm"))
     fields = {"model": "qwen-image-2.1", "prompt": prompt, "size": size}
     try:

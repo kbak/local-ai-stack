@@ -18,10 +18,10 @@ socat \
   'TCP6:[::1]:8080' &
 children+=("$!")
 
-# Preserve memory-mcp's existing host.docker.internal:172.18.0.1 route without
+# Preserve memory-mcp's configured host.docker.internal route without
 # exposing port 8080 on the WSL LAN-facing eth0 interface.
 socat \
-  TCP4-LISTEN:8080,bind=172.18.0.1,reuseaddr,fork \
+  "TCP4-LISTEN:8080,bind=${AI_BRIDGE_ADDRESS:-172.18.0.1},reuseaddr,fork" \
   'TCP6:[::1]:8080' &
 children+=("$!")
 

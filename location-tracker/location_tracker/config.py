@@ -13,7 +13,7 @@ CALENDAR_NAMES: list[str] = (
 )
 
 HOME_CITY: str = os.environ.get("HOME_CITY", "").strip()
-LOCAL_TIMEZONE: str = os.environ.get("LOCAL_TIMEZONE", "America/Phoenix")
+LOCAL_TIMEZONE: str = os.environ.get("LOCAL_TIMEZONE", "UTC")
 
 POLL_INTERVAL_MINUTES: int = int(os.environ.get("POLL_INTERVAL_MINUTES", "5"))
 LOOKBACK_DAYS: int = int(os.environ.get("LOOKBACK_DAYS", "30"))

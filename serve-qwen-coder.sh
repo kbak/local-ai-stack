@@ -2,9 +2,9 @@
 # Launcher for vLLM (Qwen2.5-Coder-1.5B-Instruct, FP16), called by llama-swap.
 # Used as the FIM/autocomplete backend for VS Code tab-complete.
 #
-# Pinned to the secondary GPU (5060 Ti) so it doesn't contend with the main
+# Pinned to the secondary GPU so it doesn't contend with the main
 # chat model on the primary GPU. ~3 GB weights + KV cache headroom; util
-# fraction kept low because the 5060 Ti also hosts audio-api workloads.
+# fraction kept low because that GPU also hosts audio-api workloads.
 #
 # Always-loaded (cuda1 group has persistent: true), so cold start cost is
 # paid once on stack startup and never during editor use.

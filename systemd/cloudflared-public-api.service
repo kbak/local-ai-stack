@@ -6,8 +6,8 @@ Requires=public-api-gateway.service
 
 [Service]
 Type=simple
-EnvironmentFile=/mnt/wsl/workspace/local-ai-stack/cloudflared.env
-ExecStart=/mnt/wsl/workspace/local-ai-stack/bin/cloudflared tunnel --no-autoupdate run
+EnvironmentFile="@STACK_ROOT@/cloudflared.env"
+ExecStart="@STACK_ROOT@/bin/cloudflared" tunnel --no-autoupdate run
 Restart=on-failure
 RestartSec=5
 NoNewPrivileges=true

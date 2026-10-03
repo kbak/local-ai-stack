@@ -7,13 +7,16 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 set -a; source "$REPO_ROOT/.env"; set +a
 
-ACME_EMAIL="${1:-${ACME_EMAIL:-spam@kacper.me}}"
+ACME_EMAIL="${1:-${ACME_EMAIL:-}}"
+: "${ACME_EMAIL:?Set ACME_EMAIL in .env or pass it as the first argument}"
+: "${STACK_DOMAIN:?STACK_DOMAIN must be set in .env}"
 : "${CLOUDFLARE_API_TOKEN:?CLOUDFLARE_API_TOKEN must be set in .env}"
 
 echo "[1] env file -> /etc/caddy/caddy.env (ACME_EMAIL=$ACME_EMAIL)"
 install -d -m 0755 /etc/caddy
 umask 077
 cat > /etc/caddy/caddy.env <<EOF
+STACK_DOMAIN=$STACK_DOMAIN
 ACME_EMAIL=$ACME_EMAIL
 CLOUDFLARE_API_TOKEN=$CLOUDFLARE_API_TOKEN
 EOF

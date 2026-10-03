@@ -25,9 +25,11 @@ services:
       MEMORY_LLM_BASE_URL: "http://host.docker.internal:8080/v1"
       MEMORY_QDRANT_HOST: qdrant
       MEMORY_QDRANT_PORT: "6333"
+      MEMORY_ALLOWED_HOSTS: "${MEMORY_ALLOWED_HOSTS:-localhost:*,127.0.0.1:*,memory-mcp:8089,host.docker.internal:8089}"
+      MEMORY_ALLOWED_ORIGINS: "${MEMORY_ALLOWED_ORIGINS:-http://localhost:8089,http://127.0.0.1:8089}"
       MEMORY_DEFAULT_USER_ID: ${MEMORY_DEFAULT_USER_ID:-default}
     extra_hosts:
-      - "host.docker.internal:172.18.0.1"
+      - "host.docker.internal:${AI_BRIDGE_ADDRESS:-172.18.0.1}"
     volumes:
       - ./shared:/shared:ro
     depends_on:
@@ -48,6 +50,7 @@ services:
       - ./audio-api.env
     environment:
       CUDA_VISIBLE_DEVICES: ${SECONDARY_GPU:?SECONDARY_GPU must select the audio GPU}
+      EXPECTED_AUDIO_GPU: "${EXPECTED_AUDIO_GPU:-}"
       HF_HOME: /app/hf-cache
       VOICE_SAMPLES_DIR: /app/voice-samples
     volumes:

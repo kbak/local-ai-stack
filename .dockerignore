@@ -7,3 +7,17 @@
 rss-watcher/blog-sources.json
 receipt-watcher/secrets
 yt-dlp-service/youtube_cookies.txt
+.local
+.deployment
+.env.*
+.claude
+.agents
+.codex
+.aws
+models
+runtimes
+**/*.log
+receipt-watcher/accounts.yaml
+receipt-watcher/vendors.yaml
+**/*.session
+**/*.session-journal

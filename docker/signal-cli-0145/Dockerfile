@@ -59,8 +59,8 @@ COPY call-bridge.py /usr/local/bin/signal-call-bridge
 COPY pulse-system.pa /etc/pulse/signal-call.pa
 COPY signal-call-bridge.conf /etc/supervisor/conf.d/signal-call-bridge.conf
 
-# Keep the proof-of-concept greeting local to the Lenovo. It remains available
-# when the GPU PC and audio-api are offline.
+# Generate the greeting locally so calls also work when audio-api is offline.
+ARG SIGNAL_CALL_GREETING="Signal calling works. Talk to you soon."
 RUN chmod 0755 /usr/local/bin/signal-call-tunnel /usr/local/bin/signal-call-bridge \
     && espeak-ng -w /usr/local/share/signal-call-greeting.wav \
-      "Hey Kacper. Signal calling works. Talk to you soon."
+      "${SIGNAL_CALL_GREETING}"

@@ -1,6 +1,6 @@
 #!/bin/bash
 # Launcher for vLLM reranker (bge-reranker-v2-m3), called by llama-swap.
-# Cross-encoder scoring via /v1/score on the secondary GPU (5060 Ti).
+# Cross-encoder scoring via /v1/score on the secondary GPU.
 # ~1.1 GB weights — persistent alongside audio-api; utilization kept low.
 set -e
 

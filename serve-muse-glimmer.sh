@@ -19,7 +19,7 @@ trap cleanup EXIT INT TERM
 # local vLLM launchers so model files survive container replacement.
 docker run --rm \
   --name "$CONTAINER_NAME" \
-  --gpus device=0 \
+  --gpus "device=${PRIMARY_GPU:-0}" \
   --ipc=host \
   --network=host \
   -e HF_HOME=/root/.cache/huggingface \

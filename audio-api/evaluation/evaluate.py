@@ -19,13 +19,13 @@ import soundfile as sf
 
 
 CASES = [
-    {"id": "en_short", "language": "en", "voice": "barack_obama", "text":
+    {"id": "en_short", "language": "en", "voice": os.getenv("EVAL_EN_VOICE", "speaker_en"), "text":
      "Good morning. Your appointment is tomorrow at half past nine. Please bring your identification and arrive ten minutes early."},
-    {"id": "en_expression", "language": "en", "voice": "barack_obama", "text":
+    {"id": "en_expression", "language": "en", "voice": os.getenv("EVAL_EN_VOICE", "speaker_en"), "text":
      "Wait, we actually did it? That is wonderful! I was worried we would miss the train, but now we have time for coffee. Let us take a moment and enjoy the view."},
-    {"id": "pl_short", "language": "pl", "voice": "potop", "text":
+    {"id": "pl_short", "language": "pl", "voice": os.getenv("EVAL_PL_VOICE", "speaker_pl"), "text":
      "Dzień dobry. Twoja wizyta jest jutro o dziewiątej trzydzieści. Zabierz dokument tożsamości i przyjdź dziesięć minut wcześniej."},
-    {"id": "pl_expression", "language": "pl", "voice": "potop", "text":
+    {"id": "pl_expression", "language": "pl", "voice": os.getenv("EVAL_PL_VOICE", "speaker_pl"), "text":
      "Naprawdę nam się udało? To wspaniale! Myślałem, że spóźnimy się na pociąg do Wrocławia, ale mamy jeszcze czas na kawę. Usiądźmy na chwilę i odpocznijmy."},
 ]
 
@@ -92,8 +92,8 @@ def main():
         import torch
         if not os.environ.get("CUDA_VISIBLE_DEVICES", "").startswith("GPU-"):
             raise RuntimeError("Evaluation requires an explicit GPU UUID")
-        if torch.cuda.device_count() != 1 or "5060 Ti" not in torch.cuda.get_device_name(0):
-            raise RuntimeError("Only the RTX 5060 Ti may be visible to audio evaluation")
+        if torch.cuda.device_count() != 1:
+            raise RuntimeError("Exactly one GPU must be visible to audio evaluation")
         report["gpu"] = torch.cuda.get_device_name(0)
         torch.cuda.reset_peak_memory_stats()
         started = time.perf_counter()

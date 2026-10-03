@@ -7,11 +7,11 @@ const { test } = require('node:test');
 
 const source = fs.readFileSync(path.join(__dirname, '..', 'librechat-render.js'), 'utf8');
 
-async function runRenderer({ doc, memory = '', enabled = 'true' }) {
+async function runRenderer({ doc, memory = '', enabled = 'true', env = {}, onLookup = () => {}, onRender = () => {} }) {
   const writes = [];
   const files = {
     '/memory/MEMORY.md': memory,
-    '/app/librechat.yaml.template': 'version: 1.3.6',
+    '/app/librechat.yaml.template': 'version: 1.3.6\nurl: ${MEMORY_MCP_URL}/mcp/mcp',
     '/app/api/server/controllers/agents/client.js': 'PDF_INSPECTOR_UPLOAD_BRIDGE',
     '/app/api/server/services/Files/process.js': 'PDF_INSPECTOR_CONTEXT_UPLOAD',
   };
@@ -22,7 +22,7 @@ async function runRenderer({ doc, memory = '', enabled = 'true' }) {
     db() {
       return {
         collection: () => ({
-          findOne: async () => doc,
+          findOne: async (query) => { onLookup(query); return doc; },
           updateOne: async (filter, update) => {
             writes.push(JSON.parse(JSON.stringify({ filter, update })));
           },
@@ -40,12 +40,31 @@ async function runRenderer({ doc, memory = '', enabled = 'true' }) {
         writeFileSync: (filename, contents) => { files[filename] = contents; },
       };
     },
-    process: { env: { LOCAL_IMAGE_TOOLS: enabled }, exit: finish },
+    process: { env: { LOCAL_IMAGE_TOOLS: enabled, ...env }, exit: finish },
     console: { log() {}, warn() {}, error: (...args) => { throw new Error(args.join(' ')); } },
   });
   await done;
+  onRender(files['/app/librechat.yaml']);
   return writes;
 }
+
+test('uses the configured agent and memory endpoint', async () => {
+  let selected, rendered;
+  await runRenderer({
+    doc: null,
+    env: { TIER1_AGENT_NAME: 'Custom Assistant', MEMORY_MCP_URL: 'https://memory.example.com' },
+    onLookup: (query) => { selected = query.name; },
+    onRender: (yaml) => { rendered = yaml; },
+  });
+  assert.equal(selected, 'Custom Assistant');
+  assert.ok(rendered.includes('url: https://memory.example.com/mcp/mcp'));
+});
+
+test('uses a neutral agent name by default', async () => {
+  let selected;
+  await runRenderer({ doc: null, onLookup: (query) => { selected = query.name; } });
+  assert.equal(selected, 'Assistant');
+});
 
 test('enables images even when memory instructions are already current', async () => {
   const writes = await runRenderer({

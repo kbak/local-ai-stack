@@ -28,7 +28,7 @@ def collect() -> list[dict]:
     sources = json.loads(Path(os.environ["BLOG_SOURCES_FILE"]).read_text())
     if not isinstance(sources, list) or not sources:
         raise ValueError("BLOG_SOURCES_FILE must contain a nonempty JSON array")
-    tz = ZoneInfo(os.environ.get("BLOG_TIMEZONE", "America/Phoenix"))
+    tz = ZoneInfo(os.environ.get("BLOG_TIMEZONE", "UTC"))
     now = datetime.now(timezone.utc)
     results = []
     for source in sources:

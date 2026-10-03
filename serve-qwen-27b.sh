@@ -16,7 +16,7 @@ source .venv/bin/activate
 # Keep large model files in the workspace, but leave HF_HOME at its default so
 # credentials written by `hf auth login` remain visible to vLLM.
 export HF_HUB_CACHE="$WORKSPACE/models/hf/hub"
-export CUDA_VISIBLE_DEVICES=0
+export CUDA_VISIBLE_DEVICES="${PRIMARY_GPU:-0}"
 export CUDA_DEVICE_ORDER=PCI_BUS_ID
 export TORCHINDUCTOR_COMPILE_THREADS=16
 # vLLM's unauthenticated EngineCore communication sockets must stay local.

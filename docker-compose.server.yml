@@ -1,13 +1,7 @@
 name: stack
 
-# Mini PC stack — lightweight always-on services.
-# LLM inference and audio models live on the AI PC (docker-compose.ai.yml);
-# this stack reaches them via stable Tailscale hostnames.
-#
-# Fallback: if the mini PC fails, run this file on the AI PC (WSL) alongside
-# docker-compose.ai.yml, then run `scripts/dns-failover.sh failover` to redirect
-# DNS. No config changes needed — the *.kacper.me hostnames resolve to the same
-# machine in both modes.
+# Application services. Configure cross-host endpoints in .env.
+# GPU inference, audio, and memory run in docker-compose.ai.yml.
 
 services:
   searxng:
@@ -59,8 +53,8 @@ services:
     ports:
       - "8087:8087"
     environment:
-      AUDIO_API_URL: "${AUDIO_API_URL:-https://audio.kacper.me}"
-      LLM_BASE_URL: "${LLM_BASE_URL:-https://llama.kacper.me/v1}"
+      AUDIO_API_URL: "${AUDIO_API_URL:-http://host.docker.internal:8088}"
+      LLM_BASE_URL: "${LLM_BASE_URL:-http://host.docker.internal:8080/v1}"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
@@ -85,7 +79,7 @@ services:
       # only after setting BROWSER_AGENT_API_TOKEN.
       - "127.0.0.1:8092:8092"
     environment:
-      LLM_BASE_URL: "${LLM_BASE_URL:-https://llama.kacper.me/v1}"
+      LLM_BASE_URL: "${LLM_BASE_URL:-http://host.docker.internal:8080/v1}"
       LLM_API_KEY: "${LLM_API_KEY:-vllm}"
       LLM_MODEL: "${BROWSER_AGENT_LLM_MODEL:-qwen3.8-27B-FP8}"
       BROWSER_AGENT_API_TOKEN: "${BROWSER_AGENT_API_TOKEN:-}"
@@ -148,7 +142,7 @@ services:
       - server-net
     mem_limit: 128m
 
-  # mongo 8.0+ hard-aborts on Linux kernel >=6.19 (this host is 7.0) via a
+  # mongo 8.0+ hard-aborts on Linux kernel >=6.19 via a
   # version-string guard (SERVER-121912) — no env var bypasses it. The guard
   # only exists in 8.0+, and MongoDB states only "8.0 or newer" is affected, so
   # 7.0 runs clean. LibreChat supports 7.x; the 8.0 dump restores fine into it.
@@ -172,10 +166,11 @@ services:
     env_file:
       - .env
     environment:
-      AUDIO_API_BASE_URL: "${AUDIO_API_URL:-https://audio.kacper.me}"
-      LLM_BASE_URL: "${LLM_BASE_URL:-https://llama.kacper.me/v1}"
+      MEMORY_MCP_URL: "${MEMORY_MCP_URL:-http://host.docker.internal:8089}"
+      AUDIO_API_BASE_URL: "${AUDIO_API_URL:-http://host.docker.internal:8088}"
+      LLM_BASE_URL: "${LLM_BASE_URL:-http://host.docker.internal:8080/v1}"
       # LibreChat's existing image toolkit talks to our local image model.
-      IMAGE_GEN_OAI_BASEURL: "${IMAGE_GEN_OAI_BASEURL:-${LLM_BASE_URL:-https://llama.kacper.me/v1}}"
+      IMAGE_GEN_OAI_BASEURL: "${IMAGE_GEN_OAI_BASEURL:-${LLM_BASE_URL:-http://host.docker.internal:8080/v1}}"
       IMAGE_GEN_OAI_API_KEY: "${IMAGE_GEN_OAI_API_KEY:-vllm}"
       IMAGE_GEN_OAI_MODEL: "qwen-image-2.1"
       LOCAL_IMAGE_TOOLS: "true"
@@ -209,14 +204,12 @@ services:
     entrypoint: ["/bin/sh", "-c", "node /app/librechat-render.js && exec node /app/api/server/index.js"]
 
   signal-api:
-    # Local overlay = bbernhard latest-dev + a reviewed signal-cli release.
-    # 2026-06-11: Signal stopped sending `serverGuid` in some sealed-sender envelopes;
-    # signal-cli <=0.14.4.1 throws `getServerGuid(...) must not be null` and DROPS every
-    # incoming message (sends unaffected — that's why tg-watcher kept posting).
-    # Fixed upstream in signal-cli 0.14.5 (AsamK/signal-cli#2059). The overlay now
-    # pins 0.14.8 explicitly so rebuilding cannot silently downgrade the receiver.
+    # Pinned signal-cli overlay includes the sealed-sender fix (AsamK/signal-cli#2059)
+    # and experimental calling support.
     build:
       context: ./docker/signal-cli-0145
+      args:
+        SIGNAL_CALL_GREETING: "${SIGNAL_CALL_GREETING:-Signal calling works. Talk to you soon.}"
     image: signal-cli-rest-api:0.14.8-local
     container_name: signal-api
     restart: unless-stopped
@@ -247,12 +240,12 @@ services:
     env_file:
       - ./signal-bot.env
     environment:
-      LLM_BASE_URL: "${LLM_BASE_URL:-https://llama.kacper.me/v1}"
+      LLM_BASE_URL: "${LLM_BASE_URL:-http://host.docker.internal:8080/v1}"
       # Always let stack_shared select the currently loaded chat model.
       LLM_MODEL: ""
-      AUDIO_API_URL: "${AUDIO_API_URL:-https://audio.kacper.me}"
-      YTDLP_SERVICE_URL: "${YTDLP_SERVICE_URL:-https://yt.kacper.me}"
-      MEMORY_MCP_URL: https://memory.kacper.me
+      AUDIO_API_URL: "${AUDIO_API_URL:-http://host.docker.internal:8088}"
+      YTDLP_SERVICE_URL: "${YTDLP_SERVICE_URL:-http://host.docker.internal:8200}"
+      MEMORY_MCP_URL: "${MEMORY_MCP_URL:-http://host.docker.internal:8089}"
       MEMORY_DIR_MOUNT: /memory
       MEMORY_DEFAULT_USER_ID: ${MEMORY_DEFAULT_USER_ID:-default}
       OFFLINE_EXCUSES_FILE: /app/config/offline-excuses.txt
@@ -268,7 +261,7 @@ services:
       - ${VOICE_SAMPLES_DIR:?VOICE_SAMPLES_DIR must be set in .env}:/app/voice-samples
       - ${MEMORY_DIR:?MEMORY_DIR must be set in .env}:/memory:ro
       - ./shared:/shared:ro
-      - ./signal-bot-offline-excuses.txt:/app/config/offline-excuses.txt:ro
+      - ${SIGNAL_OFFLINE_REPLIES_FILE:-./config/signal-offline-replies.txt}:/app/config/offline-excuses.txt:ro
     depends_on:
       signal-api:
         condition: service_healthy
@@ -289,7 +282,7 @@ services:
     env_file:
       - .env
     environment:
-      LLM_BASE_URL: "${LLM_BASE_URL:-https://llama.kacper.me/v1}"
+      LLM_BASE_URL: "${LLM_BASE_URL:-http://host.docker.internal:8080/v1}"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
@@ -327,7 +320,7 @@ services:
       - .env
       - signal-bot.env
     environment:
-      LLM_BASE_URL: "${LLM_BASE_URL:-https://llama.kacper.me/v1}"
+      LLM_BASE_URL: "${LLM_BASE_URL:-http://host.docker.internal:8080/v1}"
       LLM_MODEL: ""
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -358,7 +351,7 @@ services:
       - signal-bot.env
       - receipt-watcher.env
     environment:
-      LLM_BASE_URL: "${LLM_BASE_URL:-https://llama.kacper.me/v1}"
+      LLM_BASE_URL: "${LLM_BASE_URL:-http://host.docker.internal:8080/v1}"
       LLM_MODEL: ""
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -384,7 +377,7 @@ services:
       - .env
       - travel-watcher.env
     environment:
-      LLM_BASE_URL: "${LLM_BASE_URL:-https://llama.kacper.me/v1}"
+      LLM_BASE_URL: "${LLM_BASE_URL:-http://host.docker.internal:8080/v1}"
       LLM_MODEL: ""
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -409,7 +402,7 @@ services:
       - signal-bot.env
       - tg-watcher.env
     environment:
-      LLM_BASE_URL: "${LLM_BASE_URL:-https://llama.kacper.me/v1}"
+      LLM_BASE_URL: "${LLM_BASE_URL:-http://host.docker.internal:8080/v1}"
       LLM_MODEL: ""
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -433,7 +426,7 @@ services:
       - signal-bot.env
       - oss-watcher.env
     environment:
-      LLM_BASE_URL: "${LLM_BASE_URL:-https://llama.kacper.me/v1}"
+      LLM_BASE_URL: "${LLM_BASE_URL:-http://host.docker.internal:8080/v1}"
       LLM_MODEL: ""
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -455,9 +448,9 @@ services:
       - signal-bot.env
       - rss-watcher.env
     environment:
-      LLM_BASE_URL: "${LLM_BASE_URL:-https://llama.kacper.me/v1}"
+      LLM_BASE_URL: "${LLM_BASE_URL:-http://host.docker.internal:8080/v1}"
       LLM_MODEL: ""
-      AUDIO_API_URL: "${AUDIO_API_URL:-https://audio.kacper.me}"
+      AUDIO_API_URL: "${AUDIO_API_URL:-http://host.docker.internal:8088}"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
@@ -479,9 +472,9 @@ services:
       - signal-bot.env
       - plc-watcher.env
     environment:
-      LLM_BASE_URL: "${LLM_BASE_URL:-https://llama.kacper.me/v1}"
+      LLM_BASE_URL: "${LLM_BASE_URL:-http://host.docker.internal:8080/v1}"
       LLM_MODEL: ""
-      AUDIO_API_URL: "${AUDIO_API_URL:-https://audio.kacper.me}"
+      AUDIO_API_URL: "${AUDIO_API_URL:-http://host.docker.internal:8088}"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
@@ -577,7 +570,7 @@ services:
       - "8091:8091"
     environment:
       SAUCENAO_API_KEY: ${SAUCENAO_API_KEY:-}
-      LLM_BASE_URL: "${LLM_BASE_URL:-https://llama.kacper.me/v1}"
+      LLM_BASE_URL: "${LLM_BASE_URL:-http://host.docker.internal:8080/v1}"
       SEARXNG_URL: "http://searxng:8080"
     networks:
       - server-net

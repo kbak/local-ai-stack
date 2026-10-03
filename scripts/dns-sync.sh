@@ -11,10 +11,9 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MY_IP="$(tailscale ip -4 2>/dev/null)"
 : "${MY_IP:?Could not detect Tailscale IP — is tailscale running?}"
 
-DOMAIN="kacper.me"
+DOMAIN="${STACK_DOMAIN:?STACK_DOMAIN must be set in .env}"
 CF_API="https://api.cloudflare.com/client/v4"
-# memory.kacper.me lives on the AI box now (memory-mcp moved to docker-compose.ai.yml).
-# yt.kacper.me -> yt-dlp-service, now native+systemd on this box.
+# Memory is hosted on the AI host; yt-dlp-service is hosted on the server.
 SERVER_HOSTS=(voice chat search pdf mcp nextcloud yt)
 
 cf() { curl -sSf -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" "$@"; }

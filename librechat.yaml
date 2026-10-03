@@ -5,7 +5,7 @@ mcpSettings:
     - "http://mcp-proxy:8083"
     - "http://location-tracker:8084"
     - "http://pdf-inspector:8085/"
-    - "https://memory.kacper.me"
+    - "${MEMORY_MCP_URL}"
     - "http://reverse-image-search:8091"
     - "${AUDIO_API_BASE_URL}"
   autoApprove: true
@@ -168,7 +168,7 @@ mcpServers:
     headers:
       Authorization: "Bearer ${MCP_PROXY_AUTH_TOKEN}"
   memory:
-    url: https://memory.kacper.me/mcp/mcp
+    url: ${MEMORY_MCP_URL}/mcp/mcp
     type: streamable-http
     serverInstructions: false
   chatterbox:

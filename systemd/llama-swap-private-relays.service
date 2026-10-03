@@ -4,7 +4,8 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=/mnt/wsl/workspace/local-ai-stack/scripts/run-llama-swap-private-relays.sh
+EnvironmentFile=-"@STACK_ROOT@/.env"
+ExecStart="@STACK_ROOT@/scripts/run-llama-swap-private-relays.sh"
 Restart=on-failure
 RestartSec=3
 NoNewPrivileges=true

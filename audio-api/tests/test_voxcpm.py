@@ -85,15 +85,16 @@ class VoxCPMAdapterTests(unittest.TestCase):
 
 class AudioGPUIsolationTests(unittest.TestCase):
     def test_rejects_wrong_gpu_or_multiple_visible_gpus(self):
-        with patch.dict(os.environ, {"CUDA_VISIBLE_DEVICES": "GPU-audio"}):
+        with patch.dict(os.environ, {"CUDA_VISIBLE_DEVICES": "GPU-audio"}), \
+                patch.object(config, "EXPECTED_AUDIO_GPU", "Test Audio GPU"):
             with patch("torch.cuda.device_count", return_value=2):
                 with self.assertRaisesRegex(RuntimeError, "Exactly one"):
                     validate_audio_gpu()
             with patch("torch.cuda.device_count", return_value=1):
-                with patch("torch.cuda.get_device_name", return_value="NVIDIA RTX PRO 6000"):
+                with patch("torch.cuda.get_device_name", return_value="Other GPU"):
                     with self.assertRaisesRegex(RuntimeError, "Audio GPU must"):
                         validate_audio_gpu()
-                with patch("torch.cuda.get_device_name", return_value="NVIDIA GeForce RTX 5060 Ti"):
+                with patch("torch.cuda.get_device_name", return_value="Test Audio GPU"):
                     validate_audio_gpu()
 
 

@@ -27,7 +27,7 @@ accounts:
     auth:
       host: imap.fastmail.com
       port: 993
-      username: kacper@example.com
+      username: user@example.com
       password_env: FASTMAIL_APP_PASSWORD
     sheet:
       id: "REPLACE_WITH_GOOGLE_SHEET_ID"

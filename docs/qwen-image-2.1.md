@@ -1,207 +1,89 @@
-# Qwen-Image 2.1
+# Image generation and editing
 
-Local image generation and editing use stable-diffusion.cpp, managed by
-llama-swap as `qwen-image-2.1`. Chat models continue to use vLLM. Qwen and FLUX
-share `cuda0_image`: only one image model runs at a time, and it unloads after
-600 seconds without requests. The main chat model and autocomplete can stay
-loaded independently.
+Qwen-Image 2.1 runs through stable-diffusion.cpp and llama-swap. It shares the
+`cuda0_image` group with FLUX: one image worker runs at a time, with a ten-minute
+idle timeout. `start-ai.sh` preloads Qwen-Image.
 
-`start-ai.sh` preloads Qwen-Image as the default image model, swapping out FLUX
-if it is already loaded. FLUX stays configured for on-demand use and is not
-preloaded at startup. The ten-minute idle unload still applies to both models.
+## Install
 
-## AI host installation
-
-Run from this repository on the NVIDIA GPU host:
+On the GPU host, with `hf`, CMake, a C++ compiler, and the CUDA toolkit available:
 
 ```bash
 bash scripts/install-qwen-image-2.1.sh
 ```
 
-The installer requires `hf`, CMake, a C++ compiler, and a CUDA toolkit. It pins
-the runtime and model revisions, downloads roughly 14 GB of weights under
-`../models/image-gen/qwen-image-2.1`, and installs the executable at
-`bin/sd-server-qwen-image-2.1`. The original FLUX executable is unchanged.
-The CUDA architecture defaults to Blackwell SM120; set `QWEN_IMAGE_CUDA_ARCH`
-when building for other GPUs. Build parallelism defaults to three jobs.
+The installer pins runtime/model revisions, applies the RGBA reference-image
+patch, downloads weights to `../models/image-gen/qwen-image-2.1`, and installs
+`bin/sd-server-qwen-image-2.1`. It uses the INT8 ConvRot diffusion model, Q4_K_M
+GGUF text encoder, F16 vision projector, and the model's VAE.
 
-The pipeline uses the INT8 ConvRot diffusion model, the official Q4_K_M
-Qwen3-VL-8B GGUF encoder, its F16 vision projector, and the Qwen-Image 2.1 VAE.
-The initially tried Comfy INT8 encoder failed startup with this runtime;
-use the pinned GGUF encoder and matching projector in the installer.
-The dedicated runtime applies `patches/sdcpp-qwen-image-rgba.patch` to preserve
-all four channels in reference uploads. Upstream's OpenAI edit handler at this
-revision forces uploads to RGB, losing the transparency needed by Qwen's VAE.
+The build defaults to CUDA architecture 120; set `QWEN_IMAGE_CUDA_ARCH` for your
+target hardware. `QWEN_IMAGE_BUILD_JOBS` controls build parallelism (default 3).
+Runtime settings are in `serve-qwen-image.sh`:
 
-Restart llama-swap to register the new entry in `llama-swap.yaml`. A restart
-also unloads its language models; restore whichever main chat model was
-selected before restarting. This does not require upgrading llama-swap.
+| Variable | Default |
+| --- | --- |
+| `QWEN_IMAGE_GPU` | `0` |
+| `QWEN_IMAGE_MAX_VRAM` | `24` GiB of managed allocations |
+| `QWEN_IMAGE_STEPS` | `40` |
+| `QWEN_IMAGE_MODEL_DIR` | `../models/image-gen/qwen-image-2.1` |
+| `QWEN_IMAGE_SERVER` | `bin/sd-server-qwen-image-2.1` |
 
-`serve-qwen-image.sh` uses GPU 0, flash attention, memory-mapped weights,
-automatic placement, a 24 GiB managed VRAM budget, 40 Euler steps and CFG 1.
-Editing uses strength 1 so references guide a fresh generation. The upstream
-example's CFG 6 and the generic server's strength 0.75 produced poor editing
-results in local tests; CFG 1 matches the model's reference pipeline.
-The default image size is 1024×1024. The VRAM budget applies to managed runtime
-allocations; leave additional room for driver allocations and the other models.
+Leave memory for driver allocations and other resident models. Restart the
+router after changing its configuration; this also unloads its workers.
 
-Optional launcher overrides:
+## LibreChat
 
-| Variable | Default | Purpose |
-| --- | --- | --- |
-| `QWEN_IMAGE_GPU` | `0` | GPU visible to the image worker |
-| `QWEN_IMAGE_MAX_VRAM` | `24` | Managed VRAM budget, GiB |
-| `QWEN_IMAGE_STEPS` | `40` | Sampling steps |
-| `QWEN_IMAGE_MODEL_DIR` | `../models/image-gen/qwen-image-2.1` | Weight directory |
-| `QWEN_IMAGE_SERVER` | `bin/sd-server-qwen-image-2.1` | Runtime executable |
+Image tools use `LLM_BASE_URL`, or the optional `IMAGE_GEN_OAI_BASEURL` and
+`IMAGE_GEN_OAI_API_KEY` overrides. Set an endpoint reachable from the LibreChat
+container. The model ID is `qwen-image-2.1`.
 
-## LibreChat host activation
+At startup, the renderer enables `image_gen_oai` for the existing agent selected
+by `TIER1_AGENT_NAME` (default `Assistant`). It does not create an agent. For
+other agents, enable **OpenAI Image Tools** in the Agent Builder. Select a
+vision-capable chat model so it can inspect image results.
 
-The server-side changes are in `docker-compose.server.yml` and
-`librechat-render.js`. Deploy these files together to the machine that actually
-runs LibreChat. No LibreChat image upgrade is needed.
-
-The image endpoint defaults to that machine's `LLM_BASE_URL`, falling back to
-`https://llama.kacper.me/v1`. If necessary, set `IMAGE_GEN_OAI_BASEURL` to the
-existing route to this AI host. The model name is `qwen-image-2.1` and the
-placeholder key is `vllm`; override `IMAGE_GEN_OAI_API_KEY` if your route requires
-authentication. Do not point a remote container at WSL's loopback address.
-
-Recreate only LibreChat to apply its environment:
+Recreate LibreChat after changing its environment:
 
 ```bash
 docker compose -f docker-compose.server.yml up -d --no-deps librechat
 ```
 
-At startup the renderer adds `image_gen_oai` to the existing agent named `006`
-(or `TIER1_AGENT_NAME`). LibreChat expands this toolkit into generation and
-editing. Existing tools and saved instructions are preserved when no memory
-files are available. The renderer never creates a missing agent.
+Request transparency explicitly in the prompt as RGBA with a transparent
+background. The runtime does not translate `background` or `quality` fields into
+sampling settings. Output is PNG; transparency quality is experimental, so
+inspect the alpha channel before relying on a clean cutout.
 
-For other agents, enable **OpenAI Image Tools** in the Agent Builder. That is
-LibreChat's toolkit label; these settings route its calls to local Qwen, with
-no OpenAI account or paid API required. Use a vision-capable chat model, such
-as the current Qwen 27B, because LibreChat includes generated images in the
-immediate tool result sent back to the chat model.
+## Signal
 
-Example requests:
+The bot exposes `generate_image` and `edit_image`. Uploaded/generated images
+receive conversation-scoped references retained for seven days, up to 20 per
+conversation. Storage is in the bot data volume; pruning occurs when that
+conversation is used. Editing accepts one reference. Supported output sizes are
+1024×1024, 768×1024, and 1024×768.
 
-- "Create a transparent PNG sticker of a red robot holding a HELLO sign."
-- Upload a photo, then ask "Change the background to a beach at sunset."
-- "Make that robot blue, keeping the sign and transparent background."
+`SIGNAL_IMAGE_BASE_URL` and `SIGNAL_IMAGE_API_KEY` can override the bot's LLM
+endpoint settings. `SIGNAL_AGENT_TIMEOUT_S` controls its agent timeout (360
+seconds by default). Cancellation prevents subsequent image delivery, though
+inference may continue at the model server.
 
-The configured prompt guidance explicitly asks Qwen for RGBA transparency.
-stable-diffusion.cpp does not translate the OpenAI `background` or `quality`
-fields itself: include transparency in the prompt; sampling quality is set by
-the launcher's step count. Output remains PNG to preserve alpha.
+## API checks
 
-Transparency is experimental with this quantized runtime. The local tests
-produced RGBA files, but some background areas stayed opaque white, and an
-edit could make previously transparent areas opaque. Generation and color
-editing worked; inspect the alpha channel before relying on clean cutouts.
-
-## API and checks
-
-### Signal bot
-
-The Signal bot on the server host exposes `generate_image` and `edit_image`
-to its current chat model. Requests go to the existing image endpoints with
-`model=qwen-image-2.1`; no model-host changes are required.
-
-Example Signal messages:
-
-- "Draw a red robot holding a HELLO sign."
-- Attach a photo and say "Change the background to a beach."
-- "Make it blue, keeping the same composition."
-
-The bot posts a progress message, then sends the resulting PNG attachment.
-Uploads and outputs get opaque references scoped to the conversation (a DM
-or group). The latest reference is supplied on subsequent turns and survives
-bot restarts. References expire after seven days; each active conversation
-retains at most 20 images. Files are pruned when that conversation is used.
-References live in the existing bot data volume under `/app/data/images`.
-The first version edits one reference at a time and supports 1024×1024,
-768×1024 and 1024×768 output. Ambiguous references should be clarified.
-
-`SIGNAL_IMAGE_BASE_URL` and `SIGNAL_IMAGE_API_KEY` in `signal-bot.env` optionally
-override `LLM_BASE_URL` and `LLM_API_KEY`. Compose sets a 360-second agent
-timeout; override with `SIGNAL_AGENT_TIMEOUT_S` in the stack `.env`.
-Image HTTP requests have a 240-second read timeout. Cancellation prevents
-later image delivery, although the model server may continue its computation.
-
-Deploy changes on the Signal host:
+Generate an image through llama-swap:
 
 ```bash
-docker compose -f docker-compose.server.yml build signal-bot
-docker compose -f docker-compose.server.yml up -d --no-deps signal-bot
+curl --fail http://localhost:8080/v1/images/generations \
+  -H 'Content-Type: application/json' \
+  -d '{"model":"qwen-image-2.1","prompt":"A red robot holding a HELLO sign","size":"1024x1024","response_format":"b64_json"}'
 ```
 
-Tests in `signal-bot-patches/test_image_tools.py` intercept both inference and
-Signal delivery. `scripts/check-signal-images.py` exercises real chat routing,
-generation and follow-up editing, intercepting Signal delivery and writing
-PNGs to `/tmp` inside its container instead of messaging anyone.
+Use `scripts/check-qwen-image.py` for generation/editing checks and
+`scripts/check-signal-images.py` for the bot adapter. Review their arguments
+before running; inference checks load models and create output files. Save
+results outside the public repository.
 
-Validated on the Signal host on 2026-09-21: all nine automated tests passed;
-the built bot discovered both tools. A live Qwen 27B conversation called
-`generate_image`, then `edit_image` on "Make that robot blue". Inspection of
-both 1024×1024 outputs confirmed the red-to-blue change while preserving the
-composition and HELLO sign. Signal delivery was intercepted during this test;
-no test messages were sent to real chats.
-After deployment, the user confirmed the Signal workflow was working.
+## Upstream terms
 
-### Endpoint checks
-
-Endpoints through the existing llama-swap listener:
-
-- `POST /v1/images/generations`: JSON with `model`, `prompt`, `size` and `n`.
-- `POST /v1/images/edits`: multipart fields `model`, `prompt`, `size` and
-  `image[]` uploads. Qwen supports up to ten reference images.
-
-Both return `data[].b64_json`. `size: "auto"` uses the launcher's default.
-Explicit sizes must be divisible by 32. Start with 1024×1024; native 2K output
-and large reference batches require more compute and memory. LibreChat's
-built-in tool schema offers square, portrait and landscape presets.
-
-Run an actual generation and reference-image edit with the existing Python
-environment (Pillow is required):
-
-```bash
-../vllm-runtime/.venv/bin/python scripts/check-qwen-image.py
-node scripts/test-librechat-render.cjs
-```
-
-The image check writes PNGs and timings to `/tmp/qwen-image-check`, validates
-dimensions and PNG/RGBA output, and submits the first image to the editing
-endpoint. It checks red-to-blue color change and reports transparency coverage.
-Use `--require-transparency` to also require substantial transparency in both
-outputs; this stricter quality check currently fails intermittently.
-Inspect both images to assess edit quality.
-Set `QWEN_IMAGE_API_KEY` if the endpoint requires a different bearer token.
-
-### Local validation, 2026-09-21
-
-The installed model passed generation and multipart editing through llama-swap
-while Qwen 27B, Qwen Coder 7B and the BGE reranker stayed loaded. The existing
-`https://llama.kacper.me/v1/models` route also advertised `qwen-image-2.1`.
-
-At 1024×1024 and 40 steps, one request including model startup took 27.9 seconds;
-a subsequent generation took 14.2 seconds and its reference edit took 37.1
-seconds. The edit changed the robot from red to blue while preserving the
-composition and HELLO sign. These are individual measurements, not a benchmark.
-The primary GPU had about 18 GiB free during a sampled check with all four
-models loaded. The image worker is configured to unload after ten idle minutes.
-
-Both files were valid RGBA PNGs, but their mostly opaque backgrounds failed the
-stricter transparency quality criterion. Transparency remains experimental.
-The five renderer tests and Compose configuration validation passed. LibreChat
-itself runs on another host, so its deployment and UI workflow remain untested.
-
-## License and upstream references
-
-The released weights use the [Qwen Research License](https://huggingface.co/Qwen/Qwen-Image-2.1/blob/main/LICENSE),
-which limits use to research/evaluation and requires a separate commercial
-license for commercial use.
-
-- [Qwen-Image 2.1](https://github.com/QwenLM/Qwen-Image-2.1)
-- [stable-diffusion.cpp model guide](https://github.com/leejet/stable-diffusion.cpp/blob/master/docs/qwen_image_2.1.md)
-- [LibreChat image toolkit](https://www.librechat.ai/docs/features/image_gen)
+Model weights have their own [Qwen license](https://huggingface.co/Qwen/Qwen-Image-2.1/blob/main/LICENSE).
+The root MIT license does not cover them. Runtime source and model details are
+pinned in `scripts/install-qwen-image-2.1.sh` and the launcher.

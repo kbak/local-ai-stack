@@ -4,9 +4,9 @@ After=network.target
 
 [Service]
 Type=simple
-WorkingDirectory=/mnt/wsl/workspace/local-ai-stack/public-api-gateway
-EnvironmentFile=/mnt/wsl/workspace/local-ai-stack/public-api.env
-ExecStart=/mnt/wsl/workspace/local-ai-stack/public-api-gateway/.venv/bin/uvicorn app:app --host 127.0.0.1 --port 8093 --workers 1 --no-access-log --no-proxy-headers
+WorkingDirectory="@STACK_ROOT@/public-api-gateway"
+EnvironmentFile="@STACK_ROOT@/public-api.env"
+ExecStart="@STACK_ROOT@/public-api-gateway/.venv/bin/uvicorn" app:app --host 127.0.0.1 --port 8093 --workers 1 --no-access-log --no-proxy-headers
 Restart=on-failure
 RestartSec=3
 NoNewPrivileges=true

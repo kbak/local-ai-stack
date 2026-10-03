@@ -15,7 +15,7 @@ def main() -> None:
         from .blogs import run_blog_brief
         extra_jobs = ((run_blog_brief, "blog_brief", {
             "day_of_week": "tue", "hour": 10, "minute": 0,
-            "timezone": os.environ.get("BLOG_TIMEZONE", "America/Phoenix"),
+            "timezone": os.environ.get("BLOG_TIMEZONE", "UTC"),
         }),)
     run_cron(
         run_news_brief,

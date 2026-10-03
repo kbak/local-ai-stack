@@ -13,7 +13,7 @@ cd "$WORKSPACE/vllm-runtime"
 source .venv/bin/activate
 
 export HF_HOME="$WORKSPACE/models/hf"
-export CUDA_VISIBLE_DEVICES=0
+export CUDA_VISIBLE_DEVICES="${PRIMARY_GPU:-0}"
 export CUDA_DEVICE_ORDER=PCI_BUS_ID
 export TORCHINDUCTOR_COMPILE_THREADS=16
 # vLLM's unauthenticated EngineCore communication sockets must stay local.

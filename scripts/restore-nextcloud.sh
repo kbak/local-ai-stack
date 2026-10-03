@@ -50,4 +50,4 @@ log "Rescanning files + repairing indices..."
 docker exec -u www-data nextcloud php /var/www/html/occ files:scan --all || true
 docker exec -u www-data nextcloud php /var/www/html/occ db:add-missing-indices || true
 
-log "Done. Verify login at nextcloud.kacper.me (or http://localhost:8090)."
+log "Done. Verify login at your configured Nextcloud hostname (or http://localhost:8090)."

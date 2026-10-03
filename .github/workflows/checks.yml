@@ -1,0 +1,25 @@
+name: Checks
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  repository:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: python3 scripts/check-repo.py
+      - run: node scripts/test-librechat-render.cjs
+      - run: python3 -m unittest discover -s tests -p 'test_configuration.py' -v
+      - run: python3 scripts/check-compose.py
+      - run: git diff --check

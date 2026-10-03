@@ -20,7 +20,7 @@ RUN sed -i '/^chatterbox-tts/d' /app/requirements-base.txt && \
     pip install --no-cache-dir --force-reinstall onnxruntime-gpu==1.23.2
 
 # Step 2 — torch / torchaudio from the cu128 index. Required for Blackwell
-# (sm_120 — 5060 Ti / 5090). The cu128 wheels bundle their own CUDA runtime
+# (sm_120). The cu128 wheels bundle their own CUDA runtime
 # so the cu126 base image is fine — onnxruntime-gpu uses the system libs,
 # torch uses its bundled libs.
 RUN pip install --no-cache-dir \

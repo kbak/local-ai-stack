@@ -1,4 +1,4 @@
-"""Pinned VoxCPM2 cloning, using the settings from the listening comparison."""
+"""Pinned VoxCPM2 voice-cloning backend."""
 
 import io
 import logging
@@ -82,7 +82,7 @@ def synthesize(
     waves = []
     sample_rate = _model.tts_model.sample_rate
     # VoxCPM reuses generation caches and seeds global RNGs. Serialize with
-    # Kokoro and Whisper as well, to keep workspace usage bounded on the 5060.
+    # Kokoro and Whisper as well, to keep workspace usage bounded on the audio GPU.
     with inference_lock:
         for index, piece in enumerate(pieces):
             samples = np.asarray(_model.generate(

@@ -37,8 +37,8 @@ mcp = FastMCP(
     "memory-mcp",
     transport_security=TransportSecuritySettings(
         enable_dns_rebinding_protection=True,
-        allowed_hosts=["memory.kacper.me"],
-        allowed_origins=["https://memory.kacper.me"],
+        allowed_hosts=config.ALLOWED_HOSTS,
+        allowed_origins=config.ALLOWED_ORIGINS,
     ),
 )
 

@@ -11,7 +11,7 @@ WORKSPACE="$(dirname "$SCRIPT_DIR")"
 
 PORT="${1:?port arg required}"
 
-export CUDA_VISIBLE_DEVICES=0
+export CUDA_VISIBLE_DEVICES="${PRIMARY_GPU:-0}"
 export CUDA_DEVICE_ORDER=PCI_BUS_ID
 
 SD_MODELS=$WORKSPACE/models/image-gen

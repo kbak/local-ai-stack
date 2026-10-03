@@ -23,6 +23,14 @@ QDRANT_PORT = int(os.getenv("MEMORY_QDRANT_PORT", "6333"))
 QDRANT_COLLECTION = os.getenv("MEMORY_QDRANT_COLLECTION", "memory")
 
 # Default user scope when the caller doesn't supply one.
-# A single-user stack can leave this as "kacper"; multi-user deployments
+# A single-user stack can leave this as "default"; multi-user deployments
 # will want the client to always pass user_id explicitly.
 DEFAULT_USER_ID = os.getenv("MEMORY_DEFAULT_USER_ID", "default")
+
+# Exact proxy hostnames/origins for MCP DNS rebinding protection.
+ALLOWED_HOSTS = [value.strip() for value in os.getenv(
+    "MEMORY_ALLOWED_HOSTS", "localhost:*,127.0.0.1:*,memory-mcp:8089,host.docker.internal:8089"
+).split(",") if value.strip()]
+ALLOWED_ORIGINS = [value.strip() for value in os.getenv(
+    "MEMORY_ALLOWED_ORIGINS", "http://localhost:8089,http://127.0.0.1:8089"
+).split(",") if value.strip()]

@@ -1,7 +1,7 @@
 """Screen saved clips for missing speech with cached multilingual Whisper small.
 
 This is an automatic content check, not a human pronunciation/quality score.
-Run after synthesis candidates exit, on the same isolated 5060 Ti.
+Run after synthesis candidates exit, on the same isolated audio GPU.
 """
 
 import argparse
@@ -33,8 +33,8 @@ def main():
     args = parser.parse_args()
     if not os.environ.get("CUDA_VISIBLE_DEVICES", "").startswith("GPU-"):
         raise RuntimeError("An explicit GPU UUID is required")
-    if torch.cuda.device_count() != 1 or "5060 Ti" not in torch.cuda.get_device_name(0):
-        raise RuntimeError("Content checking must use only the RTX 5060 Ti")
+    if torch.cuda.device_count() != 1:
+        raise RuntimeError("Exactly one GPU must be visible to content checking")
     model = WhisperModel("small", device="cuda", compute_type="float16", local_files_only=True)
     checks = []
     for report_path in sorted(args.root.glob("**/results.json")):

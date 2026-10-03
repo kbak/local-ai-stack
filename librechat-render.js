@@ -1,4 +1,4 @@
-// Render librechat.yaml.template → librechat.yaml, and overwrite the 006
+// Render librechat.yaml.template → librechat.yaml, and overwrite the configured
 // agent's `instructions` field in Mongo with the current memory MD files.
 //
 // Why both: modelSpecs.promptPrefix carries ${TIER1_MEMORY} for legacy custom-
@@ -13,7 +13,7 @@
 
 const fs = require('fs');
 
-const AGENT_NAME = process.env.TIER1_AGENT_NAME || '006';
+const AGENT_NAME = process.env.TIER1_AGENT_NAME || 'Assistant';
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://mongodb:27017/LibreChat';
 // The agent's Mongo setting overrides the custom endpoint's YAML limit.
 // Reserve 8192 for output and another 8192 for overhead/tokenizer differences

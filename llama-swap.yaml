@@ -28,13 +28,7 @@ models:
     checkEndpoint: /v1/models
     ttl: 0
 
-  # FIM autocomplete model on the 5060 Ti (kept off the primary GPU so it
-  # doesn't contend with the main chat model). FP16, ~3 GB weights + small KV
-  # cache. Always-loaded via the cuda1 group so VS Code tab-complete never
-  # pays a cold-start cost.
-  #
-  # CUDA_VISIBLE_DEVICES hides the primary GPU from this subprocess entirely;
-  # with only the 5060 Ti visible vLLM uses it as cuda:0.
+  # Persistent FIM autocomplete on the primary GPU, alongside chat.
   qwen-coder-7B:
     cmd: bash ./serve-qwen-coder-7b.sh ${PORT}
     proxy: http://127.0.0.2:${PORT}
@@ -59,7 +53,7 @@ models:
     checkEndpoint: /v1/models
     ttl: 600
 
-  # Cross-encoder reranker on the 5060 Ti (~1.1 GB weights, persistent).
+  # Cross-encoder reranker on the secondary GPU (~1.1 GB weights, persistent).
   # vLLM uses --runner pooling for cross-encoder scoring.
   # Endpoint: POST /v1/score with {"model":"bge-reranker-v2-m3","text_1":"query","text_2":["doc1","doc2"]}
   bge-reranker-v2-m3:
@@ -69,11 +63,11 @@ models:
     ttl: 0
 
 # Groups, all exclusive: false so they coexist on shared GPUs:
-#   cuda0 (RTX 6000 / 96 GB):
+#   cuda0 (primary GPU):
 #     - cuda0_main:     35B-A3B, 27B, or Muse Glimmer; one is always loaded.
 #     - cuda0_coder:    coder-7B, persistent, primary-GPU autocomplete.
 #     - cuda0_image:    FLUX-dev or Qwen-Image 2.1, ttl:600 when idle.
-#   cuda1 (5060 Ti / 16 GB):
+#   cuda1 (secondary GPU):
 #     - cuda1_reranker: bge-reranker-v2-m3, persistent, tiny footprint.
 groups:
   "cuda0_main":
@@ -101,7 +95,7 @@ groups:
       - "flux-dev"
       - "qwen-image-2.1"
 
-  # Reranker on the 5060 Ti alongside audio-api. Persistent: tiny model, no
+  # Reranker on the secondary GPU alongside audio-api. Persistent: tiny model, no
   # reason to pay the vLLM startup cost on each request.
   "cuda1_reranker":
     swap: false

@@ -24,7 +24,7 @@ from stack_shared.public_http import AsyncPublicHTTPTransport
 
 log = logging.getLogger("browser-agent-api")
 
-LLM_BASE_URL = os.getenv("LLM_BASE_URL", "https://llama.kacper.me/v1").rstrip("/")
+LLM_BASE_URL = os.getenv("LLM_BASE_URL", "http://host.docker.internal:8080/v1").rstrip("/")
 LLM_API_KEY = os.getenv("LLM_API_KEY", "vllm")
 LLM_MODEL = os.getenv("LLM_MODEL", "")
 API_TOKEN = os.getenv("BROWSER_AGENT_API_TOKEN", "")
