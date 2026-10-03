@@ -51,7 +51,7 @@ def discover(skills_dir: Path) -> tuple[list, list[str]]:
         return [], []
 
     # Make the skills dir importable so `from skill_name import x` works
-    # and shared helpers like mcp_client.py at the root are resolvable.
+    # and the _shared helpers at the root are resolvable.
     if str(skills_dir) not in sys.path:
         sys.path.insert(0, str(skills_dir))
 

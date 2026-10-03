@@ -18,6 +18,7 @@ def chat(
     api_key: str | None = None,
     model: str | None = None,
     temperature: float = 0.3,
+    max_tokens: int | None = None,
 ) -> str:
     """Send a single system+user turn and return the assistant's reply.
 
@@ -32,6 +33,7 @@ def chat(
     """
     client = get_client(base_url=base_url, api_key=api_key)
     mid = model or resolve_model(base_url=base_url)
+    options = {} if max_tokens is None else {"max_tokens": max_tokens}
     response = client.chat.completions.create(
         model=mid,
         messages=[
@@ -40,6 +42,7 @@ def chat(
         ],
         temperature=temperature,
         extra_body={"chat_template_kwargs": {"enable_thinking": False}},
+        **options,
     )
     raw = response.choices[0].message.content or ""
     return _THINK_RE.sub("", raw).strip()

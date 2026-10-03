@@ -21,5 +21,7 @@ jobs:
       - run: python3 scripts/check-repo.py
       - run: node scripts/test-librechat-render.cjs
       - run: python3 -m unittest discover -s tests -p 'test_configuration.py' -v
+      - run: python3 -m pip install -r tests/requirements.txt
+      - run: python3 -m unittest discover -s tests -p 'test_shared_clients.py' -v
       - run: python3 scripts/check-compose.py
       - run: git diff --check

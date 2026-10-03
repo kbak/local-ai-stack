@@ -38,12 +38,16 @@ Run affected service tests in that service's dependency environment:
 
 | Area | Command from repository root |
 | --- | --- |
+| Shared MCP and LLM clients | `python3 -m unittest discover -s tests -p 'test_shared_clients.py' -v` |
 | Gateway | `python3 -m unittest discover -s public-api-gateway -p 'test_*.py' -v` |
 | RSS watcher | `PYTHONPATH=shared:rss-watcher python3 -m unittest discover -s rss-watcher/tests -v` |
 | HTTP and tool boundaries | `PYTHONPATH=shared python3 -m unittest discover -s tests -p 'test_security_boundaries.py' -v` |
 | Signal images | `python3 -m unittest discover -s signal-bot-patches -v` |
 | Audio adapters | `PYTHONPATH=audio-api python3 -m unittest discover -s audio-api/tests -v` |
 | Music trimming | `python3 signal-bot-custom-skills/music_download/test_trim.py` |
+
+The shared-client suite uses `tests/requirements.txt` and mocked transports; it
+does not call models or running services. CI runs it alongside the baseline checks.
 
 The audio suite needs the audio image's dependencies and ffmpeg but mocks model
 inference. GPU listening evaluations are separate manual checks under
