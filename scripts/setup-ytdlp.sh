@@ -16,7 +16,7 @@ sudo apt-get install -y ffmpeg nodejs python3-venv >/dev/null
 echo "[2] python venv + requirements"
 python3 -m venv "$SVC_DIR/.venv"
 "$SVC_DIR/.venv/bin/pip" install -q -U pip
-"$SVC_DIR/.venv/bin/pip" install -q -r "$SVC_DIR/requirements.txt"
+"$SVC_DIR/.venv/bin/pip" install -q -c "$SVC_DIR/constraints.txt" -r "$SVC_DIR/requirements.txt"
 
 echo "[3] cookies check"
 if [[ -f "$SVC_DIR/youtube_cookies.txt" ]]; then

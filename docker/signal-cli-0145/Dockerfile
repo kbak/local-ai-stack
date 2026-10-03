@@ -11,7 +11,7 @@
 #
 # Remove this image and revert docker-compose to the plain bbernhard tag once
 # their :latest (or latest-dev) ships signal-cli >=0.14.5.
-FROM rust:1.89-bookworm AS call-tunnel-builder
+FROM rust:1.89-bookworm@sha256:948f9b08a66e7fe01b03a98ef1c7568292e07ec2e4fe90d88c07bb14563c84ff AS call-tunnel-builder
 
 # signal-cli's calling support deliberately keeps RingRTC in a separate
 # process. Pin the tunnel and its RingRTC submodule together: this API is still

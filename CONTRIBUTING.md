@@ -84,6 +84,19 @@ pinned upstream revision, and review every patch when changing that revision.
 Bot and voice constraints pin their runtime dependencies; update those files
 intentionally alongside compatibility tests.
 
+Refresh uv projects with `uv lock --upgrade --project services/<service>`.
+For services using requirements and constraints, regenerate the constraints with
+`uv pip compile requirements.txt --upgrade --python-version 3.12 --no-header
+--no-annotate --no-emit-index-url -o constraints.txt` from the service directory.
+Use Python 3.13 for the MCP proxy and 3.11 for memory; the bot writes its output
+to `patches/constraints.txt`. Keep the declared SDK compatibility limits and
+explicit GPU/embedding runtime versions unless testing their migration.
+
+External Docker build images are pinned by digest. Updating a tag alone does not
+update its digest. Resolve the new digest, build candidate images, run the affected
+tests in those images, and check `pip check` before adopting a release. Local tests
+run before committing; CI repeats them independently on the committed source.
+
 Avoid unrelated formatting, dependency upgrades, and service restarts in a
 refactor. Changes to model IDs, APIs, volume names, and database schemas need
 explicit installation guidance.

@@ -1,4 +1,4 @@
-FROM python:3.11.15-slim-bookworm@sha256:d29f48a31a8b408ed19272ca1e7b10ebae13b240a27e862d3d4217c528e2e0c3
+FROM python:3.11.15-slim-bookworm@sha256:d29f48a31a8b408ed19272ca1e7b10ebae13b240a27e862d3d4217c528e2e0c3 AS dependencies
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends build-essential git && \
@@ -6,17 +6,19 @@ RUN apt-get update && \
 
 WORKDIR /app
 
-COPY services/memory-mcp/requirements.txt /app/requirements.txt
+COPY services/memory-mcp/requirements.txt services/memory-mcp/constraints.txt /app/
 # Install CPU-only torch first so sentence-transformers picks it up as
 # already-satisfied instead of pulling the cu* wheels (~4.5 GB of unused
 # CUDA libs). bge-m3 runs on CPU here — this container has no GPU access.
 RUN pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu \
         torch==2.11.0 torchvision==0.26.0 && \
-    pip install --no-cache-dir -r /app/requirements.txt
+    pip install --no-cache-dir -c /app/constraints.txt -r /app/requirements.txt
 
 # Dependencies come from the service requirements; shared code is bundled.
 COPY shared/ /shared/
 RUN pip install --no-cache-dir --no-deps /shared/
+
+FROM dependencies AS runtime
 
 # Bake bge-m3 into the image so first-run has no download delay.
 # ~2.3GB - matches the pattern used by audio-api (whisper + kokoro).

@@ -1,8 +1,14 @@
-mem0ai==2.0.13
-qdrant-client==1.18.0
+mem0ai==2.2.1
+qdrant-client==1.19.1
 sentence-transformers==3.3.1
-fastapi==0.139.2
-uvicorn[standard]==0.51.0
-mcp==1.28.1
+fastapi==0.142.2
+uvicorn[standard]==0.54.0
+mcp==1.30.0
 httpx==0.28.1
 python-multipart==0.0.32
+
+# Preserve the embedding runtime and existing SDK major.
+openai<3
+transformers<5
+torch==2.11.0
+torchvision==0.26.0

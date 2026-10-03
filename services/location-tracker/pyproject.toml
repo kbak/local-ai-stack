@@ -3,7 +3,7 @@ name = "location-tracker"
 version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = [
-    "stack-shared",
+    "stack-shared[llm,calendar,scheduling,rss]",
     "fastmcp>=2.3.4",
     "openai>=1.30.0",
     "starlette>=0.41.0",

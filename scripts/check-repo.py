@@ -40,6 +40,18 @@ def main() -> int:
             continue
         if credential.search(source):
             errors.append(f"{name}: possible credential (value withheld)")
+        if path.name == "Dockerfile":
+            stages = set()
+            for line in source.splitlines():
+                match = re.match(r"FROM\s+(\S+)(?:\s+AS\s+(\S+))?", line, re.I)
+                copy = re.match(r"COPY\s+--from=(\S+)", line, re.I)
+                reference = match[1] if match else copy[1] if copy else None
+                if (reference and reference not in stages and reference != "scratch"
+                        and not reference.isdigit()
+                        and not re.search(r"@sha256:[a-f0-9]{64}$", reference)):
+                    errors.append(f"{name}: unpinned external image {reference}")
+                if match and match[2]:
+                    stages.add(match[2])
         try:
             if path.suffix == ".py":
                 ast.parse(source, filename=name)

@@ -1,11 +1,7 @@
-FROM python:3.12-slim
+FROM python:3.12-slim@sha256:dddfd7e07f9d15aeeca61529320492139d21cac7f0070c00609243e51e4e0016
 
-RUN pip install --no-cache-dir \
-    "fastmcp<4" "mcp<2" \
-    httpx \
-    beautifulsoup4 \
-    uvicorn \
-    starlette
+COPY services/reverse-image-search/requirements.txt services/reverse-image-search/constraints.txt /tmp/
+RUN pip install --no-cache-dir -c /tmp/constraints.txt -r /tmp/requirements.txt
 
 WORKDIR /app
 COPY shared/ /shared/

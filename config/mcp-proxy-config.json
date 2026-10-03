@@ -13,23 +13,23 @@
       "command": "uvx",
       "args": [
         "--with",
-        "mcp==1.28.0",
-        "mcp-server-fetch==2025.4.7"
+        "mcp==1.30.0",
+        "mcp-server-fetch==2026.8.18"
       ]
     },
     "arxiv": {
       "command": "uvx",
       "args": [
         "--with",
-        "mcp==1.28.0",
-        "arxiv-mcp-server==0.4.11"
+        "mcp==1.30.0",
+        "arxiv-mcp-server==0.8.0"
       ]
     },
     "youtube": {
       "command": "uvx",
       "args": [
         "--with",
-        "mcp==1.28.0",
+        "mcp==1.30.0",
         "mcp-youtube-transcript==0.3.5"
       ]
     },
@@ -37,15 +37,15 @@
       "command": "uvx",
       "args": [
         "--with",
-        "mcp==1.28.0",
-        "mcp-server-time==2026.1.26"
+        "mcp==1.30.0",
+        "mcp-server-time==2026.8.18"
       ]
     },
     "weather": {
       "command": "uvx",
       "args": [
         "--with",
-        "mcp==1.28.0",
+        "mcp==1.30.0",
         "--from",
         "mcp-weather-server==0.6.1",
         "mcp_weather_server"
@@ -55,15 +55,15 @@
       "command": "uvx",
       "args": [
         "--with",
-        "mcp==1.28.0",
-        "frankfurtermcp==0.4.4"
+        "mcp==1.30.0",
+        "frankfurtermcp==0.5.0"
       ]
     },
     "finance": {
       "command": "uvx",
       "args": [
         "--with",
-        "mcp==1.28.0",
+        "mcp==1.30.0",
         "yfinance-mcp-server==1.0.4"
       ]
     },
@@ -80,7 +80,7 @@
         "--with",
         "google-maps-mcp-server==0.2.1",
         "--with",
-        "mcp==1.28.0",
+        "mcp==1.30.0",
         "python",
         "/opt/gmaps-searchtext-shim.py"
       ]

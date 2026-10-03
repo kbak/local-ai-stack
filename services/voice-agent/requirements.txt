@@ -1,7 +1,7 @@
-fastapi==0.141.1
-uvicorn[standard]==0.53.0
+fastapi==0.142.2
+uvicorn[standard]==0.54.0
 httpx==0.28.1
-strands-agents[openai]==1.56.0
+strands-agents[openai]==1.57.2
 strands-agents-tools==0.8.9
 pyyaml==6.0.3
 websockets==13.1
