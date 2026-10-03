@@ -4,8 +4,8 @@
 # Activates the vLLM venv at ~/vllm-runtime/.venv and execs `vllm serve`.
 set -e
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-WORKSPACE="$(dirname "$SCRIPT_DIR")"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+WORKSPACE="$(dirname "$REPO_ROOT")"
 
 PORT="${1:?port arg required}"
 

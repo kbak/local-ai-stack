@@ -87,7 +87,7 @@ class SearchTemplateTests(unittest.TestCase):
             root = Path(directory)
             source = 'secret: "__SEARXNG_SECRET__"\nkey: "__BRAVE_SEARCH_API_KEY__"\n'
             (root / "template.yml").write_text(source)
-            script = (ROOT / "searxng-entrypoint.sh").read_text()
+            script = (ROOT / "docker/searxng/entrypoint.sh").read_text()
             script = script.replace("/etc/searxng/settings.template.yml", str(root / "template.yml"))
             script = script.replace("/etc/searxng/settings.yml", str(root / "settings.yml"))
             script = script.replace("exec /usr/local/searxng/entrypoint.sh", "exit 0")

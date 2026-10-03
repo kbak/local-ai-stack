@@ -47,7 +47,7 @@ covered in [watchers](watchers.md). Shared Python helpers live in
 
 ## Configuration and state
 
-Compose files define services and persistent volumes. Native `serve-*.sh`
+Compose files define services and persistent volumes. Native `scripts/serve-*.sh`
 launchers define model workers. `.env` and service-specific `*.env` files supply
 operator values; tracked `*.example` files document them.
 

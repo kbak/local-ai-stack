@@ -4,8 +4,8 @@
 # ~1.1 GB weights — persistent alongside audio-api; utilization kept low.
 set -e
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-WORKSPACE="$(dirname "$SCRIPT_DIR")"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+WORKSPACE="$(dirname "$REPO_ROOT")"
 
 PORT="${1:?port arg required}"
 
@@ -22,8 +22,8 @@ export VLLM_HOST_IP=127.0.0.1
 # Pin to the secondary GPU. Prefer an inherited value, but fall back to the
 # project .env so restarting llama-swap from a non-interactive shell does not
 # silently drop the GPU selection.
-if [[ -z "${SECONDARY_GPU:-}" && -f "$SCRIPT_DIR/.env" ]]; then
-    SECONDARY_GPU=$(sed -n 's/^SECONDARY_GPU=//p' "$SCRIPT_DIR/.env" | tail -n 1)
+if [[ -z "${SECONDARY_GPU:-}" && -f "$REPO_ROOT/.env" ]]; then
+    SECONDARY_GPU=$(sed -n 's/^SECONDARY_GPU=//p' "$REPO_ROOT/.env" | tail -n 1)
     SECONDARY_GPU="${SECONDARY_GPU%$'\r'}"
     SECONDARY_GPU="${SECONDARY_GPU#\"}"
     SECONDARY_GPU="${SECONDARY_GPU%\"}"

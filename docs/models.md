@@ -1,7 +1,7 @@
 # Model serving
 
 `llama-swap.yaml` defines the available models and their lifecycle groups.
-`serve-*.sh` launchers contain runtime arguments. Clients use the stable model
+`scripts/serve-*.sh` launchers contain runtime arguments. Clients use the stable model
 IDs below; weights and runtime caches live outside the repository.
 
 ## Runtime layout
@@ -13,7 +13,7 @@ Model downloads require the upstream repository's access and license terms.
 
 The 27B launcher loads an immutable snapshot under `../models/hf/hub`. Download
 that revision using the same OS user's Hugging Face credentials before startup;
-its repository and revision are in `serve-qwen-27b.sh`. Other vLLM workers can
+its repository and revision are in `scripts/serve-qwen-27b.sh`. Other vLLM workers can
 populate their caches on first use. Muse Glimmer uses a dedicated pinned Docker
 image and needs Docker access from the llama-swap process.
 
@@ -76,4 +76,4 @@ text_encoders/t5xxl_fp8_e4m3fn.safetensors
 ```
 
 Supply a CUDA build of stable-diffusion.cpp compatible with the flags in
-`serve-sdcpp.sh`. Weight licenses and runtime licenses are separate.
+`scripts/serve-sdcpp.sh`. Weight licenses and runtime licenses are separate.

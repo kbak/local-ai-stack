@@ -64,7 +64,7 @@ services:
       - ./location-tracker/location_tracker:/app/location_tracker:ro
   librechat:
     volumes:
-      - ./librechat-render.js:/app/librechat-render.js:ro
+      - ./docker/librechat/render.js:/app/librechat-render.js:ro
   searxng:
     volumes:
-      - ./searxng-entrypoint.sh:/usr/local/bin/local-searxng-entrypoint.sh:ro
+      - ./docker/searxng/entrypoint.sh:/usr/local/bin/local-searxng-entrypoint.sh:ro

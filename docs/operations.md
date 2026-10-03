@@ -3,6 +3,26 @@
 Run commands from the repository root. Use the Compose file for the host being
 managed; service and volume names are stable across restarts.
 
+## Script layout
+
+`start-ai.sh` and `start-server.sh` remain at the repository root for host
+launchers. Other operational helpers live in `scripts/`:
+
+| Scripts | Purpose |
+| --- | --- |
+| `serve-*.sh` | Model workers invoked by `llama-swap.yaml` |
+| `setup-*.sh`, `install-*.sh`, `render-systemd.py` | Host and runtime installation |
+| `init-public-api-secrets.sh`, `set-cloudflared-token.sh` | Local API credentials |
+| `dns-sync.sh`, `run-llama-swap-private-relays.sh` | Private network access |
+| `backup-nextcloud.sh`, `restore-nextcloud.sh`, `nextcloud-backup.cron` | Backup and recovery |
+| `build-release.py` | Release image builds |
+| `check-*`, `test-*`, `validate-public-api.sh` | Repository checks and live smoke tests |
+
+Container startup adapters live beside their Dockerfiles in `docker/`.
+Model launchers resolve runtime and model paths relative to the checkout;
+run llama-swap from the repository root. After updating launcher paths in
+`llama-swap.yaml`, restart the router before requesting another model worker.
+
 ## Inspect services
 
 ```bash

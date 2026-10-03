@@ -5,7 +5,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const { test } = require('node:test');
 
-const source = fs.readFileSync(path.join(__dirname, '..', 'librechat-render.js'), 'utf8');
+const source = fs.readFileSync(path.join(__dirname, '..', 'docker', 'librechat', 'render.js'), 'utf8');
 
 async function runRenderer({ doc, memory = '', enabled = 'true', env = {}, onLookup = () => {}, onRender = () => {} }) {
   const writes = [];

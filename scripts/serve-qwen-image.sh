@@ -2,11 +2,11 @@
 # Qwen-Image 2.1 generation and editing, started on demand by llama-swap.
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-WORKSPACE="$(dirname "$SCRIPT_DIR")"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+WORKSPACE="$(dirname "$REPO_ROOT")"
 PORT="${1:?port arg required}"
 MODEL_DIR="${QWEN_IMAGE_MODEL_DIR:-$WORKSPACE/models/image-gen/qwen-image-2.1}"
-SD_SERVER="${QWEN_IMAGE_SERVER:-$SCRIPT_DIR/bin/sd-server-qwen-image-2.1}"
+SD_SERVER="${QWEN_IMAGE_SERVER:-$REPO_ROOT/bin/sd-server-qwen-image-2.1}"
 
 export CUDA_DEVICE_ORDER=PCI_BUS_ID
 export CUDA_VISIBLE_DEVICES="${QWEN_IMAGE_GPU:-0}"

@@ -19,7 +19,7 @@ GGUF text encoder, F16 vision projector, and the model's VAE.
 
 The build defaults to CUDA architecture 120; set `QWEN_IMAGE_CUDA_ARCH` for your
 target hardware. `QWEN_IMAGE_BUILD_JOBS` controls build parallelism (default 3).
-Runtime settings are in `serve-qwen-image.sh`:
+Runtime settings are in `scripts/serve-qwen-image.sh`:
 
 | Variable | Default |
 | --- | --- |

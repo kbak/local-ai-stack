@@ -8,7 +8,7 @@ healthCheckTimeout: 900
 
 models:
   qwen3.8-27B-FP8:
-    cmd: bash ./serve-qwen-27b.sh ${PORT}
+    cmd: bash ./scripts/serve-qwen-27b.sh ${PORT}
     proxy: http://127.0.0.2:${PORT}
     checkEndpoint: /v1/models
     ttl: 0
@@ -16,21 +16,21 @@ models:
   # Muse Glimmer uses its dedicated pre-release vLLM container so the working
   # local vLLM environment used by Qwen remains unchanged.
   muse-glimmer-30B-FP8:
-    cmd: bash ./serve-muse-glimmer.sh ${PORT}
+    cmd: bash ./scripts/serve-muse-glimmer.sh ${PORT}
     cmdStop: docker stop --timeout 30 llama-swap-muse-glimmer-${PORT}
     proxy: http://127.0.0.2:${PORT}
     checkEndpoint: /v1/models
     ttl: 0
 
   qwen3.6-35B-A3B-FP8:
-    cmd: bash ./serve-qwen-35b-a3b.sh ${PORT}
+    cmd: bash ./scripts/serve-qwen-35b-a3b.sh ${PORT}
     proxy: http://127.0.0.2:${PORT}
     checkEndpoint: /v1/models
     ttl: 0
 
   # Persistent FIM autocomplete on the primary GPU, alongside chat.
   qwen-coder-7B:
-    cmd: bash ./serve-qwen-coder-7b.sh ${PORT}
+    cmd: bash ./scripts/serve-qwen-coder-7b.sh ${PORT}
     proxy: http://127.0.0.2:${PORT}
     checkEndpoint: /v1/models
     ttl: 0
@@ -40,7 +40,7 @@ models:
   # serves as the human-facing frontend.
   # sd-server must be in PATH — build with -DSD_CUBLAS=on from leejet/stable-diffusion.cpp.
   flux-dev:
-    cmd: bash ./serve-sdcpp.sh ${PORT}
+    cmd: bash ./scripts/serve-sdcpp.sh ${PORT}
     proxy: http://127.0.0.2:${PORT}
     checkEndpoint: /v1/models
     ttl: 600
@@ -48,7 +48,7 @@ models:
   # Qwen Research License: evaluation/research only. Separate CUDA runtime
   # keeps the existing FLUX binary available. See docs/qwen-image-2.1.md.
   qwen-image-2.1:
-    cmd: bash ./serve-qwen-image.sh ${PORT}
+    cmd: bash ./scripts/serve-qwen-image.sh ${PORT}
     proxy: http://127.0.0.2:${PORT}
     checkEndpoint: /v1/models
     ttl: 600
@@ -57,7 +57,7 @@ models:
   # vLLM uses --runner pooling for cross-encoder scoring.
   # Endpoint: POST /v1/score with {"model":"bge-reranker-v2-m3","text_1":"query","text_2":["doc1","doc2"]}
   bge-reranker-v2-m3:
-    cmd: bash ./serve-reranker.sh ${PORT}
+    cmd: bash ./scripts/serve-reranker.sh ${PORT}
     proxy: http://127.0.0.2:${PORT}
     checkEndpoint: /v1/models
     ttl: 0
