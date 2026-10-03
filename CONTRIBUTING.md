@@ -6,7 +6,8 @@ example and documentation when changing configuration.
 
 ## Layout
 
-- Service directories contain their Dockerfile, source, and dependencies.
+- Service directories contain source and dependencies. Watchers and the location
+  tracker share `docker/watcher/Dockerfile`, with separate per-service lockfiles.
 - `shared/stack_shared/` contains common LLM, HTTP, calendar, and Signal helpers.
 - `signal-bot-custom-skills/` contains independently discovered bot skills.
 - `signal-bot-patches/` and `patches/` contain upstream integration patches.
@@ -17,6 +18,19 @@ example and documentation when changing configuration.
 Do not commit credentials, private hostnames, personal subscriptions, generated
 media, or deployment records. Keep incident reports, upgrade journals, benchmark
 runs, and personal setup notes in a private operations repository.
+
+## Development
+
+Production Compose uses bundled code. Opt into source mounts while developing:
+
+```bash
+docker compose -f docker-compose.server.yml -f docker-compose.server.dev.yml up -d --build signal-bot voice-agent
+```
+
+Restart affected processes after editing mounted Python. Dependency changes
+still require a rebuild. The AI host has a corresponding `docker-compose.ai.dev.yml`.
+The overrides retain production data volumes; use separate local configuration
+and a separate Docker environment when you need isolated test data.
 
 ## Checks
 
@@ -38,6 +52,9 @@ Run affected service tests in that service's dependency environment:
 
 | Area | Command from repository root |
 | --- | --- |
+| Discovery and polling | `python3 -m unittest discover -s tests -p 'test_runtime_helpers.py' -v` |
+| Release packaging | `python3 -m unittest discover -s tests -p 'test_release.py' -v` |
+| Bot patch failure checks | `python3 -m unittest discover -s signal-bot-patches -p 'test_patches.py' -v` |
 | Shared MCP and LLM clients | `python3 -m unittest discover -s tests -p 'test_shared_clients.py' -v` |
 | Gateway | `python3 -m unittest discover -s public-api-gateway -p 'test_*.py' -v` |
 | RSS watcher | `PYTHONPATH=shared:rss-watcher python3 -m unittest discover -s rss-watcher/tests -v` |
@@ -58,7 +75,12 @@ inference. GPU listening evaluations are separate manual checks under
 Use each service's existing dependency manager and update its lockfile alongside
 its manifest. Preserve pinned images, models, and upstream revisions unless
 updating them intentionally. Explain compatibility workarounds next to the code
-and verify patches against the exact upstream version used by the build.
+and verify patches against the exact upstream version used by the build. Bot
+patches live in `signal-bot-patches/*.patch`; the installer checks all hunks and
+Python syntax before replacing source. Rebuild the bot to validate against its
+pinned upstream revision, and review every patch when changing that revision.
+Bot and voice constraints pin their runtime dependencies; update those files
+intentionally alongside compatibility tests.
 
 Avoid unrelated formatting, dependency upgrades, and service restarts in a
 refactor. Changes to model IDs, APIs, volume names, and database schemas need

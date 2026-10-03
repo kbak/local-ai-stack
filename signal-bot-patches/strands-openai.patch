@@ -1,0 +1,12 @@
+--- a/strands/models/openai.py
++++ b/strands/models/openai.py
+@@ -532,6 +532,9 @@
+             **(self._format_request_tool_choice(tool_choice)),
+             **params,
+         }
++
++        if not request["tools"]:
++            request.pop("tools")
+ 
+         if stream:
+             request["stream_options"] = stream_options

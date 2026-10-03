@@ -84,7 +84,15 @@ This starts llama-swap, warms the configured workers, and starts GPU services.
 Cold model compilation can take several minutes. It preserves a running main
 chat model and otherwise loads the configured startup default.
 
-On the server host, run `./start-server.sh` for the full stack, or select services:
+On the server host, build the local images before starting the full stack:
+
+```bash
+docker compose -f docker-compose.server.yml build
+./start-server.sh
+```
+
+For revision-tagged releases, use [the release helper](operations.md#apply-changes).
+To build and start selected services:
 
 ```bash
 docker compose -f docker-compose.server.yml up -d --build librechat

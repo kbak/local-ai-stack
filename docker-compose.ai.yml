@@ -14,6 +14,8 @@ services:
     mem_limit: 1024m
 
   memory-mcp:
+    image: ${STACK_IMAGE_PREFIX:-local-ai-stack}/memory-mcp:${STACK_VERSION:-dev}
+    pull_policy: never
     build:
       context: .
       dockerfile: memory-mcp/Dockerfile
@@ -30,8 +32,6 @@ services:
       MEMORY_DEFAULT_USER_ID: ${MEMORY_DEFAULT_USER_ID:-default}
     extra_hosts:
       - "host.docker.internal:${AI_BRIDGE_ADDRESS:-172.18.0.1}"
-    volumes:
-      - ./shared:/shared:ro
     depends_on:
       - qdrant
     networks:
@@ -39,6 +39,8 @@ services:
     mem_limit: 3000m
 
   audio-api:
+    image: ${STACK_IMAGE_PREFIX:-local-ai-stack}/audio-api:${STACK_VERSION:-dev}
+    pull_policy: never
     build:
       context: .
       dockerfile: audio-api/Dockerfile

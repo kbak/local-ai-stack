@@ -31,7 +31,15 @@ presentation settings are listed in [deployment configuration](deployment.md).
 
 Custom skills live in `signal-bot-custom-skills/`. Each directory provides a
 `skill.yaml` manifest and Python implementation, discovered at startup. Shared
-skill helpers live in `_shared/`.
+skill helpers live in `_shared/`. Images bundle skills outside the persistent
+bot data directory, at `/app/custom_skills`; browser voice uses `/app/skills`.
+
+Both clients load only `module:function` entries listed under `tools`. Optional
+`runtimes: [signal]` or `runtimes: [voice]` restricts discovery; omitting it enables
+both. Image generation is Signal-only because it requires conversation context
+and Signal delivery. Unlisted Python files, including tests, are never scanned
+for tools. Rebuild after changing manifests or implementation, or use the
+[development override](../CONTRIBUTING.md#development).
 
 | Skills | Purpose |
 | --- | --- |

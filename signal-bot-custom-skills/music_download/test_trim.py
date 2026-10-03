@@ -1,4 +1,4 @@
-"""Run inside signal-bot: python -m unittest discover -s data/custom_skills/music_download -p 'test_*.py'."""
+"""Run inside signal-bot: python -m unittest discover -s /app/custom_skills/music_download -p 'test_*.py'."""
 import subprocess
 import tempfile
 import unittest

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-import time
+from stack_shared.polling import run_polling
 
 from .config import POLL_INTERVAL_MINUTES
 from .poller import poll_once
@@ -18,13 +18,10 @@ def main() -> None:
     )
 
     log.info("Starting poll loop (interval=%dm)", POLL_INTERVAL_MINUTES)
-    while True:
-        log.info("Polling CalDAV...")
-        try:
-            poll_once()
-        except Exception:
-            log.exception("Poll loop error")
-        time.sleep(POLL_INTERVAL_MINUTES * 60)
+    run_polling(
+        poll_once, POLL_INTERVAL_MINUTES * 60, logger=log,
+        poll_message="Polling CalDAV...",
+    )
 
 
 if __name__ == "__main__":

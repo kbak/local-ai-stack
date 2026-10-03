@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-import time
+from stack_shared.polling import run_polling
 
 from .config import DRY_RUN, POLL_INTERVAL_MINUTES
 from .poller import poll_once
@@ -17,12 +17,9 @@ def main() -> None:
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
     log.info("receipt-watcher starting (dry_run=%s, interval=%dm)", DRY_RUN, POLL_INTERVAL_MINUTES)
-    while True:
-        try:
-            poll_once()
-        except Exception:
-            log.exception("Poll loop error")
-        time.sleep(POLL_INTERVAL_MINUTES * 60)
+    run_polling(
+        poll_once, POLL_INTERVAL_MINUTES * 60, logger=log,
+    )
 
 
 if __name__ == "__main__":

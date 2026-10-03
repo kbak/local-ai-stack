@@ -33,7 +33,7 @@ async def main():
             print(f"Captured image: {destination}", flush=True)
 
     image_tools._send = capture
-    skill_path = "/app/data/custom_skills/image_generation/image_generation.py"
+    skill_path = "/app/custom_skills/image_generation/image_generation.py"
     spec = importlib.util.spec_from_file_location("image_smoke_skill", skill_path)
     skill = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(skill)

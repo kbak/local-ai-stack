@@ -43,7 +43,7 @@ requires the host firewall, proxy, and any private-network routing.
 
 Watchers have no public interface. Their schedules and integration settings are
 covered in [watchers](watchers.md). Shared Python helpers live in
-`shared/stack_shared/`, mounted into the services that use them.
+`shared/stack_shared/`, installed into the images that use them.
 
 ## Configuration and state
 

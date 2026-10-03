@@ -24,10 +24,31 @@ docker compose -f docker-compose.server.yml up -d --no-deps librechat
 docker compose -f docker-compose.ai.yml up -d --no-deps audio-api
 ```
 
-Rebuild when changing source copied into an image. Shared Python helpers and
-some frontend/skill files are bind-mounted; restart the affected process when it
-needs to reload them. Model launcher or llama-swap configuration changes require
-restarting the affected model worker or router.
+Production application code is bundled in images. Editing shared helpers,
+skills, or frontend files takes effect only after rebuilding and recreating the
+relevant services. Model launcher or llama-swap configuration changes still
+require restarting the affected model worker or router.
+
+Build a release from a clean, committed checkout:
+
+```bash
+python3 scripts/build-release.py signal-bot voice-agent rss-watcher
+```
+
+The helper builds from a Git archive, excludes private/untracked files, labels
+and tags images with the full commit, and refuses to overwrite an existing
+revision tag. It prints the deployment command. Set `STACK_VERSION` in local
+`.env` to that revision when adopting it as the installation's default. Build
+all services you intend to recreate with that version; when deploying a subset,
+use the printed `--no-deps` command with dependencies already running.
+
+To roll back, use the previous revision's Compose file and local configuration,
+set `STACK_VERSION` to its image tag, and run `up -d --no-build --pull never` for
+the affected services. Keep those images until the next release is verified.
+Data volumes are retained; code rollback does not undo application data changes.
+For the AI host, use `build-release.py --host ai`; deploy each host independently.
+
+For development source mounts, see [contributing](../CONTRIBUTING.md).
 
 ## Persistent data and backups
 

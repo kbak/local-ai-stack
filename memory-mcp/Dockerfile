@@ -14,12 +14,9 @@ RUN pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu 
         torch==2.11.0 torchvision==0.26.0 && \
     pip install --no-cache-dir -r /app/requirements.txt
 
-# Install stack_shared editable so a compose bind-mount of ./shared:/shared:ro
-# picks up source changes without rebuilding. --no-deps because memory-mcp
-# doesn't need apscheduler/caldav/icalendar from stack_shared's dep list;
-# httpx + openai come from its own requirements.
+# Dependencies come from the service requirements; shared code is bundled.
 COPY shared/ /shared/
-RUN pip install --no-cache-dir --no-deps -e /shared/
+RUN pip install --no-cache-dir --no-deps /shared/
 
 # Bake bge-m3 into the image so first-run has no download delay.
 # ~2.3GB - matches the pattern used by audio-api (whisper + kokoro).

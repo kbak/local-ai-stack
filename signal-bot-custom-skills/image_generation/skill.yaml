@@ -11,6 +11,7 @@ description: >
   in the prompt; transparency is experimental. Default to one image per user request.
 version: "1.0.0"
 enabled: true
+runtimes: [signal]
 tools:
   - "image_generation:generate_image"
   - "image_generation:edit_image"

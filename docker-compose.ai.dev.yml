@@ -1,0 +1,6 @@
+services:
+  memory-mcp:
+    environment:
+      PYTHONPATH: /shared:/app
+    volumes:
+      - ./shared:/shared:ro
