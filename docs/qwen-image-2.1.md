@@ -1,8 +1,9 @@
 # Image generation and editing
 
-Qwen-Image 2.1 runs through stable-diffusion.cpp and llama-swap. It shares the
-`cuda0_image` group with FLUX: one image worker runs at a time, with a ten-minute
-idle timeout. `start-ai.sh` preloads Qwen-Image.
+Qwen-Image 2.1 runs through stable-diffusion.cpp and llama-swap in the persistent
+`cuda0_image` group with no idle timeout (`ttl: 0`). `start-ai.sh` preloads it
+alongside the main chat model and autocomplete. FLUX is no longer configured
+in llama-swap.
 
 ## Install
 

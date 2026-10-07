@@ -35,23 +35,13 @@ models:
     checkEndpoint: /v1/models
     ttl: 0
 
-  # FLUX.1-dev FP8 image generation via stable-diffusion.cpp (sd-server).
-  # Replaces the SwarmUI+ComfyUI Docker stack. The playground UI at /ui
-  # serves as the human-facing frontend.
-  # sd-server must be in PATH — build with -DSD_CUBLAS=on from leejet/stable-diffusion.cpp.
-  flux-dev:
-    cmd: bash ./scripts/serve-sdcpp.sh ${PORT}
-    proxy: http://127.0.0.2:${PORT}
-    checkEndpoint: /v1/models
-    ttl: 600
-
-  # Qwen Research License: evaluation/research only. Separate CUDA runtime
-  # keeps the existing FLUX binary available. See docs/qwen-image-2.1.md.
+  # Qwen Research License: evaluation/research only. Uses a dedicated CUDA
+  # runtime and stays loaded without an idle timeout. See docs/qwen-image-2.1.md.
   qwen-image-2.1:
     cmd: bash ./scripts/serve-qwen-image.sh ${PORT}
     proxy: http://127.0.0.2:${PORT}
     checkEndpoint: /v1/models
-    ttl: 600
+    ttl: 0
 
   # Cross-encoder reranker on the secondary GPU (~1.1 GB weights, persistent).
   # vLLM uses --runner pooling for cross-encoder scoring.
@@ -66,7 +56,7 @@ models:
 #   cuda0 (primary GPU):
 #     - cuda0_main:     35B-A3B, 27B, or Muse Glimmer; one is always loaded.
 #     - cuda0_coder:    coder-7B, persistent, primary-GPU autocomplete.
-#     - cuda0_image:    FLUX-dev or Qwen-Image 2.1, ttl:600 when idle.
+#     - cuda0_image:    Qwen-Image 2.1, persistent image generation and editing.
 #   cuda1 (secondary GPU):
 #     - cuda1_reranker: bge-reranker-v2-m3, persistent, tiny footprint.
 groups:
@@ -86,13 +76,12 @@ groups:
     members:
       - "qwen-coder-7B"
 
-  # Image gen on the primary GPU. Not persistent — swaps out after ttl idle
-  # to free VRAM headroom for the 27B model if both are needed concurrently.
+  # Keep image generation resident alongside the chat and autocomplete models.
   "cuda0_image":
-    swap: true
+    swap: false
     exclusive: false
+    persistent: true
     members:
-      - "flux-dev"
       - "qwen-image-2.1"
 
   # Reranker on the secondary GPU alongside audio-api. Persistent: tiny model, no

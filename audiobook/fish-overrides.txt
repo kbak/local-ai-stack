@@ -1,0 +1,3 @@
+# Fish upstream overrides descript-audiotools' obsolete protobuf<3.20 pin.
+# Match its documented >=3.20,<6 compatibility range.
+protobuf==5.29.6

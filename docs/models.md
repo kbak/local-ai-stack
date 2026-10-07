@@ -30,8 +30,7 @@ them together when adapting the profile to a different GPU capacity.
 | `qwen3.8-27B-FP8` | `cuda0_main` | Swaps with other main chat models |
 | `muse-glimmer-30B-FP8` | `cuda0_main` | Swaps with other main chat models |
 | `qwen-coder-7B` | `cuda0_coder` | Persistent autocomplete |
-| `qwen-image-2.1` | `cuda0_image` | Preloaded; unloads after 600 idle seconds |
-| `flux-dev` | `cuda0_image` | On demand; unloads after 600 idle seconds |
+| `qwen-image-2.1` | `cuda0_image` | Persistent; preloaded with no idle timeout |
 | `bge-reranker-v2-m3` | `cuda1_reranker` | Persistent reranker |
 
 Only one worker in each swappable group runs at a time. Other groups coexist
@@ -66,14 +65,5 @@ Configure private relays or an HTTPS proxy for remote/container clients; see
 ## Images
 
 See [Qwen-Image](qwen-image-2.1.md) for the pinned installer and API examples.
-FLUX uses `../bin/sd-server` and these files under `../models/image-gen/`:
-
-```text
-diffusion_models/flux1-dev-fp8.safetensors
-VAE/ae.safetensors
-text_encoders/clip_l.safetensors
-text_encoders/t5xxl_fp8_e4m3fn.safetensors
-```
-
-Supply a CUDA build of stable-diffusion.cpp compatible with the flags in
-`scripts/serve-sdcpp.sh`. Weight licenses and runtime licenses are separate.
+Qwen-Image stays resident in its persistent group. FLUX is no longer configured
+in llama-swap. Weight licenses and runtime licenses are separate.

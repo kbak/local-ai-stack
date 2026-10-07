@@ -24,6 +24,10 @@ services/yt-dlp-service/youtube_cookies.txt
 
 # Google service account keys and OAuth tokens — never commit
 services/receipt-watcher/secrets/*.json
+# Local receipt-watcher configuration retained at the repository root
+/receipt-watcher/accounts.yaml
+/receipt-watcher/vendors.yaml
+/receipt-watcher/secrets/*.json
 plc-watcher.env
 
 # Local virtual environments
