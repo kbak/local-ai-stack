@@ -2,7 +2,8 @@
 
 Prepare chaptered text, render resumable narration with Fish S2 Pro or Breeze,
 check the audio with local Whisper, and export FLAC and chaptered Ogg/Opus.
-These command-line tools run separately from the stack's services.
+These command-line tools live in `scripts/audiobook/` and run separately from
+the stack's services. Run the commands below from the repository root.
 
 ## Setup
 
@@ -10,8 +11,8 @@ Requirements: Linux, Python 3.12, `uv`, `hf`, Git, FFmpeg with libopus, `flock`,
 a compiler toolchain, and a CUDA 12.8-capable driver. Install either renderer:
 
 ```bash
-bash audiobook/setup-fish.sh  # Fish S2 Pro
-bash audiobook/setup.sh       # Breeze
+bash scripts/audiobook/setup-fish.sh  # Fish S2 Pro
+bash scripts/audiobook/setup.sh       # Breeze
 ```
 
 The installers pin model and code revisions and Python dependencies. Models,
@@ -38,7 +39,7 @@ notes. Long paragraphs are split at sentence boundaries.
 
 ```bash
 JOB=.maintenance/audiobook/jobs/my-book
-python3 audiobook/audiobook.py prepare .maintenance/audiobook/manuscript.txt "$JOB" \
+python3 scripts/audiobook/audiobook.py prepare .maintenance/audiobook/manuscript.txt "$JOB" \
   --engine fish --title 'Example Book'
 ```
 
@@ -57,14 +58,14 @@ Keep both files unchanged throughout a job. Alternatively, copy this pair from
 an existing local job whose voice you want to reuse.
 
 ```bash
-bash audiobook/run-fish.sh "$JOB" --stop 4
+bash scripts/audiobook/run-fish.sh "$JOB" --stop 4
 # Listen to the opening, then resume.
-bash audiobook/run-fish.sh "$JOB"
+bash scripts/audiobook/run-fish.sh "$JOB"
 ```
 
 For Breeze, prepare with `--engine breeze`, generate a reference with
-`bash audiobook/run.sh voice "$JOB" --instruction 'A clear, calm narrator'`,
-then render with `bash audiobook/run.sh render "$JOB"`. The optional `--fast`
+`bash scripts/audiobook/run.sh voice "$JOB" --instruction 'A clear, calm narrator'`,
+then render with `bash scripts/audiobook/run.sh render "$JOB"`. The optional `--fast`
 flag is available for Breeze voice creation and rendering.
 
 Both renderers verify saved audio hashes and resume completed passages.
@@ -79,9 +80,9 @@ For Fish, use its installed environment:
 
 ```bash
 PYTHON=.maintenance/audiobook/fish-venv/bin/python
-"$PYTHON" audiobook/check_audio.py "$JOB"
-python3 audiobook/status.py "$JOB" --details
-"$PYTHON" audiobook/audiobook.py assemble "$JOB"
+"$PYTHON" scripts/audiobook/check_audio.py "$JOB"
+python3 scripts/audiobook/status.py "$JOB" --details
+"$PYTHON" scripts/audiobook/audiobook.py assemble "$JOB"
 ```
 
 For Breeze, use `.maintenance/audiobook/venv/bin/python` instead. Audio checking

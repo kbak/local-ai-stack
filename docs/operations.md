@@ -17,6 +17,7 @@ launchers. Other operational helpers live in `scripts/`:
 | `backup-nextcloud.sh`, `restore-nextcloud.sh`, `nextcloud-backup.cron` | Backup and recovery |
 | `build-release.py` | Release image builds |
 | `check-*`, `test-*`, `validate-public-api.sh` | Repository checks and live smoke tests |
+| [`audiobook/`](../scripts/audiobook/README.md) | On-demand narration, audio checking, and export |
 
 Container startup adapters live beside their Dockerfiles in `docker/`.
 Model launchers resolve runtime and model paths relative to the checkout;

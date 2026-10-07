@@ -12,7 +12,7 @@ import sys
 import time
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 STATE = ROOT / '.maintenance/audiobook'
 VENDOR = STATE / 'vendor/breeze-tts'
 MODEL = STATE / 'models/Breeze-TTS-2'

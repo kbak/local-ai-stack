@@ -31,6 +31,7 @@ separate [authenticated gateway](docs/public-openai-api.md).
 - [Search and MCP tools](docs/tools.md)
 - [Browser agent](docs/browser-agent.md)
 - [Audio and voice chat](docs/audio.md)
+- [On-demand audiobooks](scripts/audiobook/README.md)
 - [Image generation and editing](docs/qwen-image-2.1.md)
 - [Signal bot](docs/signal.md)
 - [Scheduled watchers](docs/watchers.md)

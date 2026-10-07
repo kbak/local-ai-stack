@@ -12,6 +12,7 @@ example and documentation when changing configuration.
 - `services/signal-bot/skills/` contains independently discovered bot skills.
 - `services/signal-bot/patches/` and `patches/` contain upstream integration patches.
 - `scripts/` contains setup, maintenance, and verification commands.
+- `scripts/audiobook/` contains standalone narration, audio checking, and export tools.
 - `config/` contains service configuration and host templates.
 - `examples/` contains environment-file examples and the knowledge-base template.
 - `docs/` describes current interfaces, configuration, and operation.
