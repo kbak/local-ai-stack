@@ -87,8 +87,10 @@ class RoutingTests(unittest.IsolatedAsyncioTestCase):
                 self.assertIn('No image is available', await it.run_image('edit it', '1024x1024', image_id))
             return 'done'
         agent = AsyncMock()
+        agent.messages = [{'role': 'user', 'content': [{'text': 'old caption'}, block()]}]
         agent.invoke_async.side_effect = invoke
         await it.invoke_with_images(agent, 'question', it.ImageBlocks(selection), None, 'group-a')
+        self.assertEqual(agent.messages[0]['content'], [{'text': 'old caption'}])
         self.assertIsNone(it._turn.get())
 
     async def test_quote_blocks_other_images_and_survives_continuation(self):
@@ -103,9 +105,13 @@ class RoutingTests(unittest.IsolatedAsyncioTestCase):
                 it.read_conversation_image(old_id)
             return 'done'
         agent = AsyncMock()
+        agent.messages = [{'role': 'user', 'content': [block('blue')]}]
         agent.invoke_async.side_effect = invoke
         await it.invoke_with_images(agent, 'question', images, None, 'group-a', selection)
+        self.assertFalse(any('image' in item for item in agent.messages[0]['content']))
+        agent.messages.append({'role': 'user', 'content': [block()]})
         await it.invoke_with_images(agent, 'continue', None, None, 'group-a', selection)
+        self.assertIn('image', agent.messages[-1]['content'][0])
         self.assertEqual(selected[0], selected[1])
 
     async def test_failed_fetch_and_bad_upload_cannot_reuse_old_image(self):

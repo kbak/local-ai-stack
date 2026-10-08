@@ -146,6 +146,18 @@ def reply_context(text: str, quote: dict | None) -> str:
     return text
 
 
+def _clear_earlier_vision(agent) -> None:
+    """Keep textual history, but prevent a prior photo from supplying this turn's vision."""
+    messages = getattr(agent, "messages", None)
+    if not isinstance(messages, list):
+        return
+    for message in messages:
+        content = message.get("content")
+        if isinstance(content, list) and any("image" in block for block in content):
+            message["content"] = [block for block in content if "image" not in block] or [
+                {"text": "[Earlier image omitted. Use only this turn's image references.]"}]
+
+
 def _prune(directory: Path) -> None:
     files = sorted(directory.glob("*.png"), key=lambda p: p.stat().st_mtime, reverse=True)
     for i, path in enumerate(files):
@@ -244,6 +256,9 @@ async def invoke_with_images(agent, text, images, signal, recipient, selection=N
     directory = _directory(recipient)
     _prune(directory)
     selection = selection or getattr(images, "selection", None)
+    if (not selection or selection.references is None) and (
+            images or (selection and selection.is_reply) or not _fresh_latest(directory)):
+        _clear_earlier_vision(agent)
     references = []
     for block in images or []:
         try:
@@ -260,7 +275,9 @@ async def invoke_with_images(agent, text, images, signal, recipient, selection=N
     if selection and references:
         selection.references = [ref for ref in references if ref != "unavailable"]
     restricted = selection and (selection.is_reply or selection.attachments)
-    allowed = (selection.references or []) if restricted else None
+    if restricted and selection.references is None:
+        selection.references = []
+    allowed = selection.references if restricted else None
     if restricted and not allowed:
         text += "\n[No image is available for this message. Do not use an earlier image; ask for the intended attachment if needed.]"
     elif not references and _fresh_latest(directory) and not restricted:
