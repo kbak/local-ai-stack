@@ -63,9 +63,12 @@ Replies use the quoted message's original image when its attachment metadata
 was received by the bot, including group messages that did not activate it.
 The conversation-scoped metadata index survives restarts and retains up to 200
 image messages for seven days. A quote thumbnail is used when the original is
-unavailable and Signal supplies one. Missing quoted images never select another
-conversation image. Unquoted follow-up requests can implicitly reuse the latest
-image for one hour; older images require an explicit reference or a new upload.
+unavailable and Signal supplies one. A reply's `latest` reference selects that
+reply's image; unavailable quoted images never implicitly select another photo.
+Conversation history, including earlier images, is preserved so the model can
+resolve references to older content and compare explicitly selected images.
+Unquoted messages distinguish retained images from new attachments. Retained
+image references remain available for seven days, subject to the image-count limit.
 
 If model inference is unavailable, the bot chooses a response from the configured
 offline-reply file. Supply a private file through `SIGNAL_OFFLINE_REPLIES_FILE`

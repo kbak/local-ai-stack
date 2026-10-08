@@ -76,24 +76,24 @@ class RoutingTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(it.time, 'time', return_value=time.time() + it.RETENTION_SECONDS + 1):
             self.assertEqual(it.select_message_images(reply(timestamp=205), 'group-a').attachments, [])
 
-    async def test_missing_quote_cannot_read_old_reference_or_edit_it(self):
+    async def test_missing_quote_does_not_default_to_old_image_but_preserves_history(self):
         old_id = it._save(it._directory('group-a'), block()['image']['source']['bytes'])
         selection = it.select_message_images(reply(), 'group-a')
         async def invoke(text):
-            self.assertIn('No image is available for this message', text)
-            for image_id in ('latest', old_id):
-                with self.assertRaisesRegex(ValueError, 'No image is available'):
-                    it.read_conversation_image(image_id)
-                self.assertIn('No image is available', await it.run_image('edit it', '1024x1024', image_id))
+            self.assertIn('Do not silently substitute another image', text)
+            with self.assertRaisesRegex(ValueError, 'No image is available'):
+                it.read_conversation_image('latest')
+            self.assertIn('No image is available', await it.run_image('edit it', '1024x1024', 'latest'))
+            self.assertEqual(it.read_conversation_image(old_id)[0], old_id)
             return 'done'
         agent = AsyncMock()
         agent.messages = [{'role': 'user', 'content': [{'text': 'old caption'}, block()]}]
         agent.invoke_async.side_effect = invoke
         await it.invoke_with_images(agent, 'question', it.ImageBlocks(selection), None, 'group-a')
-        self.assertEqual(agent.messages[0]['content'], [{'text': 'old caption'}])
+        self.assertEqual(agent.messages[0]['content'], [{'text': 'old caption'}, block()])
         self.assertIsNone(it._turn.get())
 
-    async def test_quote_blocks_other_images_and_survives_continuation(self):
+    async def test_quote_sets_target_and_allows_explicit_historical_comparison(self):
         old_id = it._save(it._directory('group-a'), block('blue')['image']['source']['bytes'])
         selection = it.select_message_images(reply(thumbnail='thumb'), 'group-a')
         images = it.fetch_message_images(selection, lambda att: block())
@@ -101,14 +101,14 @@ class RoutingTests(unittest.IsolatedAsyncioTestCase):
         async def invoke(content):
             image_id, _ = it.read_conversation_image('latest')
             selected.append(image_id)
-            with self.assertRaisesRegex(ValueError, 'does not belong'):
-                it.read_conversation_image(old_id)
+            self.assertNotEqual(image_id, old_id)
+            self.assertEqual(it.read_conversation_image(old_id)[0], old_id)
             return 'done'
         agent = AsyncMock()
         agent.messages = [{'role': 'user', 'content': [block('blue')]}]
         agent.invoke_async.side_effect = invoke
         await it.invoke_with_images(agent, 'question', images, None, 'group-a', selection)
-        self.assertFalse(any('image' in item for item in agent.messages[0]['content']))
+        self.assertEqual(agent.messages[0]['content'], [block('blue')])
         agent.messages.append({'role': 'user', 'content': [block()]})
         await it.invoke_with_images(agent, 'continue', None, None, 'group-a', selection)
         self.assertIn('image', agent.messages[-1]['content'][0])
@@ -127,15 +127,15 @@ class RoutingTests(unittest.IsolatedAsyncioTestCase):
             agent.invoke_async.side_effect = invoke
             await it.invoke_with_images(agent, 'question', images, None, 'group-a')
 
-    async def test_old_latest_is_not_injected_but_explicit_reference_remains_valid(self):
+    async def test_older_context_remains_available_without_claiming_a_new_upload(self):
         image_id = it._save(it._directory('group-a'), block()['image']['source']['bytes'])
-        age = time.time() - it.LATEST_CONTEXT_SECONDS - 1
+        age = time.time() - 2 * 86400
         os.utime(it._directory('group-a') / f'{image_id}.png', (age, age))
         agent = AsyncMock()
         def invoke(text):
-            self.assertNotIn('Most recent image reference', text)
-            with self.assertRaisesRegex(ValueError, 'too old'):
-                it.read_conversation_image('latest')
+            self.assertIn('No new image is attached', text)
+            self.assertIn('do not assume this image is the subject', text)
+            self.assertEqual(it.read_conversation_image('latest')[0], image_id)
             self.assertEqual(it.read_conversation_image(image_id)[0], image_id)
             return 'done'
         agent.invoke_async.side_effect = invoke

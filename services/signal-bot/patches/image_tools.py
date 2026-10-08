@@ -28,7 +28,6 @@ MAX_BYTES = 20 * 1024 * 1024
 MAX_PIXELS = 16 * 1024 * 1024
 KEEP_IMAGES = 20
 RETENTION_SECONDS = 7 * 86400
-LATEST_CONTEXT_SECONDS = 3600
 KEEP_MESSAGES = 200
 SIZES = {"1024x1024", "768x1024", "1024x768"}
 
@@ -40,6 +39,7 @@ class ImageSelection:
     thumbnail: bool = False
     references: list[str] | None = None
     thumbnails: list = field(default_factory=list)
+    source: str = "upload"
 
 
 class ImageBlocks(list):
@@ -56,8 +56,7 @@ class Turn:
     recipient: str
     directory: Path
     calls: int = 0
-    allowed_images: list[str] | None = None
-    allow_latest: bool = True
+    selected_images: list[str] | None = None
 
 
 _turn: ContextVar[Turn | None] = ContextVar("signal_image_turn", default=None)
@@ -119,8 +118,8 @@ def select_message_images(message: dict, recipient: str) -> ImageSelection:
                             thumbnail.get("contentType") or attachment.get("contentType")}]))
     for entry in reversed(_message_index(recipient)):
         if entry["timestamp"] == str(quote.get("id")) and authors.intersection(entry["authors"]):
-            return ImageSelection(entry["attachments"], is_reply=True, thumbnails=thumbnails)
-    return ImageSelection(thumbnails, is_reply=True, thumbnail=bool(thumbnails))
+            return ImageSelection(entry["attachments"], is_reply=True, thumbnails=thumbnails, source="quote")
+    return ImageSelection(thumbnails, is_reply=True, thumbnail=bool(thumbnails), source="quote")
 
 
 def fetch_message_images(selection: ImageSelection, fetch) -> ImageBlocks:
@@ -144,18 +143,6 @@ def reply_context(text: str, quote: dict | None) -> str:
         quoted = quoted[:500] + ("…" if len(quoted) > 500 else "")
         return f"[replying to: {quoted}]\n{text}".strip()
     return text
-
-
-def _clear_earlier_vision(agent) -> None:
-    """Keep textual history, but prevent a prior photo from supplying this turn's vision."""
-    messages = getattr(agent, "messages", None)
-    if not isinstance(messages, list):
-        return
-    for message in messages:
-        content = message.get("content")
-        if isinstance(content, list) and any("image" in block for block in content):
-            message["content"] = [block for block in content if "image" not in block] or [
-                {"text": "[Earlier image omitted. Use only this turn's image references.]"}]
 
 
 def _prune(directory: Path) -> None:
@@ -211,27 +198,13 @@ def read_conversation_image(image_id: str) -> tuple[str, bytes]:
 
 
 def _turn_reference(turn: Turn, image_id: str) -> tuple[str, bytes]:
-    if turn.allowed_images is not None:
-        if not turn.allowed_images:
-            raise ValueError("No image is available for this message. Ask the user to attach the intended image.")
-        if image_id == "latest":
-            image_id = turn.allowed_images[-1]
-        if image_id not in turn.allowed_images:
-            raise ValueError("That image does not belong to this message. Use its supplied image reference.")
-    result = _reference(turn.directory, image_id)
-    if image_id == "latest" and not turn.allow_latest:
-        raise ValueError("The previous image is too old to select implicitly. Ask for an image or an explicit reference.")
-    return result
-
-
-def _fresh_latest(directory: Path) -> bool:
-    try:
-        image_id = (directory / "latest").read_text().strip()
-        if not re.fullmatch(r"[a-f0-9]{32}", image_id):
-            return False
-        return time.time() - (directory / f"{image_id}.png").stat().st_mtime <= LATEST_CONTEXT_SECONDS
-    except (ValueError, OSError):
-        return False
+    # A quote changes what "latest" means, not which historical images may be
+    # explicitly referenced (e.g. comparing this photo with an earlier one).
+    if image_id == "latest" and turn.selected_images is not None:
+        if not turn.selected_images:
+            raise ValueError("No image is available for this message. Use an explicit earlier image reference only if the user intends it; otherwise ask for the intended attachment.")
+        image_id = turn.selected_images[-1]
+    return _reference(turn.directory, image_id)
 
 
 def identify_direct(func, source, images, signal, recipient):
@@ -239,12 +212,11 @@ def identify_direct(func, source, images, signal, recipient):
     directory = _directory(recipient)
     _prune(directory)
     selection = getattr(images, "selection", None)
-    allowed = [] if selection and (selection.is_reply or selection.attachments) else None
+    selected = [] if selection and (selection.is_reply or selection.attachments) else None
     if images:
         source = _save(directory, images[0]["image"]["source"]["bytes"])
-        allowed = [source]
-    token = _turn.set(Turn(signal, recipient, directory, allowed_images=allowed,
-                           allow_latest=_fresh_latest(directory)))
+        selected = [source]
+    token = _turn.set(Turn(signal, recipient, directory, selected_images=selected))
     try:
         return func(source=source or "latest")
     finally:
@@ -256,9 +228,6 @@ async def invoke_with_images(agent, text, images, signal, recipient, selection=N
     directory = _directory(recipient)
     _prune(directory)
     selection = selection or getattr(images, "selection", None)
-    if (not selection or selection.references is None) and (
-            images or (selection and selection.is_reply) or not _fresh_latest(directory)):
-        _clear_earlier_vision(agent)
     references = []
     for block in images or []:
         try:
@@ -267,27 +236,27 @@ async def invoke_with_images(agent, text, images, signal, recipient, selection=N
             log.warning("Could not retain image for editing", exc_info=True)
             references.append("unavailable")
     if references:
-        label = "quoted thumbnail" if selection and selection.thumbnail else "upload or quoted image"
+        label = "quoted thumbnail" if selection and selection.thumbnail else (
+            "quoted image" if selection and selection.source == "quote" else "upload")
         text += f"\n[Image references for this {label}, in order: " + ", ".join(references) + "]"
         if "unavailable" in references:
             # Never silently edit an older image when the new upload failed.
             (directory / "latest").unlink(missing_ok=True)
     if selection and references:
         selection.references = [ref for ref in references if ref != "unavailable"]
-    restricted = selection and (selection.is_reply or selection.attachments)
-    if restricted and selection.references is None:
+    has_selection = selection and (selection.is_reply or selection.attachments)
+    if has_selection and selection.references is None:
         selection.references = []
-    allowed = selection.references if restricted else None
-    if restricted and not allowed:
-        text += "\n[No image is available for this message. Do not use an earlier image; ask for the intended attachment if needed.]"
-    elif not references and _fresh_latest(directory) and not restricted:
+    selected = selection.references if has_selection else None
+    if has_selection and not selected:
+        text += "\n[No image was resolved from the quoted/current message. Do not silently substitute another image. Conversation history remains available; use an explicit earlier reference only if the user intends it, or ask which image they mean.]"
+    elif not references and not has_selection:
         try:
             image_id, _ = _reference(directory, "latest")
-            text += f"\n[Most recent image reference in this conversation: {image_id}]"
+            text += f"\n[No new image is attached. Most recent retained image reference: {image_id}. Use conversation history to resolve earlier references; do not assume this image is the subject of the current request.]"
         except ValueError:
             pass
-    token = _turn.set(Turn(signal, recipient, directory, allowed_images=allowed,
-                           allow_latest=_fresh_latest(directory)))
+    token = _turn.set(Turn(signal, recipient, directory, selected_images=selected))
     try:
         return await agent.invoke_async([{"text": text}] + images if images else text)
     finally:
@@ -355,8 +324,8 @@ async def run_image(prompt: str, size: str, image_id: str | None = None) -> str:
             encoded = json.loads(body)["data"][0]["b64_json"]
             data = base64.b64decode(encoded, validate=True)
             result_id = _save(turn.directory, data)
-            if turn.allowed_images is not None:
-                turn.allowed_images.append(result_id)
+            if turn.selected_images is not None:
+                turn.selected_images.append(result_id)
             data = (turn.directory / f"{result_id}.png").read_bytes()
     except (httpx.HTTPError, ValueError, KeyError, IndexError, TypeError, OSError, Image.DecompressionBombError):
         log.exception("Qwen image request failed")

@@ -174,15 +174,17 @@
  You are a helpful AI assistant communicating through Signal messenger.{name_line}
  
  You have access to the following skill sets:
-@@ -54,6 +54,7 @@
+@@ -54,6 +54,9 @@
  
  Be concise. This is a messenger — keep replies short and to the point. \
  No long paragraphs, no unnecessary preamble. If you're unsure, say so.
 +Treat <completed_operation> records as authoritative facts about direct skills. For ambiguous follow-ups, use the newest relevant completed operation and any Signal reply-quote before older conversation topics. Never claim an operation succeeded or failed contrary to its recorded result. Never use an unrelated tool to probe a file: PDF tools are only for PDFs, and music-library checks use the music library tool. If no suitable verification tool exists, say exactly what is known from the operation record.
++
++Use conversation history to resolve references to older content. A current attachment or reply-quote identifies the primary subject; never silently substitute the latest saved image for an unavailable quoted image. Earlier images remain valid context and may be explicitly selected for comparisons or follow-ups. If the intended image is ambiguous, ask which one the user means.
  
  Always respond in the same language the user is currently writing in.
  
-@@ -162,6 +163,7 @@
+@@ -162,6 +165,7 @@
          params={
              "temperature": config.llm.temperature,
              "max_tokens": max_tok,
@@ -190,7 +192,7 @@
          },
      )
      _model_id = mid
-@@ -322,7 +324,7 @@
+@@ -322,7 +326,7 @@
          resp = httpx.get(f"{base}/running", timeout=2)
          resp.raise_for_status()
          running = resp.json().get("running", [])
