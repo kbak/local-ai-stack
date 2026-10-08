@@ -17,6 +17,7 @@ def apply_patches(app: Path, site_packages: Path) -> None:
         'agent.py': app / 'agent.py',
         'config.py': app / 'config.py',
         'skills/registry.py': app / 'skills/registry.py',
+        'skills/memory/memory.py': app / 'skills/memory/memory.py',
         'strands/models/openai.py': site_packages / 'strands/models/openai.py',
     }
     with tempfile.TemporaryDirectory(prefix='bot-patches-') as directory:

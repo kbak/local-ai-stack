@@ -105,6 +105,8 @@ endpoints:
 mcpServers:
   searxng:
     url: http://mcp-proxy:8083/servers/searxng/mcp
+    headers:
+      Authorization: "Bearer ${MCP_PROXY_AUTH_TOKEN}"
     type: streamable-http
     serverInstructions: |
       Search only when external information is needed or the user requests research. Answer simple facts, explanations, estimates, and arithmetic directly when possible.
@@ -113,41 +115,59 @@ mcpServers:
       Search first, then use fetch on only the most relevant results. Do not use browser_use for ordinary research.
   time:
     url: http://mcp-proxy:8083/servers/time/mcp
+    headers:
+      Authorization: "Bearer ${MCP_PROXY_AUTH_TOKEN}"
     type: streamable-http
     serverInstructions: false
   fetch:
     url: http://mcp-proxy:8083/servers/fetch/mcp
+    headers:
+      Authorization: "Bearer ${MCP_PROXY_AUTH_TOKEN}"
     type: streamable-http
     serverInstructions: |
       Use fetch for normal readable webpages found through web_search. Escalate a URL to browser_use only when fetch is blocked or incomplete and interaction or JavaScript rendering is genuinely required.
       For ordinary lookups, use raw=false and max_length of at most 5000 characters. Do not repeatedly fetch or paginate documents once you can answer the question.
   arxiv:
     url: http://mcp-proxy:8083/servers/arxiv/mcp
+    headers:
+      Authorization: "Bearer ${MCP_PROXY_AUTH_TOKEN}"
     type: streamable-http
     serverInstructions: |
       Use arXiv when the user asks for academic papers or the question requires scientific literature. Do not use it for everyday facts or estimates.
   youtube:
     url: http://mcp-proxy:8083/servers/youtube/mcp
+    headers:
+      Authorization: "Bearer ${MCP_PROXY_AUTH_TOKEN}"
     type: streamable-http
     serverInstructions: false
   weather:
     url: http://mcp-proxy:8083/servers/weather/mcp
+    headers:
+      Authorization: "Bearer ${MCP_PROXY_AUTH_TOKEN}"
     type: streamable-http
     serverInstructions: false
   currency:
     url: http://mcp-proxy:8083/servers/currency/mcp
+    headers:
+      Authorization: "Bearer ${MCP_PROXY_AUTH_TOKEN}"
     type: streamable-http
     serverInstructions: false
   github:
     url: http://mcp-proxy:8083/servers/github/mcp
+    headers:
+      Authorization: "Bearer ${MCP_PROXY_AUTH_TOKEN}"
     type: streamable-http
     serverInstructions: false
   google-maps:
     url: http://mcp-proxy:8083/servers/google-maps/mcp
+    headers:
+      Authorization: "Bearer ${MCP_PROXY_AUTH_TOKEN}"
     type: streamable-http
     serverInstructions: false
   browser:
     url: http://mcp-proxy:8083/servers/browser/mcp
+    headers:
+      Authorization: "Bearer ${MCP_PROXY_AUTH_TOKEN}"
     type: streamable-http
     timeout: 660000
     requiresOAuth: false
@@ -169,6 +189,8 @@ mcpServers:
       Authorization: "Bearer ${MCP_PROXY_AUTH_TOKEN}"
   memory:
     url: ${MEMORY_MCP_URL}/mcp/mcp
+    headers:
+      Authorization: "Bearer ${MEMORY_API_TOKEN}"
     type: streamable-http
     serverInstructions: false
   chatterbox:

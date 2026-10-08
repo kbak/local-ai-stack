@@ -8,7 +8,24 @@ Used by services that need to call MCP tools programmatically
 from __future__ import annotations
 
 import json
+import os
+from urllib.parse import urlsplit
 import httpx
+
+
+def proxy_auth_headers(server_url: str) -> dict[str, str]:
+    """Attach the proxy credential only to its configured origin."""
+    target = urlsplit(server_url)
+    proxy = urlsplit(os.getenv("MCP_PROXY_URL", "http://mcp-proxy:8083"))
+    if (target.scheme, target.hostname, target.port) != (proxy.scheme, proxy.hostname, proxy.port):
+        return {}
+    token = os.getenv("MCP_PROXY_AUTH_TOKEN", "")
+    return {"Authorization": f"Bearer {token}"} if token else {}
+
+
+def memory_auth_headers() -> dict[str, str]:
+    token = os.getenv("MEMORY_API_TOKEN", "")
+    return {"Authorization": f"Bearer {token}"} if token else {}
 
 
 def _parse_sse_json(text: str) -> dict:
@@ -48,6 +65,8 @@ def request_mcp(
     }
     if auth_token:
         headers["Authorization"] = f"Bearer {auth_token}"
+    else:
+        headers.update(proxy_auth_headers(server_url))
 
     with httpx.Client(timeout=timeout) as client:
         init_resp = client.post(

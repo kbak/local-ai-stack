@@ -5,6 +5,8 @@ All values come from env vars so the service is fully declarative from docker-co
 
 import os
 
+API_TOKEN = os.getenv("MEMORY_API_TOKEN", "")
+
 # The LLM that Mem0 uses for fact extraction, dedup decisions, and summarization.
 # Points at llama-swap on the host. OpenAI-compatible endpoint.
 # MEMORY_LLM_MODEL is optional - if unset, memory_backend.load() resolves the

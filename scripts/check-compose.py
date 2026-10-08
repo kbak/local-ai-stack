@@ -12,6 +12,45 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def check_security(config, host):
+    services = config['services']
+    def networks(name):
+        return set(services[name].get('networks', {}))
+    if host == 'server':
+        proxy = services['mcp-proxy']
+        if proxy.get('env_file') or '--pass-environment' in proxy.get('command', []):
+            raise ValueError('MCP proxy must not inherit the deployment environment')
+        if not proxy['environment'].get('MCP_PROXY_AUTH_TOKEN'):
+            raise ValueError('MCP proxy authentication is required')
+        location = services['location-tracker']
+        if location.get('env_file') or any(key in location['environment'] for key in
+                                          ('MEMORY_API_TOKEN', 'GITHUB_TOKEN', 'GOOGLE_MAPS_API_KEY')):
+            raise ValueError('Location tool must receive only its own credentials')
+        if not proxy.get('read_only') or set(proxy.get('cap_add', [])) != {'SETUID', 'SETGID'}:
+            raise ValueError('MCP broker requires a read-only root and only identity-drop capabilities')
+        for tool in ('mcp-proxy', 'searxng', 'browser-agent-api', 'pdf-inspector', 'reverse-image-search'):
+            for store in ('mongodb', 'nextcloud-db', 'nextcloud-redis'):
+                if networks(tool) & networks(store):
+                    raise ValueError(f'{tool} shares a private data-store network with {store}')
+        for client in ('librechat', 'signal-bot'):
+            mounts = services[client].get('volumes', [])
+            if any(m['target'] == '/memory' for m in mounts):
+                raise ValueError(f'{client} must not mount raw vector storage')
+            for name in ('SOUL.md', 'USER.md', 'MEMORY.md'):
+                mount = next(m for m in mounts if m['target'] == f'/memory/{name}')
+                if not mount.get('read_only') or mount.get('bind', {}).get('create_host_path', True):
+                    raise ValueError(f'{client}: prompt files must exist and be read-only')
+    else:
+        if networks('qdrant') & networks('audio-api'):
+            raise ValueError('Qdrant must be isolated from inference-facing services')
+        if not config['networks']['memory-store-net'].get('internal'):
+            raise ValueError('The memory-store network must remain internal')
+        if not networks('qdrant') - networks('memory-mcp'):
+            raise ValueError('Qdrant needs a separate bridge to publish loopback administration')
+        if any(port.get('host_ip') != '127.0.0.1' for port in services['qdrant'].get('ports', [])):
+            raise ValueError('Direct vector-store management must remain host-local')
+
+
 def main() -> None:
     names = subprocess.check_output(
         ["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard"], cwd=ROOT,
@@ -37,6 +76,7 @@ def main() -> None:
             command = ["docker", "compose", "--env-file", str(checkout / ".env"), "-f", name]
             config = json.loads(subprocess.check_output(
                 [*command, "config", "--format", "json"], cwd=checkout, env=env))
+            check_security(config, host)
             for service in config["services"].values():
                 for mount in service.get("volumes", []):
                     if mount["type"] != "bind":

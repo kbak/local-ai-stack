@@ -15,6 +15,8 @@ environment files. Keep values containing spaces quoted for shell compatibility.
 | `STACK_DOMAIN`, `ACME_EMAIL` | HTTPS hostnames and certificate contact |
 | `LLM_BASE_URL`, `AUDIO_API_URL`, `MEMORY_MCP_URL`, `YTDLP_SERVICE_URL` | Routes between hosts |
 | `MEMORY_ALLOWED_HOSTS`, `MEMORY_ALLOWED_ORIGINS` | Memory MCP proxy allowlist |
+| `MCP_PROXY_AUTH_TOKEN`, `MEMORY_API_TOKEN` | Separate internal service credentials |
+| `MCP_PROXY_BIND_ADDRESS`, `MEMORY_BIND_ADDRESS` | Host bindings: proxy defaults to loopback; memory must be reachable from client containers |
 | `MEMORY_DEFAULT_USER_ID`, `TIER1_AGENT_NAME` | Memory scope and LibreChat agent selection |
 | `PRIMARY_GPU`, `SECONDARY_GPU`, `EXPECTED_AUDIO_GPU` | Device selection and optional audio-device name check |
 | `MEMORY_DIR`, `VOICE_SAMPLES_DIR`, `MUSIC_HOST_DIR` | Private host data directories |

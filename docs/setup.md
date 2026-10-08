@@ -47,6 +47,22 @@ Generate a secret with `openssl rand -hex 32`. Use different values for unrelate
 credentials. Keep real configuration in ignored files or a
 [private deployment repository](deployment.md).
 
+Set `MCP_PROXY_AUTH_TOKEN` on the server host and a separate `MEMORY_API_TOKEN`
+on both hosts. The memory token must match between its service and clients.
+Set `SEARXNG_SECRET` before rendering server Compose. External MCP clients must
+send the proxy token; LibreChat, the bot, voice, and watchers use it automatically.
+
+LibreChat and the bot mount only `SOUL.md`, `USER.md`, and `MEMORY.md` from
+`MEMORY_DIR`, read-only. Create any missing files before starting them:
+
+```bash
+mkdir -p "$MEMORY_DIR"
+touch "$MEMORY_DIR/SOUL.md" "$MEMORY_DIR/USER.md" "$MEMORY_DIR/MEMORY.md"
+```
+
+Load your local `.env` first or substitute your configured directory in these
+commands. Existing file contents are preserved.
+
 ## Networking
 
 The server Compose file creates its own bridge. The AI Compose file expects an
@@ -62,6 +78,15 @@ Cross-host endpoints must be reachable from containers. Set `LLM_BASE_URL`,
 `AUDIO_API_URL`, `MEMORY_MCP_URL`, and `YTDLP_SERVICE_URL` to the appropriate
 private routes. Defaults use `host.docker.internal`; they do not discover a
 remote AI host. Set memory's allowed hosts and origins to match its proxy URL.
+For split-host access, set `MEMORY_BIND_ADDRESS` on the AI host to its private
+interface address and configure `MEMORY_MCP_URL` on the server host to match.
+Memory defaults to all host interfaces so Docker clients can reach it; restrict
+its bind address and host firewall to the clients that need access. The MCP
+proxy defaults to loopback. Set
+`MCP_PROXY_BIND_ADDRESS` to a private interface only when external clients need
+it, and restrict access with the host firewall. Authentication is required
+regardless of the bind address; use HTTPS or a trusted encrypted private route
+for cross-host traffic.
 
 Native inference binds to loopback. The [private relays](public-openai-api.md#local-services)
 bridge IPv4 and Docker clients to llama-swap's IPv6 listener. Configure the

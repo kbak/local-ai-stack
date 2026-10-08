@@ -23,6 +23,9 @@ jobs:
       - run: python3 -m unittest discover -s tests -p 'test_configuration.py' -v
       - run: python3 -m pip install -r tests/requirements.txt
       - run: python3 -m unittest discover -s tests -p 'test_shared_clients.py' -v
+      - run: PYTHONPATH=shared python3 -m unittest discover -s tests -p 'test_security_boundaries.py' -v
+      - run: PYTHONPATH=shared python3 -m unittest discover -s tests -p 'test_internal_auth.py' -v
+      - run: python3 -m unittest discover -s services/public-api-gateway -p 'test_*.py' -v
       - run: python3 -m unittest discover -s tests -p 'test_runtime_helpers.py' -v
       - run: python3 -m unittest discover -s tests -p 'test_release.py' -v
       - run: python3 -m unittest discover -s services/signal-bot/patches -p 'test_patches.py' -v

@@ -167,3 +167,29 @@
          except Exception as e:
              logger.error("Failed to load external tool %s from %s: %s", tool_ref, skill_dir.name, e)
              return None
+--- a/skills/memory/memory.py
++++ b/skills/memory/memory.py
+@@ -8,6 +8,7 @@
+ 
+ import httpx
+ from strands import tool
++from stack_shared.mcp_client import memory_auth_headers
+ 
+ import config
+ 
+@@ -46,6 +47,7 @@
+             f"{_base()}/v1/memory",
+             json={"content": content, "user_id": config.memory.default_user_id,
+                   "verbatim": verbatim},
++            headers=memory_auth_headers(),
+             timeout=config.memory.timeout,
+         )
+         resp.raise_for_status()
+@@ -76,6 +78,7 @@
+                 "user_id": config.memory.default_user_id,
+                 "limit": limit,
+             },
++            headers=memory_auth_headers(),
+             timeout=config.memory.timeout,
+         )
+         resp.raise_for_status()

@@ -22,7 +22,9 @@
       "args": [
         "--with",
         "mcp==1.30.0",
-        "arxiv-mcp-server==0.8.0"
+        "arxiv-mcp-server==0.8.0",
+        "--storage-path",
+        "/tmp/arxiv-papers"
       ]
     },
     "youtube": {

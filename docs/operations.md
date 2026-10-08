@@ -91,8 +91,12 @@ Search and external integrations contact their configured providers even though
 the model runs locally. Reverse image search uploads selected images to
 Litterbox with a one-hour expiry and sends image URLs to external providers.
 
-The MCP proxy has no authentication; restrict it to trusted clients. The
-location tracker requires a bearer token. Browser traffic uses isolated Steel
+The MCP proxy and location tracker require `MCP_PROXY_AUTH_TOKEN`; memory
+requires a separate `MEMORY_API_TOKEN`. Tool containers use a separate network
+from the internal MongoDB, Nextcloud database/Redis, and Qdrant networks. The
+proxy's credentialed subprocesses run under separate unprivileged identities.
+These networks restrict container connectivity; they do not block all outgoing
+LAN access from tools. Browser traffic uses isolated Steel
 and the public-egress proxy; local-browser and external-CDP fallbacks are
 disabled. Image and PDF downloads reject private destinations. Receipt rows are
 written as raw values so email text cannot execute spreadsheet formulas.

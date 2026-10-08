@@ -4,3 +4,7 @@ httpx==0.28.1
 openai==2.54.0
 strands-agents==1.57.2
 pyyaml==6.0.3
+pillow==12.3.0
+mcp==1.30.0
+fastapi==0.142.2
+mcp-proxy @ https://github.com/sparfenyuk/mcp-proxy/archive/153a96a61fde2bf5a23961c64a3dd96b5e385108.tar.gz

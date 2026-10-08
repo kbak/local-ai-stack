@@ -1,7 +1,7 @@
 """Mem0 wrapper with a background write queue.
 
 Writes (add_memory) return immediately and are processed asynchronously so
-they never block a chat turn. Reads (search_memory, list, delete) are sync
+they never block a chat turn. Reads (search_memory, list) are sync
 since the agent needs the results inline.
 """
 
@@ -164,19 +164,6 @@ def list_all(user_id: str, limit: int = 100) -> list[dict[str, Any]]:
     if isinstance(result, dict) and "results" in result:
         return result["results"]
     return result  # type: ignore[return-value]
-
-
-def get_by_id(memory_id: str) -> dict[str, Any] | None:
-    assert _memory is not None
-    try:
-        return _memory.get(memory_id=memory_id)
-    except Exception:
-        return None
-
-
-def delete(memory_id: str) -> None:
-    assert _memory is not None
-    _memory.delete(memory_id=memory_id)
 
 
 def pending_writes() -> int:

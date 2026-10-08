@@ -165,7 +165,9 @@ async def _connect_one(name: str, url: str):
     try:
         await sub.__aenter__()
         async with asyncio.timeout(CONNECT_TIMEOUT):
-            read, write, _ = await sub.enter_async_context(streamablehttp_client(url))
+            from stack_shared.mcp_client import proxy_auth_headers
+            read, write, _ = await sub.enter_async_context(
+                streamablehttp_client(url, headers=proxy_auth_headers(url)))
             session = await sub.enter_async_context(ClientSession(read, write))
             await session.initialize()
             resp = await session.list_tools()

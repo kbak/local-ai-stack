@@ -16,39 +16,49 @@ services:
     restart: unless-stopped
     ports:
       - "8081:8080"
-    env_file:
-      - .env
+    environment:
+      BRAVE_SEARCH_API_KEY: "${BRAVE_SEARCH_API_KEY:-}"
+      SEARXNG_SECRET: "${SEARXNG_SECRET:?SEARXNG_SECRET must be set}"
     volumes:
       - ./config/searxng-settings.yml:/etc/searxng/settings.template.yml:ro
     entrypoint: ["/usr/local/bin/local-searxng-entrypoint.sh"]
     networks:
-      - server-net
+      - tools-net
     mem_limit: 512m
 
   mcp-proxy:
     image: ${STACK_IMAGE_PREFIX:-local-ai-stack}/mcp-proxy:${STACK_VERSION:-dev}
     pull_policy: never
-    build: ./services/mcp-proxy
+    build:
+      context: .
+      dockerfile: services/mcp-proxy/Dockerfile
     container_name: mcp-proxy
     restart: unless-stopped
     ports:
-      - "8083:8083"
-    env_file:
-      - .env
+      - "${MCP_PROXY_BIND_ADDRESS:-127.0.0.1}:8083:8083"
     volumes:
-      - ./config/mcp-proxy-config.json:/config.json
-      - mcp-proxy-uv-cache:/root/.cache/uv
+      - ./config/mcp-proxy-config.json:/config.json:ro
+      - mcp-proxy-tool-cache:/home/tool-11000/.cache/uv
     environment:
-      MCP_PROXY_AUTH_TOKEN: ""
-    command: ["--host", "0.0.0.0", "--port", "8083", "--transport", "streamablehttp", "--named-server-config", "/config.json", "--pass-environment"]
+      MCP_PROXY_AUTH_TOKEN: "${MCP_PROXY_AUTH_TOKEN:?MCP_PROXY_AUTH_TOKEN must be set}"
+      GITHUB_TOKEN: "${GITHUB_TOKEN:-}"
+      GOOGLE_MAPS_API_KEY: "${GOOGLE_MAPS_API_KEY:-}"
+      BROWSER_AGENT_API_TOKEN: "${BROWSER_AGENT_API_TOKEN:-}"
+    command: ["--host", "0.0.0.0", "--port", "8083", "--named-server-config", "/config.json"]
+    cap_drop: [ALL]
+    cap_add: [SETUID, SETGID]
+    security_opt: [no-new-privileges:true]
+    read_only: true
+    tmpfs:
+      - /tmp:rw,nosuid,size=256m
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8083/status', timeout=2)"]
+      test: ["CMD", "python", "-c", "import os, urllib.request; urllib.request.urlopen(urllib.request.Request('http://127.0.0.1:8083/status', headers={'Authorization': 'Bearer ' + os.environ['MCP_PROXY_AUTH_TOKEN']}), timeout=2)"]
       interval: 5s
       timeout: 3s
       retries: 12
       start_period: 10s
     networks:
-      - server-net
+      - tools-net
     mem_limit: 1500m
 
   voice-agent:
@@ -66,13 +76,14 @@ services:
     environment:
       AUDIO_API_URL: "${AUDIO_API_URL:-http://host.docker.internal:8088}"
       LLM_BASE_URL: "${LLM_BASE_URL:-http://host.docker.internal:8080/v1}"
+      MCP_PROXY_AUTH_TOKEN: "${MCP_PROXY_AUTH_TOKEN:?MCP_PROXY_AUTH_TOKEN must be set}"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
       mcp-proxy:
         condition: service_healthy
     networks:
-      - server-net
+      - tools-net
     mem_limit: 512m
 
   browser-agent-api:
@@ -105,13 +116,15 @@ services:
       BROWSER_AGENT_TASK_TIMEOUT_SECONDS: "600"
       BROWSER_AGENT_IMAGE_DOWNLOAD_LIMIT_BYTES: "12582912"
       ANONYMIZED_TELEMETRY: "false"
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
       - browser-agent-data:/data
     shm_size: 1gb
     networks:
-      - server-net
+      - tools-net
       - browser-net
     mem_limit: 2g
     healthcheck:
@@ -145,12 +158,15 @@ services:
       context: .
       dockerfile: services/public-egress/Dockerfile
     restart: unless-stopped
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    read_only: true
     ports:
       - "127.0.0.1:3090:3000"
       - "127.0.0.1:9293:9223"
     networks:
       - browser-net
-      - server-net
+      - egress-net
     mem_limit: 128m
 
   # mongo 8.0+ hard-aborts on Linux kernel >=6.19 via a
@@ -165,7 +181,7 @@ services:
     volumes:
       - mongodb-data:/data/db
     networks:
-      - server-net
+      - chat-store-net
     mem_limit: 512m
 
   librechat:
@@ -184,6 +200,7 @@ services:
       - .env
     environment:
       MEMORY_MCP_URL: "${MEMORY_MCP_URL:-http://host.docker.internal:8089}"
+      MEMORY_API_TOKEN: "${MEMORY_API_TOKEN:?MEMORY_API_TOKEN must be set}"
       AUDIO_API_BASE_URL: "${AUDIO_API_URL:-http://host.docker.internal:8088}"
       LLM_BASE_URL: "${LLM_BASE_URL:-http://host.docker.internal:8080/v1}"
       # LibreChat's existing image toolkit talks to our local image model.
@@ -208,7 +225,24 @@ services:
       - ./config/librechat.yaml:/app/librechat.yaml.template:ro
       - librechat-data:/app/client/public/images
       - librechat-uploads:/app/uploads
-      - ${MEMORY_DIR:?MEMORY_DIR must be set in .env}:/memory:ro
+      - type: bind
+        source: ${MEMORY_DIR:?MEMORY_DIR must be set in .env}/SOUL.md
+        target: /memory/SOUL.md
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${MEMORY_DIR:?MEMORY_DIR must be set in .env}/USER.md
+        target: /memory/USER.md
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${MEMORY_DIR:?MEMORY_DIR must be set in .env}/MEMORY.md
+        target: /memory/MEMORY.md
+        read_only: true
+        bind:
+          create_host_path: false
     depends_on:
       mongodb:
         condition: service_started
@@ -216,6 +250,8 @@ services:
         condition: service_healthy
     networks:
       - server-net
+      - tools-net
+      - chat-store-net
     mem_limit: 768m
     entrypoint: ["/bin/sh", "-c", "node /app/librechat-render.js && exec node /app/api/server/index.js"]
 
@@ -267,6 +303,8 @@ services:
       AUDIO_API_URL: "${AUDIO_API_URL:-http://host.docker.internal:8088}"
       YTDLP_SERVICE_URL: "${YTDLP_SERVICE_URL:-http://host.docker.internal:8200}"
       MEMORY_MCP_URL: "${MEMORY_MCP_URL:-http://host.docker.internal:8089}"
+      MEMORY_API_TOKEN: "${MEMORY_API_TOKEN:?MEMORY_API_TOKEN must be set}"
+      MCP_PROXY_AUTH_TOKEN: "${MCP_PROXY_AUTH_TOKEN:?MCP_PROXY_AUTH_TOKEN must be set}"
       MEMORY_DIR_MOUNT: /memory
       MEMORY_DEFAULT_USER_ID: ${MEMORY_DEFAULT_USER_ID:-default}
       OFFLINE_EXCUSES_FILE: /app/config/offline-excuses.txt
@@ -279,7 +317,24 @@ services:
       - signal-cli-data:/signal-cli-data:ro
       - ${MUSIC_HOST_DIR:?MUSIC_HOST_DIR must be set in .env}:/music
       - ${VOICE_SAMPLES_DIR:?VOICE_SAMPLES_DIR must be set in .env}:/app/voice-samples
-      - ${MEMORY_DIR:?MEMORY_DIR must be set in .env}:/memory:ro
+      - type: bind
+        source: ${MEMORY_DIR:?MEMORY_DIR must be set in .env}/SOUL.md
+        target: /memory/SOUL.md
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${MEMORY_DIR:?MEMORY_DIR must be set in .env}/USER.md
+        target: /memory/USER.md
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${MEMORY_DIR:?MEMORY_DIR must be set in .env}/MEMORY.md
+        target: /memory/MEMORY.md
+        read_only: true
+        bind:
+          create_host_path: false
       - ${SIGNAL_OFFLINE_REPLIES_FILE:-./config/signal-offline-replies.txt}:/app/config/offline-excuses.txt:ro
     depends_on:
       signal-api:
@@ -290,6 +345,7 @@ services:
         condition: service_started
     networks:
       - server-net
+      - tools-net
     mem_limit: 1500m
 
   location-tracker:
@@ -307,16 +363,31 @@ services:
     command: ["python", "-m", "location_tracker.mcp_server"]
     container_name: location-tracker
     restart: unless-stopped
-    env_file:
-      - .env
     environment:
+      CALDAV_BASE_URL: "${CALDAV_BASE_URL:?CALDAV_BASE_URL must be set}"
+      CALDAV_USERNAME: "${CALDAV_USERNAME:?CALDAV_USERNAME must be set}"
+      CALDAV_PASSWORD: "${CALDAV_PASSWORD:?CALDAV_PASSWORD must be set}"
+      CALDAV_CALENDAR_NAMES: "${CALDAV_CALENDAR_NAMES:-}"
+      HOME_CITY: "${HOME_CITY:-}"
+      LOCAL_TIMEZONE: "${LOCAL_TIMEZONE:-UTC}"
+      POLL_INTERVAL_MINUTES: "${POLL_INTERVAL_MINUTES:-5}"
+      LOOKBACK_DAYS: "${LOOKBACK_DAYS:-30}"
+      LOOKAHEAD_DAYS: "${LOOKAHEAD_DAYS:-90}"
+      SEARXNG_URL: "${SEARXNG_URL:-http://searxng:8080}"
+      STATE_FILE: "${STATE_FILE:-/data/location_state.json}"
+      MCP_PORT: "${MCP_PORT:-8084}"
+      MCP_PROXY_AUTH_TOKEN: "${MCP_PROXY_AUTH_TOKEN:?MCP_PROXY_AUTH_TOKEN must be set}"
       LLM_BASE_URL: "${LLM_BASE_URL:-http://host.docker.internal:8080/v1}"
+      LLM_API_KEY: "${LLM_API_KEY:-${INFERENCE_API_KEY:-sk-no-key-required}}"
+      LLM_MODEL: "${LLM_MODEL:-}"
+      LLM_MODEL_FALLBACK: "${LLM_MODEL_FALLBACK:-}"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
       - location-tracker-data:/data
     networks:
       - server-net
+      - tools-net
     mem_limit: 512m
 
   pdf-inspector:
@@ -336,7 +407,7 @@ services:
       - librechat-uploads:/uploads:ro
       - travel-attachments:/travel-attachments:ro
     networks:
-      - server-net
+      - tools-net
     mem_limit: 512m
 
   calendar-watcher:
@@ -375,6 +446,7 @@ services:
         condition: service_started
     networks:
       - server-net
+      - tools-net
     mem_limit: 512m
 
   receipt-watcher:
@@ -442,6 +514,7 @@ services:
       - pdf-inspector
     networks:
       - server-net
+      - tools-net
     mem_limit: 512m
 
   tg-watcher:
@@ -586,7 +659,7 @@ services:
       retries: 20
       start_period: 30s
     networks:
-      - server-net
+      - nextcloud-store-net
     mem_limit: 512m
 
   nextcloud-redis:
@@ -594,7 +667,7 @@ services:
     container_name: nextcloud-redis
     restart: unless-stopped
     networks:
-      - server-net
+      - nextcloud-store-net
     mem_limit: 128m
 
   nextcloud:
@@ -624,6 +697,7 @@ services:
         condition: service_started
     networks:
       - server-net
+      - nextcloud-store-net
     mem_limit: 1024m
 
   nextcloud-cron:
@@ -640,6 +714,7 @@ services:
         condition: service_started
     networks:
       - server-net
+      - nextcloud-store-net
     mem_limit: 256m
 
   reverse-image-search:
@@ -657,11 +732,19 @@ services:
       LLM_BASE_URL: "${LLM_BASE_URL:-http://host.docker.internal:8080/v1}"
       SEARXNG_URL: "http://searxng:8080"
     networks:
-      - server-net
+      - tools-net
     mem_limit: 256m
 
 
 networks:
+  tools-net:
+    driver: bridge
+  egress-net:
+    driver: bridge
+  chat-store-net:
+    internal: true
+  nextcloud-store-net:
+    internal: true
   browser-net:
     internal: true
   server-net:
@@ -673,7 +756,7 @@ networks:
 
 volumes:
   browser-agent-data:
-  mcp-proxy-uv-cache:
+  mcp-proxy-tool-cache:
   mongodb-data:
   librechat-data:
   librechat-uploads:

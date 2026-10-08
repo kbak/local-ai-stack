@@ -19,6 +19,7 @@ from .classifier import ClassifyResult
 from .config import (
     GOOGLE_MAPS_API_KEY,
     MCP_PROXY_URL,
+    MCP_PROXY_AUTH_TOKEN,
     SEARXNG_URL,
 )
 
@@ -188,7 +189,7 @@ def enrich(event: RawEvent, classification: ClassifyResult) -> tuple[str, str | 
     )
 
     menu_url = _find_menu_url(venue, city)
-    weather = get_weather(city, event.start, mcp_proxy_url=MCP_PROXY_URL, mcp_auth_token="")
+    weather = get_weather(city, event.start, mcp_proxy_url=MCP_PROXY_URL, mcp_auth_token=MCP_PROXY_AUTH_TOKEN)
     murl = maps_url(f"{venue}, {formatted_address}" if formatted_address else f"{venue} {city}")
 
     try:

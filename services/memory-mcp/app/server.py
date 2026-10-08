@@ -12,7 +12,6 @@ fails with TypeError when annotations are stringified forward refs.
 """
 
 import logging
-import secrets
 from contextlib import asynccontextmanager
 
 from typing import Any
@@ -22,6 +21,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
+from stack_shared.auth_middleware import BearerAuthMiddleware
 
 from . import config, memory_backend
 
@@ -92,51 +92,6 @@ def list_memories(user_id: str = "", limit: int = 100) -> dict:
     return {"user_id": uid, "count": len(results), "results": results}
 
 
-# Two-step delete confirmation. The agent calls once without confirm_token to
-# get a preview + token, then calls again with the token to actually delete.
-# Tokens are single-use and process-local (fine: memory-mcp is one process).
-_pending_deletes: dict[str, str] = {}  # memory_id -> confirm_token
-
-
-@mcp.tool()
-def delete_memory(memory_id: str, confirm_token: str = "") -> dict:
-    """Delete a memory — two-step: first call previews, second call with confirm_token deletes.
-
-    Step 1: call with just `memory_id`. Returns a preview of the memory plus a
-    `confirm_token`. Show the preview to the user and get their confirmation.
-    Step 2: call again with the same `memory_id` and the `confirm_token` from
-    step 1. The memory is then deleted. Tokens are single-use.
-
-    Never call step 2 without a user confirmation in between.
-    """
-    if not confirm_token:
-        if not memory_backend.is_ready():
-            return {"error": "backend not ready"}
-        record = memory_backend.get_by_id(memory_id)
-        if record is None:
-            return {"error": f"memory_id not found: {memory_id}"}
-        token = secrets.token_urlsafe(12)
-        _pending_deletes[memory_id] = token
-        preview = record.get("memory") or record.get("text") or record
-        return {
-            "requires_confirmation": True,
-            "memory_id": memory_id,
-            "preview": preview,
-            "confirm_token": token,
-            "instructions": "Show the preview to the user. If they confirm, call delete_memory again with this confirm_token.",
-        }
-
-    expected = _pending_deletes.get(memory_id)
-    if expected is None:
-        return {"error": "no pending deletion for this memory_id — call without confirm_token first to get a token"}
-    if not secrets.compare_digest(expected, confirm_token):
-        return {"error": "confirm_token does not match the pending deletion"}
-
-    _pending_deletes.pop(memory_id, None)
-    memory_backend.delete(memory_id=memory_id)
-    return {"deleted": memory_id}
-
-
 # ── FastAPI app (REST + mounted MCP) ────────────────────────────────────
 
 # Build the MCP sub-app once so we can also hoist its lifespan into FastAPI's.
@@ -156,6 +111,9 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="memory-mcp", version="1.0.0", lifespan=lifespan)
+if not config.API_TOKEN:
+    raise RuntimeError("MEMORY_API_TOKEN is required")
+app.add_middleware(BearerAuthMiddleware, token=config.API_TOKEN, public_paths=("/health",))
 
 
 @app.get("/health")
@@ -193,12 +151,6 @@ def rest_list(user_id: str = config.DEFAULT_USER_ID, limit: int = 100):
         raise HTTPException(status_code=503, detail="backend not ready")
     results = memory_backend.list_all(user_id=user_id, limit=limit)
     return {"user_id": user_id, "count": len(results), "results": results}
-
-
-@app.delete("/v1/memory/{memory_id}")
-def rest_delete(memory_id: str):
-    memory_backend.delete(memory_id=memory_id)
-    return {"deleted": memory_id}
 
 
 # Mount the MCP streamable-http app at /mcp. Clients (LibreChat, mcp-proxy,

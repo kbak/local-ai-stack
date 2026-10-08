@@ -15,7 +15,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Install uv (provides uvx)
 COPY --from=ghcr.io/astral-sh/uv:0.12.23@sha256:61d393e44e249f2e4b526b6c7ddcecce245946826e608e11c93ad4f5bba55b21 /uv /uvx /usr/local/bin/
 
-COPY requirements.txt constraints.txt /tmp/
+COPY services/mcp-proxy/requirements.txt services/mcp-proxy/constraints.txt /tmp/
 
 # Build and install a reviewed mcp-proxy revision instead of a moving main branch.
 ARG MCP_PROXY_REV=153a96a61fde2bf5a23961c64a3dd96b5e385108
@@ -29,16 +29,22 @@ RUN git clone https://github.com/sparfenyuk/mcp-proxy.git /mcp-proxy-src && \
 
 # Runtime shim that patches google-maps-mcp-server's PlacesTool to use
 # searchText instead of its broken searchNearby+keyword-filter combo.
-COPY gmaps-searchtext-shim.py /opt/gmaps-searchtext-shim.py
+COPY services/mcp-proxy/gmaps-searchtext-shim.py /opt/gmaps-searchtext-shim.py
 
 # Thin read-only GitHub MCP server (replaces @modelcontextprotocol/server-github).
 # One tool (gh_read) instead of 26 — uses the gh CLI with GITHUB_TOKEN from env.
-COPY gh-read-server.py /opt/gh-read-server.py
-COPY browser-agent-server.py /opt/browser-agent-server.py
+COPY services/mcp-proxy/gh-read-server.py /opt/gh-read-server.py
+COPY services/mcp-proxy/browser-agent-server.py /opt/browser-agent-server.py
 
-# Match the Maps shim's runtime environment; uvx creates a different cache entry.
-RUN uv run --with google-maps-mcp-server==0.2.1 --with mcp==1.30.0 \
-    python -c "from google_maps_mcp_server.tools.places import PlacesTool"
+# Separate credentialed workers from the uncredentialed uv cache and each
+# other. The broker only retains SETUID/SETGID to launch these identities.
+RUN for uid in 11000 11001 11002 11003; do \
+      useradd --create-home --uid "$uid" --user-group --home-dir "/home/tool-$uid" "tool-$uid"; \
+    done
+ENV UV_CACHE_DIR=/home/tool-11000/.cache/uv PYTHONDONTWRITEBYTECODE=1
+RUN uv venv /opt/maps && \
+    uv pip install --python /opt/maps/bin/python google-maps-mcp-server==0.2.1 mcp==1.30.0 && \
+    /opt/maps/bin/python -c "from google_maps_mcp_server.tools.places import PlacesTool"
 
 # Pre-install all MCP packages at pinned versions so first connection doesn't time out
 RUN uvx google-maps-mcp-server==0.2.1 --help 2>/dev/null || true && \
@@ -51,9 +57,14 @@ RUN uvx google-maps-mcp-server==0.2.1 --help 2>/dev/null || true && \
     uvx --with mcp==1.30.0 --from mcp-weather-server==0.6.1 mcp_weather_server --help 2>/dev/null || true && \
     uvx --with mcp==1.30.0 frankfurtermcp==0.5.0 --help 2>/dev/null || true && \
     uvx --with mcp==1.30.0 yfinance-mcp-server==1.0.4 --help 2>/dev/null || true && \
-    rm -rf /root/.cache/uv/builds-v0 /root/.cache/uv/git-v0 2>/dev/null || true
+    rm -rf /home/tool-11000/.cache/uv/builds-v0 /home/tool-11000/.cache/uv/git-v0 2>/dev/null || true
 
 # Keep frequently edited local servers after dependency warm-up for fast rebuilds.
-COPY searxng-server.py /opt/searxng-server.py
+COPY services/mcp-proxy/searxng-server.py /opt/searxng-server.py
 
-ENTRYPOINT ["mcp-proxy"]
+COPY shared/ /shared/
+RUN pip install --no-cache-dir --no-deps /shared/ && \
+    chown -R 11000:11000 /home/tool-11000/.cache
+COPY services/mcp-proxy/secure_proxy.py services/mcp-proxy/run_tool.py /opt/
+
+ENTRYPOINT ["python", "/opt/secure_proxy.py"]

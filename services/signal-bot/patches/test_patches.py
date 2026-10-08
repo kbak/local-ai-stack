@@ -14,7 +14,7 @@ class PatchTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             app, site = root / 'app', root / 'site'
-            files = [app / p for p in ['bot.py', 'agent.py', 'config.py', 'skills/registry.py']]
+            files = [app / p for p in ['bot.py', 'agent.py', 'config.py', 'skills/registry.py', 'skills/memory/memory.py']]
             files.append(site / 'strands/models/openai.py')
             for path in files:
                 path.parent.mkdir(parents=True, exist_ok=True)
@@ -29,7 +29,7 @@ class PatchTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             app, site = root / 'app', root / 'site'
-            files = [app / p for p in ['bot.py', 'agent.py', 'config.py', 'skills/registry.py']]
+            files = [app / p for p in ['bot.py', 'agent.py', 'config.py', 'skills/registry.py', 'skills/memory/memory.py']]
             files.append(site / 'strands/models/openai.py')
             for path in files:
                 path.parent.mkdir(parents=True, exist_ok=True)

@@ -2,6 +2,7 @@
 
 import importlib.util
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -37,6 +38,16 @@ def load_skill(name):
 
 
 class MCPContracts(unittest.TestCase):
+    def test_proxy_skills_authenticate_every_protocol_request(self):
+        with patch.dict(os.environ, {'MCP_PROXY_AUTH_TOKEN': 'proxy-test-secret'}):
+            for name, (_, server) in SKILLS.items():
+                self.requests.clear()
+                self.sse = server is None
+                load_skill(name)._call_mcp('lookup', {'query': 'test'})
+                for request, _ in self.requests:
+                    expected = 'Bearer proxy-test-secret' if server else None
+                    self.assertEqual(request.headers.get('authorization'), expected)
+
     def test_skills_load_without_the_custom_skills_directory_on_sys_path(self):
         # The bot registry loads each entry point by file path, before other
         # skills happen to make their parent directory importable.
