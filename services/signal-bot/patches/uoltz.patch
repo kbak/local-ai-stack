@@ -1,11 +1,12 @@
 --- a/bot.py
 +++ b/bot.py
-@@ -1,3 +1,4 @@
-+from image_tools import invoke_with_images, identify_direct
+@@ -1,3 +1,5 @@
++from image_tools import (invoke_with_images, identify_direct, ImageBlocks,
++                         remember_image_message, select_message_images, reply_context, fetch_message_images)
  """Main bot loop: polls Signal for messages and routes them to the agent.
  
  Uses a message queue so the agent processes one request at a time,
-@@ -28,6 +29,7 @@
+@@ -28,6 +30,7 @@
      server_reload_model, get_running_model,
  )
  from skills import SkillRegistry
@@ -13,18 +14,49 @@
  from transcribe import download_and_transcribe, AUDIO_CONTENT_TYPES
  import tts as tts_module
  
-@@ -606,9 +608,7 @@
+@@ -82,7 +85,7 @@
+     return r"(?:hey\s+)?(?:" + "|".join(alts) + r")(?:\s*[,.]?)?"
+ 
+ 
+-MAX_IMAGE_BYTES = 10 * 1024 * 1024  # 10 MB
++MAX_IMAGE_BYTES = 20 * 1024 * 1024  # 20 MiB
+ 
+ _IMAGE_FORMAT = {
+     "image/jpeg": "jpeg",
+@@ -215,7 +218,7 @@
+ 
+     # Ack instantly, queue the work
+     _work_queue.put((
+-        "direct_skill", signal, sender, command, dc, args.strip(), images or [],
++        "direct_skill", signal, sender, command, dc, args.strip(), images if images is not None else [],
+         target_author, target_ts,
+     ))
+     return True
+@@ -566,6 +569,9 @@
+                 "sender": sender,
+                 "text": text,
+                 "attachments": attachments,
++                "body": data.get("message") or "",
++                "quote": data.get("quote"),
++                "sender_aliases": [envelope.get(key) for key in ("source", "sourceNumber", "sourceUuid")],
+                 "group_id": group_id,
+                 "mentions": mentions,
+                 "timestamp": timestamp,
+@@ -605,10 +611,9 @@
+                         turn_input = text if first_turn else "continue"
                          turn_images = images if first_turn else None
  
-                         async def _run_agent(_in=turn_input, _imgs=turn_images):
+-                        async def _run_agent(_in=turn_input, _imgs=turn_images):
 -                            if _imgs:
 -                                return await agent.invoke_async([{"text": _in}] + _imgs)
 -                            return await agent.invoke_async(_in)
-+                            return await invoke_with_images(agent, _in, _imgs, _signal, sender)
++                        async def _run_agent(_in=turn_input, _imgs=turn_images,
++                                             _selection=getattr(images, "selection", None)):
++                            return await invoke_with_images(agent, _in, _imgs, _signal, sender, _selection)
  
                          async def _run_with_registration():
                              with _current_task_lock:
-@@ -720,7 +720,9 @@
+@@ -720,7 +725,9 @@
                      _signal.send(sender, msg)
  
                  try:
@@ -35,7 +67,7 @@
                          kwargs = {dc.arg_name: args}
                          if images:
                              kwargs["images"] = images
-@@ -759,8 +761,10 @@
+@@ -759,8 +766,10 @@
                  if reply:
                      _signal.send(sender, reply)
                      logger.info("Direct skill %s replied to %s (%d chars)", command, sender, len(reply))
@@ -46,7 +78,56 @@
  
              _work_queue.task_done()
  
-@@ -938,7 +942,7 @@
+@@ -827,7 +836,7 @@
+             raw = signal.receive()
+             for msg in extract_messages(raw):
+                 sender = msg["sender"]
+-                text = msg["text"]
++                text = msg["body"]
+                 attachments = msg["attachments"]
+                 group_id = msg["group_id"]
+                 mentions = msg["mentions"]
+@@ -847,13 +856,15 @@
+                     logger.warning("Ignoring message from unauthorized number: %s", sender)
+                     continue
+ 
++                remember_image_message(msg, reply_to)
++
+                 # Group message filtering: only respond to prefix, mention, voice wake-word, or / commands
+                 if group_id:
+                     # Buffer every group message for context
+                     if group_id not in _group_history:
+                         _group_history[group_id] = deque(maxlen=_GROUP_HISTORY_MAX)
+                         _group_history_count[group_id] = 0
+-                    _group_history[group_id].append((sender, text.strip()))
++                    _group_history[group_id].append((sender, msg["text"].strip()))
+                     _group_history_count[group_id] += 1
+ 
+                     prefix = config.signal.group_prefix.lower()
+@@ -917,18 +928,10 @@
+                     else:
+                         signal.send(reply_to, f'📝 Heard: "{text}"')
+ 
+-                # Fetch image attachments for vision-capable model
+-                image_atts = [a for a in attachments if a.get("contentType", "") in IMAGE_CONTENT_TYPES]
+-                images = []
+-                att_paths = []  # local paths for image-analysis tools
+-                for att in image_atts:
+-                    att_id = att.get("id", att.get("filename", ""))
+-                    ct = att.get("contentType", "image/jpeg")
+-                    block = _fetch_image_b64(cfg_signal.api_url, att_id, ct)
+-                    if block:
+-                        images.append(block)
+-                    if att_id:
+-                        att_paths.append(f"/signal-cli-data/attachments/{att_id}")
++                # Resolve quoted originals before thumbnails; never substitute an older image.
++                selection = select_message_images(msg, reply_to)
++                images = fetch_message_images(selection, lambda att: _fetch_image_b64(
++                    cfg_signal.api_url, att["id"], att["contentType"]))
+ 
+                 # PDF attachments: the vision model can't read PDFs, but the read_pdf
+                 # tool can. Hand the agent the signal-api attachment URL (pdf-inspector
+@@ -938,7 +941,7 @@
                  pdf_atts = [
                      a for a in attachments
                      if a.get("contentType", "") in PDF_CONTENT_TYPES
@@ -55,6 +136,33 @@
                  ]
                  pdf_notes = []
                  for att in pdf_atts:
+@@ -957,16 +960,7 @@
+                 if not group_id:
+                     logger.info("Message from %s: %s", sender, text[:80])
+ 
+-                # Include local path so the agent can invoke image tools if needed.
+-                if att_paths:
+-                    cmd_parts = text.strip().split(None, 1) if text.strip().startswith("/") else []
+-                    if cmd_parts and len(cmd_parts) == 1:
+-                        # Slash command with no args — supply the path as the argument
+-                        text = f"{cmd_parts[0]} {att_paths[0]}"
+-                    else:
+-                        path_note = "[image: " + att_paths[0] + "]"
+-                        text = f"{text}\n{path_note}".strip() if text else path_note
+-                elif not text and images:
++                if not text and images:
+                     text = "What's in this image?"
+ 
+                 if pdf_notes:
+@@ -989,6 +983,8 @@
+ 
+                     if handle_slash_command(text, signal, sender=sender, reply_to=reply_to, group_id=group_id):
+                         continue
++
++                text = reply_context(text, msg.get("quote"))
+ 
+                 # Ack with robot emoji reaction, queue for sequential processing
+                 signal.react(reply_to, sender, timestamp)
 --- a/agent.py
 +++ b/agent.py
 @@ -39,7 +39,7 @@

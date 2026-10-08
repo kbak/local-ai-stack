@@ -28,6 +28,16 @@ jobs:
       - run: python3 -m unittest discover -s services/public-api-gateway -p 'test_*.py' -v
       - run: python3 -m unittest discover -s tests -p 'test_runtime_helpers.py' -v
       - run: python3 -m unittest discover -s tests -p 'test_release.py' -v
-      - run: python3 -m unittest discover -s services/signal-bot/patches -p 'test_patches.py' -v
+      - run: python3 -m unittest discover -s services/signal-bot/patches -v
       - run: python3 scripts/check-compose.py
       - run: git diff --check
+
+  image-search:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python3 -m pip install -c services/reverse-image-search/constraints.txt -r services/reverse-image-search/requirements.txt
+      - run: PYTHONPATH=shared python3 -m unittest discover -s services/reverse-image-search -p 'test_*.py' -v

@@ -13,6 +13,7 @@ Use reverse_image_search for originals where the image exists on the web.
 from __future__ import annotations
 
 import base64
+from contextlib import asynccontextmanager
 import json
 import logging
 import os
@@ -23,6 +24,10 @@ from urllib.parse import quote
 import httpx
 from bs4 import BeautifulSoup
 from fastmcp import FastMCP
+from fastmcp.server.http import StreamableHTTPASGIApp
+from mcp.server.transport_security import RequestBodyLimitMiddleware
+from starlette.applications import Starlette
+from starlette.routing import Mount
 from stack_shared.llm_model import resolve_model
 
 log = logging.getLogger(__name__)
@@ -32,6 +37,10 @@ log = logging.getLogger(__name__)
 SAUCENAO_API_KEY = os.environ.get("SAUCENAO_API_KEY", "")
 LLM_BASE_URL = os.environ.get("LLM_BASE_URL", "").rstrip("/")
 SEARXNG_URL = os.environ.get("SEARXNG_URL", "http://searxng:8080")
+MAX_IMAGE_BYTES = 20 * 1024 * 1024
+# The image limit applies to decoded bytes; JSON carries base64 plus RPC metadata.
+MAX_BASE64_BYTES = 4 * ((MAX_IMAGE_BYTES + 2) // 3)
+MAX_MCP_REQUEST_BYTES = MAX_BASE64_BYTES + 64 * 1024
 
 _MIME = {
     ".jpg": "image/jpeg",
@@ -60,10 +69,14 @@ def _litterbox_upload(image_bytes: bytes, ext: str) -> str:
 
 def _decode_upload(image_base64: str, filename: str) -> tuple[bytes, str]:
     """Decode base64 image and normalise extension. Raises ValueError on bad input."""
+    if len(image_base64) > MAX_BASE64_BYTES:
+        raise ValueError("Image exceeds the 20 MiB limit.")
     try:
-        image_bytes = base64.b64decode(image_base64)
+        image_bytes = base64.b64decode(image_base64, validate=True)
     except Exception as exc:
         raise ValueError(f"Could not decode base64 image: {exc}") from exc
+    if len(image_bytes) > MAX_IMAGE_BYTES:
+        raise ValueError("Image exceeds the 20 MiB limit.")
     ext = Path(filename).suffix.lower() or ".jpg"
     if ext not in _MIME:
         ext = ".jpg"
@@ -435,6 +448,27 @@ def reverse_image_search_upload(image_base64: str, filename: str = "image.jpg") 
 
 # ── Entrypoint ────────────────────────────────────────────────────────────────
 
+def create_app():
+    http_app = mcp.http_app(path="/", transport="streamable-http")
+    transport = next(route.app for route in http_app.routes
+                     if isinstance(route.app, StreamableHTTPASGIApp))
+
+    @asynccontextmanager
+    async def lifespan(app):
+        async with http_app.lifespan(http_app):
+            # FastMCP 3.4.7 does not expose the SDK's body-limit constructor
+            # argument. Configure this app's manager after FastMCP creates it,
+            # preserving its session lifecycle and all other transport limits.
+            manager = transport.session_manager
+            if not isinstance(manager.asgi_app, RequestBodyLimitMiddleware):
+                raise RuntimeError("Unsupported MCP request-limit middleware")
+            manager.max_request_body_size = MAX_MCP_REQUEST_BYTES
+            manager.asgi_app.max_body_size = MAX_MCP_REQUEST_BYTES
+            yield
+
+    return Starlette(routes=[Mount("/mcp", app=http_app)], lifespan=lifespan)
+
+
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
 
@@ -444,10 +478,5 @@ if __name__ == "__main__":
         log.warning("SAUCENAO_API_KEY not set — SauceNAO matching disabled")
 
     import uvicorn
-    from starlette.applications import Starlette
-    from starlette.routing import Mount
-
     port = int(os.environ.get("PORT", "8091"))
-    http_app = mcp.http_app(path="/", transport="streamable-http")
-    app = Starlette(routes=[Mount("/mcp", app=http_app)], lifespan=http_app.lifespan)
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    uvicorn.run(create_app(), host="0.0.0.0", port=port)

@@ -55,6 +55,18 @@ Manifests define the supported arguments. The bot exposes direct commands from
 these skills; conversational tool use shares the same implementations. See
 [image generation](qwen-image-2.1.md) and [audio](audio.md) for their APIs.
 
+Image attachments and image-search uploads accept up to 20 MiB per image. The
+image-search HTTP limit includes room for base64 and JSON overhead. Retained
+editing references also have a 16-megapixel limit.
+
+Replies use the quoted message's original image when its attachment metadata
+was received by the bot, including group messages that did not activate it.
+The conversation-scoped metadata index survives restarts and retains up to 200
+image messages for seven days. A quote thumbnail is used when the original is
+unavailable and Signal supplies one. Missing quoted images never select another
+conversation image. Unquoted follow-up requests can implicitly reuse the latest
+image for one hour; older images require an explicit reference or a new upload.
+
 If model inference is unavailable, the bot chooses a response from the configured
 offline-reply file. Supply a private file through `SIGNAL_OFFLINE_REPLIES_FILE`
 to customize the wording; use one reply per line.

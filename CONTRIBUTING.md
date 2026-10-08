@@ -64,6 +64,7 @@ Run affected service tests in that service's dependency environment:
 | HTTP and tool boundaries | `PYTHONPATH=shared python3 -m unittest discover -s tests -p 'test_security_boundaries.py' -v` |
 | Internal authentication and tool credentials | `PYTHONPATH=shared python3 -m unittest discover -s tests -p 'test_internal_auth.py' -v` |
 | Signal images | `python3 -m unittest discover -s services/signal-bot/patches -v` |
+| Image-search uploads | `PYTHONPATH=shared python3 -m unittest discover -s services/reverse-image-search -p 'test_*.py' -v` |
 | Audio adapters | `PYTHONPATH=services/audio-api python3 -m unittest discover -s services/audio-api/tests -v` |
 | Music trimming | `python3 services/signal-bot/skills/music_download/test_trim.py` |
 
