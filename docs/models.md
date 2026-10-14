@@ -39,7 +39,34 @@ from launcher settings. On a single GPU, reduce the model set or budgets before
 assigning both primary and secondary workloads to it.
 
 The chat workers enable automatic tool choice and reasoning parsers. The coder
-provides FIM completion. The reranker uses vLLM's pooling runner, exposed through
+loads the pinned `Qwen/Qwen2.5-Coder-7B` base checkpoint; its served model ID
+remains `qwen-coder-7B`. Autocomplete clients and startup warmup use
+`POST /v1/completions` with a raw FIM prompt:
+
+```text
+<|fim_prefix|>code before cursor<|fim_suffix|>code after cursor<|fim_middle|>
+```
+
+The base checkpoint has no chat template. Configure editor autocomplete to send
+completion requests rather than `POST /v1/chat/completions`. The launcher's 8K
+context limit and GPU memory budget remain unchanged.
+
+For Continue's OpenAI-compatible provider, keep the coder in the autocomplete
+role and explicitly select the completions endpoint. Its Qwen coder template
+formats the prefix, suffix, and any retrieved code context:
+
+```yaml
+models:
+  - name: Qwen Coder 7B Base
+    provider: openai
+    model: qwen-coder-7B
+    apiBase: http://localhost:8080/v1
+    useLegacyCompletionsEndpoint: true
+    roles:
+      - autocomplete
+```
+
+The reranker uses vLLM's pooling runner, exposed through
 `POST /upstream/bge-reranker-v2-m3/v1/score`.
 
 The coder uses vLLM's V1 runner for WSL compatibility. The 35B worker disables the

@@ -21,9 +21,9 @@ nohup llama-swap -listen '[::1]:8080' --config config/llama-swap.yaml >/tmp/llam
 disown
 
 echo "Pre-loading qwen-coder-7B (cuda0_coder, persistent)..."
-until curl -sf http://localhost:8080/v1/chat/completions \
+until curl -sf http://localhost:8080/v1/completions \
     -H "Content-Type: application/json" \
-    -d '{"model":"qwen-coder-7B","messages":[{"role":"user","content":"hi"}],"max_tokens":1}' \
+    -d '{"model":"qwen-coder-7B","prompt":"<|fim_prefix|>def add(a, b):\n    return <|fim_suffix|>\n<|fim_middle|>","max_tokens":1,"temperature":0}' \
     >/dev/null 2>&1; do
     sleep 2
 done

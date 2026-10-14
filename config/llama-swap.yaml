@@ -28,7 +28,7 @@ models:
     checkEndpoint: /v1/models
     ttl: 0
 
-  # Persistent FIM autocomplete on the primary GPU, alongside chat.
+  # Persistent Qwen2.5-Coder-7B base FIM autocomplete, alongside chat.
   qwen-coder-7B:
     cmd: bash ./scripts/serve-qwen-coder-7b.sh ${PORT}
     proxy: http://127.0.0.2:${PORT}

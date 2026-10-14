@@ -1,5 +1,5 @@
 #!/bin/bash
-# Launcher for vLLM (Qwen2.5-Coder-7B-Instruct), called by llama-swap.
+# Launcher for vLLM (Qwen2.5-Coder-7B base), called by llama-swap.
 # FIM/autocomplete backend for VS Code tab-complete on the primary GPU.
 set -e
 
@@ -22,7 +22,9 @@ export VLLM_HOST_IP=127.0.0.1
 # CUDA Unified Virtual Addressing, which is unavailable on this WSL GPU path.
 export VLLM_USE_V2_MODEL_RUNNER=0
 
-exec vllm serve Qwen/Qwen2.5-Coder-7B-Instruct \
+# Use the completion checkpoint with raw FIM prompts, not chat messages.
+exec vllm serve Qwen/Qwen2.5-Coder-7B \
+  --revision 0396a76181e127dfc13e5c5ec48a8cee09938b02 \
   --trust-remote-code \
   --served-model-name qwen-coder-7B \
   --port "$PORT" \
