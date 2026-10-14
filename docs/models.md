@@ -48,8 +48,11 @@ remains `qwen-coder-7B`. Autocomplete clients and startup warmup use
 ```
 
 The base checkpoint has no chat template. Configure editor autocomplete to send
-completion requests rather than `POST /v1/chat/completions`. The launcher's 8K
-context limit and GPU memory budget remain unchanged.
+completion requests rather than `POST /v1/chat/completions`. The launcher keeps
+the 8K context limit and two concurrent sequences. It reserves 1 GiB of KV cache
+explicitly so automatic profiling does not miscount memory used by other
+resident GPU workers. This overrides automatic cache sizing from
+`gpu-memory-utilization`; account for the weights and runtime overhead separately.
 
 For Continue's OpenAI-compatible provider, keep the coder in the autocomplete
 role and explicitly select the completions endpoint. Its Qwen coder template
