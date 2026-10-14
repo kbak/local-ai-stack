@@ -47,8 +47,9 @@ remains `qwen-coder-7B`. Autocomplete clients and startup warmup use
 <|fim_prefix|>code before cursor<|fim_suffix|>code after cursor<|fim_middle|>
 ```
 
-The base checkpoint has no chat template. Configure editor autocomplete to send
-completion requests rather than `POST /v1/chat/completions`. The launcher keeps
+The base checkpoint is trained for code completion. Configure editor autocomplete
+to send completion requests rather than `POST /v1/chat/completions`, and stop or
+trim generated text at the existing suffix. The launcher keeps
 the 8K context limit and two concurrent sequences. It reserves 1 GiB of KV cache
 explicitly so automatic profiling does not miscount memory used by other
 resident GPU workers. This overrides automatic cache sizing from
