@@ -15,7 +15,7 @@ launchers. Other operational helpers live in `scripts/`:
 | `init-public-api-secrets.sh`, `set-cloudflared-token.sh` | Local API credentials |
 | `dns-sync.sh`, `run-llama-swap-private-relays.sh` | Private network access |
 | `backup-nextcloud.sh`, `restore-nextcloud.sh`, `nextcloud-backup.cron` | Backup and recovery |
-| `build-release.py` | Release image builds |
+| `build-release.py` | Committed image builds and selective deployment/rollback |
 | `check-*`, `test-*`, `validate-public-api.sh` | Repository checks and live smoke tests |
 | [`audiobook/`](../scripts/audiobook/README.md) | On-demand narration, audio checking, and export |
 
@@ -58,16 +58,44 @@ python3 scripts/build-release.py signal-bot voice-agent rss-watcher
 
 The helper builds from a Git archive, excludes private/untracked files, labels
 and tags images with the full commit, and refuses to overwrite an existing
-revision tag. It prints the deployment command. Set `STACK_VERSION` in local
-`.env` to that revision when adopting it as the installation's default. Build
-all services you intend to recreate with that version; when deploying a subset,
-use the printed `--no-deps` command with dependencies already running.
+revision tag. Build-only mode prints the corresponding deployment command.
 
-To roll back, use the previous revision's Compose file and local configuration,
-set `STACK_VERSION` to its image tag, and run `up -d --no-build --pull never` for
-the affected services. Keep those images until the next release is verified.
-Data volumes are retained; code rollback does not undo application data changes.
-For the AI host, use `build-release.py --host ai`; deploy each host independently.
+For an existing installation, run on the target host from the clean checkout
+at the commit you want to deploy:
+
+```bash
+python3 scripts/build-release.py --deploy signal-bot
+python3 scripts/build-release.py --host ai --deploy memory-mcp
+```
+
+Choose services explicitly, including affected consumers of shared code. The
+helper builds missing images, reuses existing images only with a matching
+revision label, and updates only the named services with `--no-deps`. Dependencies
+must already be running. It waits up to 180 seconds for existing healthchecks,
+or running state when there is no healthcheck; use `--wait-timeout` for slower
+services. This does not replace application-specific smoke tests.
+
+Each host's selected images and previous image IDs are saved privately in
+`.local/releases/server.json` or `.local/releases/ai.json`. Services can run
+different revisions without changing the global `STACK_VERSION`. The startup
+scripts apply these image pins on subsequent starts. Include the same override
+when running Compose directly, including environment-only updates:
+
+```bash
+docker compose -f docker-compose.server.yml -f .local/releases/server.json up -d --no-deps --no-build --pull never signal-bot
+```
+
+After a failed deployment, inspect the error and explicitly roll back if needed:
+
+```bash
+python3 scripts/build-release.py --rollback signal-bot
+```
+
+Rollback restores only selected images using current Compose/configuration; it
+does not undo configuration changes or data migrations. A failed deploy retains
+its requested pins with a failed status and keeps the previous images available
+for rollback. Retain those images and the private pin files. Deploy the hosts
+independently; this helper does not fetch Git revisions or operate over SSH.
 
 For development source mounts, see [contributing](../CONTRIBUTING.md).
 

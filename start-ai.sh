@@ -71,7 +71,10 @@ if grep -qi microsoft /proc/version 2>/dev/null; then
 fi
 
 echo "Starting Docker services (ai)..."
-docker compose -f "$SCRIPT_DIR/docker-compose.ai.yml" up -d --wait
+compose=(docker compose -f "$SCRIPT_DIR/docker-compose.ai.yml")
+image_pins="$SCRIPT_DIR/.local/releases/ai.json"
+if [ -f "$image_pins" ]; then compose+=(-f "$image_pins"); fi
+"${compose[@]}" up -d --wait
 
 echo "Waiting for audio-api to load Whisper + Kokoro + voice cloning..."
 until curl -sf --max-time 3 http://127.0.0.1:8088/health >/dev/null; do
