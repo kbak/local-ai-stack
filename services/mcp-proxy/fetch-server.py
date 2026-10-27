@@ -1,5 +1,7 @@
 """Readable, bounded web excerpts without raw HTML or pagination prompts."""
 
+import logging
+import subprocess
 from typing import Annotated
 
 from mcp.server.fastmcp import FastMCP
@@ -13,6 +15,7 @@ from pydantic import AnyHttpUrl, Field
 
 mcp = FastMCP("fetch")
 MAX_EXCERPT_LENGTH = 5000
+logger = logging.getLogger(__name__)
 
 
 @mcp.tool()
@@ -31,7 +34,15 @@ async def fetch(
     """
     source = str(url)
     await check_may_autonomously_fetch_url(source, DEFAULT_USER_AGENT_AUTONOMOUS)
-    content, _ = await fetch_url(source, DEFAULT_USER_AGENT_AUTONOMOUS, force_raw=False)
+    try:
+        content, _ = await fetch_url(source, DEFAULT_USER_AGENT_AUTONOMOUS, force_raw=False)
+    except subprocess.CalledProcessError as error:
+        logger.warning("HTML extraction failed for %s (exit %s)", source, error.returncode)
+        return {
+            "url": source,
+            "error": "Readable text could not be extracted from this page. Use another source or the search excerpt.",
+            "retryable": False,
+        }
     excerpt = content[start_index : start_index + min(max_length, MAX_EXCERPT_LENGTH)]
     end_index = start_index + len(excerpt)
     truncated = end_index < len(content)

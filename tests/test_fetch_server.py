@@ -3,6 +3,7 @@
 import importlib.util
 from pathlib import Path
 import sys
+import subprocess
 from types import ModuleType
 import unittest
 from unittest.mock import AsyncMock, patch
@@ -57,6 +58,16 @@ class FetchServerTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaisesRegex(ValueError, "robots denied"):
             await self.server.fetch("https://example.com/")
         self.upstream.fetch_url.assert_not_awaited()
+
+    async def test_parser_failure_does_not_expose_subprocess_commands_or_temp_paths(self):
+        self.upstream.fetch_url.side_effect = subprocess.CalledProcessError(
+            1, ["node", "ExtractArticle.js", "-i", "/tmp/internal.html"])
+        with self.assertLogs("fetch_adapter_test", level="WARNING"):
+            result = await self.server.fetch("https://example.com/")
+        self.assertFalse(result["retryable"])
+        self.assertIn("Readable text could not be extracted", result["error"])
+        self.assertNotIn("ExtractArticle", str(result))
+        self.assertNotIn("/tmp/", str(result))
 
     async def test_schema_exposes_readable_http_fetch_without_raw_mode(self):
         tools = await self.server.mcp.list_tools()
