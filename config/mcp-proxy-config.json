@@ -10,11 +10,10 @@
       }
     },
     "fetch": {
-      "command": "uvx",
+      "command": "/opt/fetch/bin/python",
       "args": [
-        "--with",
-        "mcp==1.30.0",
-        "mcp-server-fetch==2026.8.18"
+        "-m",
+        "mcp_server_fetch"
       ]
     },
     "arxiv": {

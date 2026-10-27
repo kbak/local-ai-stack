@@ -67,4 +67,16 @@ RUN pip install --no-cache-dir --no-deps /shared/ && \
     chown -R 11000:11000 /home/tool-11000/.cache
 COPY services/mcp-proxy/secure_proxy.py services/mcp-proxy/run_tool.py /opt/
 
+# Fetch's ReadabiliPy parser otherwise installs unbounded npm dependencies on
+# its first HTML request. Bundle a Node 20-compatible lockfile outside the
+# mutable uv volume so unprivileged workers need no runtime npm installation.
+COPY services/mcp-proxy/fetch-node/ /tmp/fetch-node/
+RUN uv venv /opt/fetch && \
+    uv pip install --python /opt/fetch/bin/python mcp-server-fetch==2026.8.18 mcp==1.30.0 && \
+    fetch_js_dir=$(/opt/fetch/bin/python -c "import pathlib, readabilipy; print(pathlib.Path(readabilipy.__file__).parent / 'javascript')") && \
+    cp /tmp/fetch-node/package*.json "$fetch_js_dir/" && \
+    npm ci --prefix "$fetch_js_dir" --omit=dev --ignore-scripts && \
+    /opt/fetch/bin/python -c "from mcp_server_fetch.server import extract_content_from_html; assert 'Parser smoke test' in extract_content_from_html('<html><body><h1>Parser smoke test</h1><p>Readable page content.</p></body></html>')" && \
+    rm -rf /tmp/fetch-node /root/.npm
+
 ENTRYPOINT ["python", "/opt/secure_proxy.py"]
