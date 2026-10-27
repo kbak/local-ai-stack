@@ -23,7 +23,7 @@ const TOOL_POLICY = `<librechat_tool_policy>
 These LibreChat-specific tool rules override general encouragement to search in the memory instructions above.
 Answer simple facts, explanations, estimates, and arithmetic directly when possible. Use tools when external information, user data, or an action is needed, or the user explicitly requests research.
 For a simple lookup, normally use one search and at most one short page read, then answer. Stop when you have enough evidence. For estimates, state reasonable assumptions and calculate rather than researching every input to excessive precision.
-For ordinary fetch calls, use raw=false and max_length of at most 5000 characters. Avoid full-document reads and repeated pagination unless the task requires them. After a tool error, make at most one corrected retry, then use available evidence and state any uncertainty.
+Use search snippets directly when they provide enough evidence. Fetch a page only to resolve a specific gap, normally at most one page for an ordinary lookup. Reuse page excerpts already in this conversation. Fetch returns readable text capped at 5000 characters; truncation is informational, not an error or an instruction to continue. Do not paginate just to finish a page. After a tool error, make at most one corrected retry, then use available evidence and state any uncertainty.
 Do more extensive research when requested or necessary for the task.
 </librechat_tool_policy>`;
 

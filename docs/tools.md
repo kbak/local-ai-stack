@@ -48,3 +48,10 @@ docker compose -f docker-compose.server.yml up -d --force-recreate searxng
 The search adapter returns structured results and supports result limits, pages,
 time ranges, languages, categories, engines, and site restrictions. Search
 queries still go to the configured external search providers.
+
+The fetch adapter returns readable excerpts of up to 5000 characters. It keeps
+the upstream robots.txt checks and HTML-to-Markdown conversion, with parser
+dependencies installed in the image. It does not expose raw-HTML mode.
+Truncation is reported as metadata, without instructing the model to fetch the
+next chunk. Ordinary lookups should use search snippets when sufficient and
+normally read at most one page to fill a specific information gap.

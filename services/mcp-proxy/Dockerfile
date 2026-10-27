@@ -79,4 +79,6 @@ RUN uv venv /opt/fetch && \
     /opt/fetch/bin/python -c "from mcp_server_fetch.server import extract_content_from_html; assert 'Parser smoke test' in extract_content_from_html('<html><body><h1>Parser smoke test</h1><p>Readable page content.</p></body></html>')" && \
     rm -rf /tmp/fetch-node /root/.npm
 
+COPY services/mcp-proxy/fetch-server.py /opt/fetch-server.py
+
 ENTRYPOINT ["python", "/opt/secure_proxy.py"]

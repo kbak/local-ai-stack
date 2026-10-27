@@ -12,8 +12,7 @@
     "fetch": {
       "command": "/opt/fetch/bin/python",
       "args": [
-        "-m",
-        "mcp_server_fetch"
+        "/opt/fetch-server.py"
       ]
     },
     "arxiv": {

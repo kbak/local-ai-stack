@@ -23,6 +23,7 @@ jobs:
       - run: python3 -m unittest discover -s tests -p 'test_configuration.py' -v
       - run: python3 -m pip install -r tests/requirements.txt
       - run: python3 -m unittest discover -s tests -p 'test_shared_clients.py' -v
+      - run: python3 -m unittest discover -s tests -p 'test_fetch_server.py' -v
       - run: PYTHONPATH=shared python3 -m unittest discover -s tests -p 'test_security_boundaries.py' -v
       - run: PYTHONPATH=shared python3 -m unittest discover -s tests -p 'test_internal_auth.py' -v
       - run: python3 -m unittest discover -s services/public-api-gateway -p 'test_*.py' -v

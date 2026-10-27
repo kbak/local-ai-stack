@@ -68,10 +68,11 @@ def web_search(
 ) -> dict[str, Any]:
     """Search the web and return compact structured results.
 
-    Start with 5-8 results. Fetch the most promising 2-3 URLs with the separate
-    fetch tool before answering research questions. Use `site` for a domain
-    restriction, `categories` for comma-separated SearXNG categories, and
-    `engines` only when a specific comma-separated engine list is needed.
+    Start with 5-8 results. Fetch a result only when the snippets do not provide
+    enough evidence to answer; a simple lookup normally needs at most one page
+    read. Stop once the question is answered. Use `site` for a domain restriction,
+    `categories` for comma-separated SearXNG categories, and `engines` only when
+    a specific comma-separated engine list is needed.
     """
     clean_query = _clean_query(query)
     if not clean_query:

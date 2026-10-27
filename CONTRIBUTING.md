@@ -59,6 +59,7 @@ Run affected service tests in that service's dependency environment:
 | Release packaging | `python3 -m unittest discover -s tests -p 'test_release.py' -v` |
 | Bot patch failure checks | `python3 -m unittest discover -s services/signal-bot/patches -p 'test_patches.py' -v` |
 | Shared MCP and LLM clients | `python3 -m unittest discover -s tests -p 'test_shared_clients.py' -v` |
+| Readable web fetch | `python3 -m unittest discover -s tests -p 'test_fetch_server.py' -v` |
 | Gateway | `python3 -m unittest discover -s services/public-api-gateway -p 'test_*.py' -v` |
 | RSS watcher | `PYTHONPATH=shared:services/rss-watcher python3 -m unittest discover -s services/rss-watcher/tests -v` |
 | HTTP and tool boundaries | `PYTHONPATH=shared python3 -m unittest discover -s tests -p 'test_security_boundaries.py' -v` |

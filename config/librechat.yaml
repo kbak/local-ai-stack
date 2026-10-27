@@ -115,7 +115,7 @@ mcpServers:
       Search only when external information is needed or the user requests research. Answer simple facts, explanations, estimates, and arithmetic directly when possible.
       For simple lookups, normally use one search and at most one short page read, then answer. Stop once you have enough evidence.
       Use web_search as the default tool for current information, market research, pricing comparisons, recent sales, news, and multi-source research.
-      Search first, then use fetch on only the most relevant results. Do not use browser_use for ordinary research.
+      Search first. Fetch a page only if the snippets leave a specific question unanswered; do not fetch each result automatically. Do not use browser_use for ordinary research.
   time:
     url: http://mcp-proxy:8083/servers/time/mcp
     headers:
@@ -131,7 +131,8 @@ mcpServers:
     requiresOAuth: false
     serverInstructions: |
       Use fetch for normal readable webpages found through web_search. Escalate a URL to browser_use only when fetch is blocked or incomplete and interaction or JavaScript rendering is genuinely required.
-      For ordinary lookups, use raw=false and max_length of at most 5000 characters. Do not repeatedly fetch or paginate documents once you can answer the question.
+      Fetch returns readable text with at most 5000 characters per call. For an ordinary lookup, normally read at most one page and reuse that excerpt in follow-up answers.
+      A truncated excerpt is not an error or a request to continue. Use start_index only when a specific fact needed for the answer is missing. Do not paginate just to finish a page.
   youtube:
     url: http://mcp-proxy:8083/servers/youtube/mcp
     headers:
