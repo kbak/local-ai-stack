@@ -62,12 +62,13 @@ class FetchServerTests(unittest.IsolatedAsyncioTestCase):
     async def test_parser_failure_does_not_expose_subprocess_commands_or_temp_paths(self):
         self.upstream.fetch_url.side_effect = subprocess.CalledProcessError(
             1, ["node", "ExtractArticle.js", "-i", "/tmp/internal.html"])
-        with self.assertLogs("fetch_adapter_test", level="WARNING"):
-            result = await self.server.fetch("https://example.com/")
+        with self.assertLogs("fetch_adapter_test", level="WARNING") as logs:
+            result = await self.server.fetch("https://example.com/private?token=test-secret")
         self.assertFalse(result["retryable"])
         self.assertIn("Readable text could not be extracted", result["error"])
         self.assertNotIn("ExtractArticle", str(result))
         self.assertNotIn("/tmp/", str(result))
+        self.assertEqual(logs.output, ["WARNING:fetch_adapter_test:HTML extraction failed (exit 1)"])
 
     async def test_schema_exposes_readable_http_fetch_without_raw_mode(self):
         tools = await self.server.mcp.list_tools()

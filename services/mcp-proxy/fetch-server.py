@@ -37,7 +37,7 @@ async def fetch(
     try:
         content, _ = await fetch_url(source, DEFAULT_USER_AGENT_AUTONOMOUS, force_raw=False)
     except subprocess.CalledProcessError as error:
-        logger.warning("HTML extraction failed for %s (exit %s)", source, error.returncode)
+        logger.warning("HTML extraction failed (exit %s)", error.returncode)
         return {
             "url": source,
             "error": "Readable text could not be extracted from this page. Use another source or the search excerpt.",
