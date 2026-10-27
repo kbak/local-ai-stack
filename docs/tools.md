@@ -5,6 +5,12 @@ including SSE and `/status`, require `Authorization: Bearer <MCP_PROXY_AUTH_TOKE
 The host port binds to loopback by default; containers use `http://mcp-proxy:8083`.
 Its tool definitions are in `config/mcp-proxy-config.json`.
 
+LibreChat's internal MCP connections explicitly set `requiresOAuth: false`.
+They use static bearer headers (or no authentication), so OAuth discovery must
+not interpret a missing bearer token as a request for user sign-in. This does
+not disable the servers' token checks. arXiv remains available to the Signal
+integration through the shared proxy, but is not exposed to LibreChat.
+
 | Tool group | Interface |
 | --- | --- |
 | Search, fetch, papers, transcripts, time, weather, currency, finance, GitHub, maps, browser | `http://<server>:8083/servers/<name>/mcp` |

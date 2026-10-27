@@ -104,15 +104,15 @@ test('does not create an agent when the configured agent is missing', async () =
 });
 
 
-test('removes finance while preserving arxiv and caps excessive agent context', async () => {
+test('removes finance and arxiv tools and servers while preserving web tools and capping context', async () => {
   const writes = await runRenderer({ doc: {
-    _id: 'agent', tools: ['sys__server__sys_mcp_finance', 'get_stock_info_mcp_finance', 'search_papers_mcp_arxiv', 'fetch_mcp_fetch'],
-    mcpServerNames: ['finance', 'arxiv', 'fetch'],
+    _id: 'agent', tools: ['sys__server__sys_mcp_finance', 'get_stock_info_mcp_finance', 'sys__server__sys_mcp_arxiv', 'search_papers_mcp_arxiv', 'web_search_mcp_searxng', 'fetch_mcp_fetch'],
+    mcpServerNames: ['finance', 'arxiv', 'searxng', 'fetch'],
     model_parameters: { maxContextTokens: 262144, max_tokens: 8192 },
   } });
   const update = writes[0].update.$set;
-  assert.deepEqual(update.tools, ['search_papers_mcp_arxiv', 'fetch_mcp_fetch', 'image_gen_oai']);
-  assert.deepEqual(update.mcpServerNames, ['arxiv', 'fetch']);
+  assert.deepEqual(update.tools, ['web_search_mcp_searxng', 'fetch_mcp_fetch', 'image_gen_oai']);
+  assert.deepEqual(update.mcpServerNames, ['searxng', 'fetch']);
   assert.equal(update['model_parameters.maxContextTokens'], 114688);
   assert.equal(update.model_parameters, undefined);
 });
