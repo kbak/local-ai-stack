@@ -64,7 +64,7 @@ def _from_running(base: str, pattern: re.Pattern[str]) -> str | None:
         resp.raise_for_status()
         running = resp.json().get("running", [])
     except Exception as e:
-        log.debug("llama-swap /running unreachable: %s", e)
+        log.warning("llama-swap /running check failed (%s): %s", type(e).__name__, e)
         return None
     ready = [
         entry.get("model")
@@ -128,19 +128,22 @@ def resolve_model(
             break
         if deadline is None or time.monotonic() >= deadline:
             break
+        delay = min(backoff, deadline - time.monotonic())
+        if delay <= 0:
+            break
         log.info(
             "llama-swap not yet ready at %s, retrying in %.1fs (deadline %.0fs away)",
-            base, backoff, deadline - time.monotonic(),
+            base, delay, deadline - time.monotonic(),
         )
-        time.sleep(backoff)
+        time.sleep(delay)
         backoff = min(backoff * 2.0, 15.0)
 
     if not picked:
         picked = os.environ.get("LLM_MODEL_FALLBACK")
     if not picked:
         raise RuntimeError(
-            "Could not resolve an LLM model: no ready non-coder model is "
-            "currently loaded and no explicit LLM_MODEL / "
+            "Could not resolve an LLM model: readiness check failed or no ready "
+            "non-coder model is currently loaded, and no explicit LLM_MODEL / "
             "LLM_MODEL_FALLBACK is set."
         )
 

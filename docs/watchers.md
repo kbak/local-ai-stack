@@ -49,6 +49,10 @@ user account; it does not add a bot to the group.
 `RSS_FEEDS` maps category names to feed URL lists. News summaries run at 00:05 and
 12:05 UTC and cover the preceding 12 hours. Each category is summarized
 independently. Set the sources and optional voice delivery in `rss-watcher.env`.
+Before each category summary, model discovery retries with backoff for up to two
+minutes if the readiness endpoint fails or no suitable loaded model is ready.
+Discovery failures are logged with their exception type. Signal delivery is not
+retried by this mechanism.
 
 For the weekly digest, copy `services/rss-watcher/blog-sources.example.json` to the ignored
 `services/rss-watcher/blog-sources.json`, replace its examples, and set `BLOG_SOURCES_FILE`.

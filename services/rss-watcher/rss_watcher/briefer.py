@@ -6,6 +6,7 @@ import logging
 import os
 
 from stack_shared.llm_chat import chat
+from stack_shared.llm_model import resolve_model
 from stack_shared.rss_fetch import fetch_category
 from stack_shared.signal_client import send_message
 from stack_shared.voice_note import send_text_and_voice_brief
@@ -68,6 +69,7 @@ def run_news_brief() -> None:
         summary = chat(
             _SYSTEM_PROMPT.format(hours=RSS_LOOKBACK_HOURS, category=category),
             user_prompt,
+            model=resolve_model(startup_timeout=120),
         )
         parts.append(f"*{category.upper()}*\n{summary}")
 
